@@ -7,7 +7,7 @@ import JSZip from "jszip";
 interface InstallCommunityPluginsSettings {
 	loadSettingsOnInstall: boolean;
 	loadSettingsOnStartup: boolean;
-	autoInstallPlugins: boolean; // новая настройка — автоустановка плагинов
+	autoInstallPlugins: boolean;
 }
 
 const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
