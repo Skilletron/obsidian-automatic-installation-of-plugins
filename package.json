@@ -1,0 +1,28 @@
+{
+	"name": "Automatic installation of plugins",
+	"version": "1.0.0",
+	"main": "main.js",
+	"description": "Allows you to use `community-plugins.js` to search for and automatically install plugins when you launch `obsidian`.",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [],
+	"author": "Konstantin Volobuev",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/jszip": "^3.4.1",
+		"@types/node": "^16.11.6",
+		"@typescript-eslint/eslint-plugin": "5.29.0",
+		"@typescript-eslint/parser": "5.29.0",
+		"builtin-modules": "3.3.0",
+		"esbuild": "0.17.3",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "4.7.4"
+	},
+	"dependencies": {
+		"jszip": "^3.10.1"
+	}
+}
