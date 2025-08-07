@@ -222,7 +222,6 @@ export default class InstallCommunityPlugins extends Plugin {
 				return;
 			}
 
-			// Применяем настройки из community-plugins-settings.json, если включено и файл существует
 			if (
 				this.settings.loadSettingsOnInstall &&
 				fs.existsSync(settingsFile)
