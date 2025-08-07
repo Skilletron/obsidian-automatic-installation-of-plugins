@@ -30,12 +30,11 @@ jobs:
           test -f manifest.json || (echo "❌ manifest.json missing!" && exit 1)
           test -f main.js || (echo "❌ main.js missing!" && exit 1)
 
-      - name: Create plugin zip
-        run: zip plugin.zip manifest.json main.js styles.css || true
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: plugin.zip
+          files: |
+            manifest.json
+            main.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
