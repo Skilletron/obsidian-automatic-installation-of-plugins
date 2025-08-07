@@ -1,0 +1,26 @@
+name: Release Obsidian Plugin
+on:
+    push:
+        tags:
+            - "*"
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
+            - name: Use Node.js
+              uses: actions/setup-node@v1
+              with:
+                  node-version: "14.x"
+            - name: Build plugin
+              run: npm install && npm run build
+            - name: Create ZIP artifact
+              run: zip -r plugin.zip manifest.json main.js styles.css
+            - name: Create GitHub Release
+              uses: ncipollo/release-action@v1
+              with:
+                  tag: ${{ github.ref_name }}
+                  files: plugin.zip
