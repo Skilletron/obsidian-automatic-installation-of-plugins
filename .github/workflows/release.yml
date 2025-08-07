@@ -1,26 +1,41 @@
 name: Release Obsidian Plugin
+
 on:
-    push:
-        tags:
-            - "*"
+  push:
+    tags:
+      - '*'
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v2
-              with:
-                  fetch-depth: 0
-            - name: Use Node.js
-              uses: actions/setup-node@v1
-              with:
-                  node-version: "14.x"
-            - name: Build plugin
-              run: npm install && npm run build
-            - name: Create ZIP artifact
-              run: zip -r plugin.zip manifest.json main.js styles.css
-            - name: Create GitHub Release
-              uses: ncipollo/release-action@v1
-              with:
-                  tag: ${{ github.ref_name }}
-                  files: plugin.zip
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Check files exist
+        run: |
+          test -f manifest.json || (echo "❌ manifest.json missing!" && exit 1)
+          test -f main.js || (echo "❌ main.js missing!" && exit 1)
+
+      - name: Create plugin zip
+        run: zip plugin.zip manifest.json main.js styles.css || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: plugin.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
