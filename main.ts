@@ -1,4 +1,11 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from "obsidian";
+import {
+	App,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	Notice,
+	FileSystemAdapter,
+} from "obsidian";
 import * as fs from "fs";
 import * as path from "path";
 import * as https from "https";
@@ -49,19 +56,25 @@ export default class InstallCommunityPlugins extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	private getBasePathAndConfigDir() {
+		const adapter = this.app.vault.adapter as FileSystemAdapter;
+		const basePath = adapter.getBasePath();
+		const configDir = this.app.vault.configDir;
+		return { basePath, configDir };
+	}
+
 	async applySettingsToInstalledPlugins() {
-		const adapterWithBasePath = this.app.vault.adapter as any;
-		const basePath = adapterWithBasePath.basePath;
-		const pluginsFolder = path.join(basePath, ".obsidian", "plugins");
+		const { basePath, configDir } = this.getBasePathAndConfigDir();
+		const pluginsFolder = path.join(basePath, configDir, "plugins");
 		const settingsFile = path.join(
 			basePath,
-			".obsidian",
+			configDir,
 			"community-plugins-settings.json"
 		);
 
 		if (!fs.existsSync(settingsFile)) {
-			console.log(
-				"[Installer] No community-plugins-settings.json file found, skipping applying settings on startup."
+			new Notice(
+				`[Installer] No community-plugins-settings.json file found, skipping applying settings on startup`
 			);
 			return;
 		}
@@ -71,10 +84,6 @@ export default class InstallCommunityPlugins extends Plugin {
 			const rawSettings = fs.readFileSync(settingsFile, "utf-8");
 			allSettings = JSON.parse(rawSettings);
 		} catch (e) {
-			console.warn(
-				"[Installer] Failed to parse community-plugins-settings.json on startup",
-				e
-			);
 			return;
 		}
 
@@ -89,13 +98,9 @@ export default class InstallCommunityPlugins extends Plugin {
 						JSON.stringify(allSettings[pluginId], null, 2),
 						"utf-8"
 					);
-					console.log(
-						`[Installer] Applied settings on startup to plugin ${pluginId}`
-					);
 				} catch (e) {
-					console.warn(
-						`[Installer] Failed to write data.json for plugin ${pluginId} on startup`,
-						e
+					new Notice(
+						`[Installer] Failed to write data.json for plugin ${pluginId} on startup`
 					);
 				}
 			}
@@ -103,10 +108,10 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async installPluginsFromFile() {
-		const adapterWithBasePath = this.app.vault.adapter as any;
+		const { basePath, configDir } = this.getBasePathAndConfigDir();
 		const pluginsJsonPath = path.join(
-			adapterWithBasePath.basePath,
-			".obsidian",
+			basePath,
+			configDir,
 			"community-plugins.json"
 		);
 
@@ -122,29 +127,22 @@ export default class InstallCommunityPlugins extends Plugin {
 				await this.installPluginById(pluginId);
 			}
 		} catch (e) {
-			console.error("Failed to read or parse community-plugins.json", e);
 			new Notice("Error reading community-plugins.json. See console.");
 		}
 	}
 
 	async installPluginById(pluginId: string) {
-		const adapterWithBasePath = this.app.vault.adapter as any;
-		const basePath = adapterWithBasePath.basePath;
-		const pluginsFolder = path.join(basePath, ".obsidian", "plugins");
+		const { basePath, configDir } = this.getBasePathAndConfigDir();
+		const pluginsFolder = path.join(basePath, configDir, "plugins");
 		const pluginFolder = path.join(pluginsFolder, pluginId);
 		const settingsFile = path.join(
 			basePath,
-			".obsidian",
+			configDir,
 			"community-plugins-settings.json"
 		);
 
-		console.log(`[Installer] Installing plugin: ${pluginId}`);
-
 		if (fs.existsSync(pluginFolder)) {
 			new Notice(`Plugin "${pluginId}" already installed.`);
-			console.log(
-				`[Installer] Plugin folder exists, skipping install: ${pluginId}`
-			);
 			return;
 		}
 
@@ -152,11 +150,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			"https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json";
 
 		try {
-			console.log(`[Installer] Fetching plugin registry...`);
 			const pluginRegistry = await this.fetchJson(registryUrl);
-			console.log(
-				`[Installer] Registry fetched, searching for plugin...`
-			);
 			const normalizedId = pluginId.trim().toLowerCase();
 			const pluginMeta = pluginRegistry.find(
 				(p: any) => p.id.trim().toLowerCase() === normalizedId
@@ -164,23 +158,14 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			if (!pluginMeta) {
 				new Notice(`Plugin "${pluginId}" not found in registry`);
-				console.log(
-					`[Installer] Plugin not found in registry: ${pluginId}`
-				);
 				return;
 			}
 
 			const [owner, repo] = pluginMeta.repo.split("/");
-			console.log(
-				`[Installer] Fetching latest release for ${owner}/${repo}...`
-			);
 			const release = await this.fetchJson(
 				`https://api.github.com/repos/${owner}/${repo}/releases/latest`
 			);
 
-			console.log(
-				`[Installer] Release info received. Preparing folders...`
-			);
 			if (!fs.existsSync(pluginFolder)) {
 				fs.mkdirSync(pluginFolder, { recursive: true });
 			}
@@ -190,25 +175,15 @@ export default class InstallCommunityPlugins extends Plugin {
 			);
 			if (zipAsset) {
 				const zipPath = path.join(pluginsFolder, `${pluginId}.zip`);
-				console.log(
-					`[Installer] Downloading zip asset: ${zipAsset.browser_download_url}`
-				);
 				await this.downloadFileWithRedirect(
 					zipAsset.browser_download_url,
 					zipPath
 				);
-				console.log(`[Installer] Unzipping plugin...`);
 				await this.unzipPlugin(zipPath, pluginFolder, pluginId);
 				fs.unlinkSync(zipPath);
 			} else if (release.assets && release.assets.length > 0) {
-				console.log(
-					`[Installer] No zip asset found, downloading individual assets...`
-				);
 				for (const asset of release.assets) {
 					const destPath = path.join(pluginFolder, asset.name);
-					console.log(
-						`[Installer] Downloading asset: ${asset.browser_download_url}`
-					);
 					await this.downloadFileWithRedirect(
 						asset.browser_download_url,
 						destPath
@@ -216,9 +191,6 @@ export default class InstallCommunityPlugins extends Plugin {
 				}
 			} else {
 				new Notice(`No zip or assets found for plugin "${pluginId}"`);
-				console.log(
-					`[Installer] No zip or assets in release: ${pluginId}`
-				);
 				return;
 			}
 
@@ -239,25 +211,16 @@ export default class InstallCommunityPlugins extends Plugin {
 							JSON.stringify(allSettings[pluginId], null, 2),
 							"utf-8"
 						);
-						console.log(
-							`[Installer] Applied saved settings to plugin ${pluginId} data.json`
-						);
 					}
 				} catch (e) {
-					console.warn(
-						`[Installer] Failed to apply settings for plugin ${pluginId}`,
-						e
+					new Notice(
+						`[Installer] Failed to apply settings for plugin ${pluginId}`
 					);
 				}
 			}
 
 			new Notice(`Plugin "${pluginId}" installed.`);
-			console.log(`[Installer] Installation finished: ${pluginId}`);
 		} catch (error) {
-			console.error(
-				`[Installer] Failed to install plugin "${pluginId}":`,
-				error
-			);
 			new Notice(`Failed to install plugin "${pluginId}". See console.`);
 		}
 	}
