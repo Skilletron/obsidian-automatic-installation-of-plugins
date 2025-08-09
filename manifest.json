@@ -1,9 +1,9 @@
 {
 	"id": "automatic-installation-of-plugins",
 	"name": "Automatic Installation of Plugins",
-	"version": "1.0.2",
-	"minAppVersion": "1.0.2",
-	"description": "Automatically installs plugins listed in community-plugins.js when Obsidian starts.",
+	"version": "1.0.3",
+	"minAppVersion": "1.0.3",
+	"description": "Automatically installs plugins listed in community-plugins-list.json on launch and sync settings for plugins with community-plugins-settings.json.",
 	"author": "Konstantin Volobuev",
 	"authorUrl": "https://github.com/Skilletron",
 	"isDesktopOnly": true
