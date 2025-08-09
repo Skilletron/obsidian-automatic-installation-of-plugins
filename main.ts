@@ -57,10 +57,16 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	private getBasePathAndConfigDir() {
-		const adapter = this.app.vault.adapter as FileSystemAdapter;
-		const basePath = adapter.getBasePath();
-		const configDir = this.app.vault.configDir;
-		return { basePath, configDir };
+		const adapter = this.app.vault.adapter;
+		if (adapter instanceof FileSystemAdapter) {
+			const basePath = adapter.getBasePath();
+			const configDir = this.app.vault.configDir;
+			return { basePath, configDir };
+		} else {
+			throw new Error(
+				"Base path is only available on desktop (FileSystemAdapter)."
+			);
+		}
 	}
 
 	async applySettingsToInstalledPlugins() {
@@ -112,22 +118,32 @@ export default class InstallCommunityPlugins extends Plugin {
 		const pluginsJsonPath = path.join(
 			basePath,
 			configDir,
-			"community-plugins.json"
+			"community-plugins-list.json"
 		);
 
 		if (!fs.existsSync(pluginsJsonPath)) {
-			new Notice(`File not found: ${pluginsJsonPath}`);
+			fs.writeFileSync(pluginsJsonPath, "[]", "utf-8");
+			new Notice(`[Installer] Created empty community-plugins-list.json`);
 			return;
 		}
 
 		try {
 			const content = fs.readFileSync(pluginsJsonPath, "utf-8");
 			const pluginIds: string[] = JSON.parse(content);
+
+			if (!Array.isArray(pluginIds) || pluginIds.length === 0) {
+				new Notice("[Installer] No plugins to install.");
+				return;
+			}
+
 			for (const pluginId of pluginIds) {
 				await this.installPluginById(pluginId);
 			}
 		} catch (e) {
-			new Notice("Error reading community-plugins.json. See console.");
+			new Notice(
+				"Error reading community-plugins-list.json. See console."
+			);
+			console.error(e);
 		}
 	}
 
@@ -374,7 +390,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Auto install plugins on startup")
 			.setDesc(
-				"If enabled, plugins from community-plugins.json will be automatically installed on Obsidian startup."
+				"If enabled, plugins from community-plugins-list.json will be automatically installed on Obsidian startup."
 			)
 			.addToggle((toggle) =>
 				toggle

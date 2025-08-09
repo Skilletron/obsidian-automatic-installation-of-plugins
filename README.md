@@ -1,10 +1,10 @@
 # obsidian-automatic-installation-of-plugins
 
-This Obsidian plugin automatically installs and configures community plugins based on the `community-plugins.json` file on vault startup.
+This Obsidian plugin automatically installs and configures community plugins based on the `community-plugins-list.json` file on vault startup.
 
 ## 🔧 Features
 
-- ✅ Automatically installs missing community plugins defined in `community-plugins.json`
+- ✅ Automatically installs missing community plugins defined in `community-plugins-list.json`
 - ✅ Loads and enables installed plugins at startup
 - ✅ Applies predefined plugin settings from `community-plugins-settings.json`
 - ✅ Writes default plugin settings to `community-plugins-settings.json` on install if not already present
@@ -20,11 +20,11 @@ This plugin relies on two configuration files in your vault root:
 .vault/
 ├── .obsidian/
 │   ├── plugins/
-│   ├── community-plugins.json
+│   ├── community-plugins-list.json
 │   └── community-plugins-settings.json
 ```
 
-- **`community-plugins.json`** — array of plugin IDs to install and enable
+- **`community-plugins-list.json`** — array of plugin IDs to install and enable
 - **`community-plugins-settings.json`** — an object where each key is a plugin ID and value is the plugin settings
 
 ## 🧠 Use cases
@@ -35,7 +35,7 @@ This plugin relies on two configuration files in your vault root:
 
 ## 🗂️ Example
 
-### community-plugins.json
+### community-plugins-list.json
 
 ```json
 [
