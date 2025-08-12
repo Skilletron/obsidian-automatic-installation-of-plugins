@@ -4,10 +4,9 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -22,25 +21,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
-      - name: Update version in manifest.json and package.json
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}
-
-          echo "Updating manifest.json to $VERSION"
-          jq --arg v "$VERSION" '.version = $v' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
-
-          echo "Updating package.json to $VERSION"
-          jq --arg v "$VERSION" '.version = $v' package.json > package.tmp && mv package.tmp package.json
-
-      - name: Commit updated version files
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifest.json package.json
-          git commit -m "chore: update version to ${VERSION}"
-          git push origin HEAD:${GITHUB_REF#refs/heads/} || git push origin HEAD:${GITHUB_REF}
 
       - name: Build plugin
         run: npm run build
