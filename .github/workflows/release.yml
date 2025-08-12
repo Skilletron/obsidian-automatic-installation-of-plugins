@@ -49,14 +49,14 @@ jobs:
       - name: Create tag
         run: |
           VERSION=${{ github.event.inputs.version }}
-          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git tag -a "$VERSION" -m "$VERSION"
           git push origin "v$VERSION"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: Release v${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
           files: |
             manifest.json
             main.js
