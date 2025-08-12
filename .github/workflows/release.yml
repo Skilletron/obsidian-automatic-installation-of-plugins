@@ -1,9 +1,11 @@
-name: Release Obsidian Plugin
+name: Prepare & Release Obsidian Plugin
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (without v)'
+        required: true
 
 jobs:
   release:
@@ -22,17 +24,39 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Update manifest.json and package.json
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+
+          echo "Updating manifest.json to $VERSION"
+          jq --arg v "$VERSION" '.version = $v' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+
+          echo "Updating package.json to $VERSION"
+          jq --arg v "$VERSION" '.version = $v' package.json > package.tmp && mv package.tmp package.json
+
       - name: Build plugin
         run: npm run build
 
-      - name: Check files exist
+      - name: Commit changes
         run: |
-          test -f manifest.json || (echo "❌ manifest.json missing!" && exit 1)
-          test -f main.js || (echo "❌ main.js missing!" && exit 1)
+          VERSION=${{ github.event.inputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json package.json main.js
+          git commit -m "chore: release v$VERSION"
+          git push origin HEAD
+
+      - name: Create tag
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
           files: |
             manifest.json
             main.js
