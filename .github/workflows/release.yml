@@ -37,12 +37,12 @@ jobs:
       - name: Build plugin
         run: npm run build
 
-      - name: Commit changes
+      - name: Commit changes (force add main.js)
         run: |
           VERSION=${{ github.event.inputs.version }}
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manifest.json package.json main.js
+          git add manifest.json package.json -f main.js
           git commit -m "chore: release v$VERSION"
           git push origin HEAD
 
