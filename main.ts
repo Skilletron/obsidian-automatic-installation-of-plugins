@@ -64,7 +64,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			return { basePath, configDir };
 		} else {
 			throw new Error(
-				"Base path is only available on desktop (FileSystemAdapter)."
+				"Base path is only available on desktop."
 			);
 		}
 	}
