@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.9)'
+        required: true
+        type: string
 
 jobs:
   build:
@@ -12,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -20,11 +29,53 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Update version (manual release)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          # Check if version tag already exists (without v prefix)
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists. Please use a different version or delete the existing tag."
+            exit 1
+          fi
+          
+          # Update version in package.json
+          npm version $VERSION --no-git-tag-version
+          
+          # Update manifest.json and versions.json
+          node -e "
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+            manifest.version = '${{ github.event.inputs.version }}';
+            fs.writeFileSync('manifest.json', JSON.stringify(manifest, null, '\t'));
+            
+            const versions = JSON.parse(fs.readFileSync('versions.json', 'utf8'));
+            versions['${{ github.event.inputs.version }}'] = manifest.minAppVersion;
+            fs.writeFileSync('versions.json', JSON.stringify(versions, null, '\t'));
+          "
+          
+          # Commit version changes
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json versions.json package.json
+          git commit -m "Bump version to ${{ github.event.inputs.version }}"
+          
+          # Create and push tag (without v prefix for Obsidian compatibility)
+          git tag -a "$VERSION" -m "Release version $VERSION"
+          git push origin main
+          git push origin "$VERSION"
+      
       - name: Get version
         id: version
         run: |
-          VERSION=$(node -p "require('./manifest.json').version")
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(node -p "require('./manifest.json').version")
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+      
       - name: Create release
         uses: obsidian-tools/obsidian-release-action@v1
         with:
