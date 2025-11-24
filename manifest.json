@@ -1,9 +1,9 @@
 {
   "id": "automatic-installation-of-plugins",
-  "name": "Automatic Installation of Plugins",
+  "name": "Automatic Plugin Manager",
   "version": "1.0.8",
   "minAppVersion": "1.0.3",
-  "description": "Automatically installs plugins listed in community-plugins-list.json on launch and sync settings for plugins with community-plugins-settings.json.",
+  "description": "Automatically install, enable, and configure community plugins from a simple JSON file. Perfect for syncing plugin setups across devices or sharing vault configurations with predefined plugins and settings.",
   "author": "Konstantin Volobuev",
   "authorUrl": "https://github.com/Skilletron",
   "isDesktopOnly": true

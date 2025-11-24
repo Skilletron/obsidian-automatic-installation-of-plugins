@@ -4,30 +4,47 @@ import {
 	PluginSettingTab,
 	Setting,
 	Notice,
-	FileSystemAdapter,
 } from "obsidian";
-import * as fs from "fs";
 import * as path from "path";
-import * as https from "https";
-import JSZip from "jszip";
+import { FileManager } from "./src/utils/FileManager";
+import { NetworkManager } from "./src/utils/NetworkManager";
+import { SettingsManager } from "./src/core/SettingsManager";
+import { PluginInstaller } from "./src/core/PluginInstaller";
+import { PluginEnabler } from "./src/core/PluginEnabler";
+import {
+	InstallCommunityPluginsSettings,
+	DEFAULT_SETTINGS,
+	PLUGINS_LIST_FILE,
+	PLUGINS_SETTINGS_FILE,
+} from "./src/types";
+import { logger, LogLevel } from "./src/utils/Logger";
 
-interface InstallCommunityPluginsSettings {
-	loadSettingsOnInstall: boolean;
-	loadSettingsOnStartup: boolean;
-	autoInstallPlugins: boolean;
-}
-
-const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
-	loadSettingsOnInstall: true,
-	loadSettingsOnStartup: true,
-	autoInstallPlugins: true,
-};
-
+/**
+ * Plugin that automatically installs and configures community plugins
+ * based on configuration files in the vault.
+ */
 export default class InstallCommunityPlugins extends Plugin {
 	settings: InstallCommunityPluginsSettings;
+	fileManager: FileManager;
+	networkManager: NetworkManager;
+	settingsManager: SettingsManager;
+	pluginInstaller: PluginInstaller;
+	pluginEnabler: PluginEnabler;
 
 	async onload() {
 		await this.loadSettings();
+
+		// Initialize managers
+		this.fileManager = new FileManager(this.app);
+		this.networkManager = new NetworkManager();
+		this.settingsManager = new SettingsManager(this.fileManager);
+		this.pluginInstaller = new PluginInstaller(
+			this.fileManager,
+			this.networkManager,
+			this.settingsManager,
+			this.settings.loadSettingsOnInstall
+		);
+		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
 
 		if (this.settings.loadSettingsOnStartup) {
 			await this.applySettingsToInstalledPlugins();
@@ -38,6 +55,17 @@ export default class InstallCommunityPlugins extends Plugin {
 			await this.installPluginsFromFile();
 			new Notice("Installation process finished.");
 		}
+
+		// Add command for manual installation
+		this.addCommand({
+			id: "install-plugins",
+			name: "Install plugins from list",
+			callback: async () => {
+				new Notice("Starting manual plugin installation...");
+				await this.installPluginsFromFile();
+				new Notice("Manual installation finished.");
+			},
+		});
 
 		this.addSettingTab(
 			new InstallCommunityPluginsSettingTab(this.app, this)
@@ -50,327 +78,192 @@ export default class InstallCommunityPlugins extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		
+		// Set log level from settings
+		const logLevelMap: Record<string, LogLevel> = {
+			debug: LogLevel.DEBUG,
+			info: LogLevel.INFO,
+			warn: LogLevel.WARN,
+			error: LogLevel.ERROR,
+			none: LogLevel.NONE,
+		};
+		const level = logLevelMap[this.settings.logLevel || "info"] || LogLevel.INFO;
+		logger.setLevel(level);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
-	private getBasePathAndConfigDir() {
-		const adapter = this.app.vault.adapter;
-		if (adapter instanceof FileSystemAdapter) {
-			const basePath = adapter.getBasePath();
-			const configDir = this.app.vault.configDir;
-			return { basePath, configDir };
-		} else {
-			throw new Error(
-				"Base path is only available on desktop."
-			);
-		}
-	}
-
+	/**
+	 * Applies settings from community-plugins-settings.json to installed plugins.
+	 */
 	async applySettingsToInstalledPlugins() {
-		const { basePath, configDir } = this.getBasePathAndConfigDir();
-		const pluginsFolder = path.join(basePath, configDir, "plugins");
-		const settingsFile = path.join(
-			basePath,
-			configDir,
-			"community-plugins-settings.json"
-		);
-
-		if (!fs.existsSync(settingsFile)) {
-			new Notice(
-				`[Installer] No community-plugins-settings.json file found, skipping applying settings on startup`
-			);
-			return;
-		}
-
-		let allSettings: Record<string, any>;
 		try {
-			const rawSettings = fs.readFileSync(settingsFile, "utf-8");
-			allSettings = JSON.parse(rawSettings);
-		} catch (e) {
-			return;
-		}
+			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
+			const pluginsFolder = path.join(basePath, configDir, "plugins");
+			const settingsFile = path.join(basePath, configDir, PLUGINS_SETTINGS_FILE);
 
-		for (const pluginId of Object.keys(allSettings)) {
-			const pluginFolder = path.join(pluginsFolder, pluginId);
-			const dataJsonPath = path.join(pluginFolder, "data.json");
-
-			if (fs.existsSync(pluginFolder) && allSettings[pluginId]) {
-				try {
-					fs.writeFileSync(
-						dataJsonPath,
-						JSON.stringify(allSettings[pluginId], null, 2),
-						"utf-8"
-					);
-				} catch (e) {
-					new Notice(
-						`[Installer] Failed to write data.json for plugin ${pluginId} on startup`
-					);
-				}
-			}
+			await this.settingsManager.applySettingsToInstalledPlugins(
+				pluginsFolder,
+				settingsFile
+			);
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
+			new Notice(
+				`[Installer] Cannot access file system: ${errorMessage}`
+			);
+			logger.error("File system access error:", error);
 		}
 	}
 
+	/**
+	 * Installs plugins listed in community-plugins-list.json.
+	 */
 	async installPluginsFromFile() {
-		const { basePath, configDir } = this.getBasePathAndConfigDir();
-		const pluginsJsonPath = path.join(
-			basePath,
-			configDir,
-			"community-plugins-list.json"
-		);
-
-		if (!fs.existsSync(pluginsJsonPath)) {
-			fs.writeFileSync(pluginsJsonPath, "[]", "utf-8");
-			new Notice(`[Installer] Created empty community-plugins-list.json`);
-			return;
-		}
-
 		try {
-			const content = fs.readFileSync(pluginsJsonPath, "utf-8");
-			const pluginIds: string[] = JSON.parse(content);
+			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
+			const pluginsJsonPath = path.join(
+				basePath,
+				configDir,
+				PLUGINS_LIST_FILE
+			);
+			const pluginsFolder = path.join(basePath, configDir, "plugins");
+			const settingsFile = path.join(basePath, configDir, PLUGINS_SETTINGS_FILE);
 
-			if (!Array.isArray(pluginIds) || pluginIds.length === 0) {
+			if (!this.fileManager.fileExists(pluginsJsonPath)) {
+				try {
+					if (!this.fileManager.isFileSystemAccessible(pluginsJsonPath)) {
+						new Notice(
+							`[Installer] Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`
+						);
+						return;
+					}
+					this.fileManager.writeFile(pluginsJsonPath, "[]");
+					new Notice(`[Installer] Created empty ${PLUGINS_LIST_FILE}`);
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : "Unknown error";
+					new Notice(
+						`[Installer] Failed to create ${PLUGINS_LIST_FILE}: ${errorMessage}`
+					);
+				logger.error(`Failed to create ${PLUGINS_LIST_FILE}:`, error);
+				}
+				return;
+			}
+
+			const content = this.fileManager.readFile(pluginsJsonPath);
+			if (!content) {
+				return;
+			}
+
+			const pluginIds = this.fileManager.parseJsonWithValidation<string[]>(
+				content,
+				PLUGINS_LIST_FILE
+			);
+
+			if (!pluginIds) {
+				return;
+			}
+
+			if (!Array.isArray(pluginIds)) {
+				new Notice(
+					`[Installer] ${PLUGINS_LIST_FILE} must contain an array of plugin IDs.`
+				);
+				return;
+			}
+
+			if (pluginIds.length === 0) {
 				new Notice("[Installer] No plugins to install.");
 				return;
 			}
 
-			for (const pluginId of pluginIds) {
-				await this.installPluginById(pluginId);
-			}
-		} catch (e) {
-			new Notice(
-				"Error reading community-plugins-list.json. See console."
+			// Validate plugin IDs are strings
+			const invalidIds = pluginIds.filter(
+				(id) => typeof id !== "string" || id.trim() === ""
 			);
-			console.error(e);
-		}
-	}
-
-	async installPluginById(pluginId: string) {
-		const { basePath, configDir } = this.getBasePathAndConfigDir();
-		const pluginsFolder = path.join(basePath, configDir, "plugins");
-		const pluginFolder = path.join(pluginsFolder, pluginId);
-		const settingsFile = path.join(
-			basePath,
-			configDir,
-			"community-plugins-settings.json"
-		);
-
-		if (fs.existsSync(pluginFolder)) {
-			new Notice(`Plugin "${pluginId}" already installed.`);
-			return;
-		}
-
-		const registryUrl =
-			"https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json";
-
-		try {
-			const pluginRegistry = await this.fetchJson(registryUrl);
-			const normalizedId = pluginId.trim().toLowerCase();
-			const pluginMeta = pluginRegistry.find(
-				(p: any) => p.id.trim().toLowerCase() === normalizedId
-			);
-
-			if (!pluginMeta) {
-				new Notice(`Plugin "${pluginId}" not found in registry`);
-				return;
-			}
-
-			const [owner, repo] = pluginMeta.repo.split("/");
-			const release = await this.fetchJson(
-				`https://api.github.com/repos/${owner}/${repo}/releases/latest`
-			);
-
-			if (!fs.existsSync(pluginFolder)) {
-				fs.mkdirSync(pluginFolder, { recursive: true });
-			}
-
-			const zipAsset = release.assets.find((a: any) =>
-				a.name.endsWith(".zip")
-			);
-			if (zipAsset) {
-				const zipPath = path.join(pluginsFolder, `${pluginId}.zip`);
-				await this.downloadFileWithRedirect(
-					zipAsset.browser_download_url,
-					zipPath
+			if (invalidIds.length > 0) {
+				new Notice(
+					`[Installer] Invalid plugin IDs found in ${PLUGINS_LIST_FILE}. All entries must be non-empty strings.`
 				);
-				await this.unzipPlugin(zipPath, pluginFolder, pluginId);
-				fs.unlinkSync(zipPath);
-			} else if (release.assets && release.assets.length > 0) {
-				for (const asset of release.assets) {
-					const destPath = path.join(pluginFolder, asset.name);
-					await this.downloadFileWithRedirect(
-						asset.browser_download_url,
-						destPath
-					);
+				logger.warn("Invalid plugin IDs:", invalidIds);
+			}
+
+			// Install plugins with progress tracking
+			const validPluginIds = pluginIds.filter(
+				(id) => typeof id === "string" && id.trim() !== ""
+			);
+			const totalPlugins = validPluginIds.length;
+			let installedCount = 0;
+
+			for (let i = 0; i < validPluginIds.length; i++) {
+				const pluginId = validPluginIds[i].trim();
+				const current = i + 1;
+
+				new Notice(
+					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${pluginId}...`
+				);
+
+				const success = await this.pluginInstaller.installPluginById(
+					pluginId,
+					pluginsFolder,
+					settingsFile,
+					(bytesDownloaded) => {
+						// Progress callback for download
+						const mb = (bytesDownloaded / 1024 / 1024).toFixed(2);
+						logger.debug(`Downloaded ${mb} MB for ${pluginId}`);
+					}
+				);
+
+				if (success) {
+					installedCount++;
+				}
+			}
+
+			// Auto-enable plugins if setting is enabled
+			if (this.settings.autoEnablePlugins) {
+				const result = await this.pluginEnabler.enableInstalledPlugins(
+					validPluginIds,
+					(current, total, pluginId) => {
+						new Notice(
+							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`
+						);
+					}
+				);
+
+				if (result.enabled > 0) {
+					await this.pluginEnabler.refreshPluginsUI();
 				}
 			} else {
-				new Notice(`No zip or assets found for plugin "${pluginId}"`);
-				return;
+				// Even if auto-enable is off, refresh UI after installation
+				await this.pluginEnabler.refreshPluginsUI();
 			}
 
-			if (
-				this.settings.loadSettingsOnInstall &&
-				fs.existsSync(settingsFile)
-			) {
-				try {
-					const rawSettings = fs.readFileSync(settingsFile, "utf-8");
-					const allSettings = JSON.parse(rawSettings);
-					if (allSettings[pluginId]) {
-						const dataJsonPath = path.join(
-							pluginFolder,
-							"data.json"
-						);
-						fs.writeFileSync(
-							dataJsonPath,
-							JSON.stringify(allSettings[pluginId], null, 2),
-							"utf-8"
-						);
-					}
-				} catch (e) {
-					new Notice(
-						`[Installer] Failed to apply settings for plugin ${pluginId}`
-					);
-				}
+			// Show final summary
+			if (installedCount === totalPlugins) {
+				new Notice(
+					`[Installer] Successfully installed ${installedCount} plugin${installedCount > 1 ? "s" : ""}.`
+				);
+			} else {
+				new Notice(
+					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.`
+				);
 			}
-
-			new Notice(`Plugin "${pluginId}" installed.`);
 		} catch (error) {
-			new Notice(`Failed to install plugin "${pluginId}". See console.`);
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
+			new Notice(
+				`[Installer] Error during installation: ${errorMessage}. See console for details.`
+			);
+			logger.error("Installation error:", error);
 		}
-	}
-
-	fetchJson(url: string): Promise<any> {
-		return new Promise((resolve, reject) => {
-			https
-				.get(
-					url,
-					{ headers: { "User-Agent": "obsidian-plugin-installer" } },
-					(res) => {
-						if (res.statusCode !== 200) {
-							reject(new Error(`HTTP ${res.statusCode}: ${url}`));
-							return;
-						}
-						let data = "";
-						res.on("data", (chunk) => (data += chunk));
-						res.on("end", () => {
-							try {
-								resolve(JSON.parse(data));
-							} catch (err) {
-								reject(err);
-							}
-						});
-					}
-				)
-				.on("error", reject);
-		});
-	}
-
-	downloadFileWithRedirect(
-		url: string,
-		dest: string,
-		options: { headers?: Record<string, string> } = {},
-		maxRedirects = 5
-	): Promise<void> {
-		return new Promise((resolve, reject) => {
-			if (maxRedirects < 0) {
-				reject(new Error("Too many redirects"));
-				return;
-			}
-
-			const file = fs.createWriteStream(dest);
-
-			https
-				.get(url, { headers: options.headers || {} }, (res) => {
-					if (
-						res.statusCode &&
-						[301, 302, 303, 307, 308].includes(res.statusCode)
-					) {
-						const location = res.headers.location;
-						if (!location) {
-							reject(
-								new Error(
-									`Redirect status code ${res.statusCode} but no Location header`
-								)
-							);
-							return;
-						}
-						file.close();
-						fs.unlink(dest, () => {
-							this.downloadFileWithRedirect(
-								location,
-								dest,
-								options,
-								maxRedirects - 1
-							)
-								.then(resolve)
-								.catch(reject);
-						});
-						return;
-					}
-
-					if (res.statusCode !== 200) {
-						reject(
-							new Error(
-								`Failed to download file: ${res.statusCode} ${res.statusMessage}`
-							)
-						);
-						return;
-					}
-
-					res.pipe(file);
-					file.on("finish", () => {
-						file.close();
-						resolve();
-					});
-					file.on("error", (err) => {
-						fs.unlink(dest, () => reject(err));
-					});
-				})
-				.on("error", (err) => {
-					fs.unlink(dest, () => reject(err));
-				});
-		});
-	}
-
-	async unzipPlugin(
-		zipFilePath: string,
-		destFolder: string,
-		pluginId: string
-	) {
-		const data = fs.readFileSync(zipFilePath);
-		const zip = await JSZip.loadAsync(data);
-
-		if (!fs.existsSync(destFolder)) {
-			fs.mkdirSync(destFolder, { recursive: true });
-		}
-
-		const rootPrefix = pluginId + "/";
-
-		await Promise.all(
-			Object.keys(zip.files).map(async (filename) => {
-				let relativePath = filename.startsWith(rootPrefix)
-					? filename.slice(rootPrefix.length)
-					: filename;
-				if (!relativePath) return;
-
-				const filePath = path.join(destFolder, relativePath);
-				const file = zip.files[filename];
-
-				if (file.dir) {
-					if (!fs.existsSync(filePath))
-						fs.mkdirSync(filePath, { recursive: true });
-				} else {
-					const content = await file.async("nodebuffer");
-					fs.mkdirSync(path.dirname(filePath), { recursive: true });
-					fs.writeFileSync(filePath, content);
-				}
-			})
-		);
 	}
 }
 
+/**
+ * Settings tab for the Automatic Plugin Manager plugin.
+ */
 class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 	plugin: InstallCommunityPlugins;
 
@@ -384,13 +277,27 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("h2", {
-			text: "Install Community Plugins Settings",
+			text: "Automatic Plugin Manager Settings",
 		});
 
+		// Security warning
+		const warningDiv = containerEl.createDiv("setting-item-description");
+		warningDiv.createEl("strong", {
+			text: "⚠️ Security Warning: ",
+		});
+		warningDiv.appendText(
+			"This plugin automatically downloads and installs plugins from the Obsidian Community Plugins registry. Only use this plugin with trusted vaults and review the community-plugins-list.json file before enabling."
+		);
+		warningDiv.style.color = "var(--text-warning)";
+		warningDiv.style.marginBottom = "1.5em";
+		warningDiv.style.padding = "0.75em";
+		warningDiv.style.backgroundColor = "var(--background-modifier-border)";
+		warningDiv.style.borderRadius = "4px";
+
 		new Setting(containerEl)
-			.setName("Auto install plugins on startup")
+			.setName("🚀 Auto-install plugins on startup")
 			.setDesc(
-				"If enabled, plugins from community-plugins-list.json will be automatically installed on Obsidian startup."
+				"Automatically install missing plugins from your `community-plugins-list.json` file when Obsidian starts. Perfect for keeping your vault's plugin setup synchronized across devices."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -402,23 +309,44 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Load plugin settings on install")
+			.setName("⚡ Auto-enable plugins after installation")
 			.setDesc(
-				"If enabled, plugin configuration will be loaded from community-plugins-settings.json after installation."
+				"Automatically enable all installed plugins right after installation. The plugin list will be refreshed first to ensure newly installed plugins are recognized. This gives you a fully automated setup experience."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoEnablePlugins)
+					.onChange(async (value) => {
+						this.plugin.settings.autoEnablePlugins = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("⚙️ Apply settings on installation")
+			.setDesc(
+				"When a plugin is installed, automatically apply its configuration from `community-plugins-settings.json`. This ensures your plugins are configured exactly as you want them from the moment they're installed."
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.loadSettingsOnInstall)
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnInstall = value;
+						// Update pluginInstaller with new setting
+						this.plugin.pluginInstaller = new PluginInstaller(
+							this.plugin.fileManager,
+							this.plugin.networkManager,
+							this.plugin.settingsManager,
+							value
+						);
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
-			.setName("Load plugin settings on startup")
+			.setName("🔄 Sync settings on every startup")
 			.setDesc(
-				"If enabled, plugin configuration will be loaded from community-plugins-settings.json into installed plugins' data.json on Obsidian startup."
+				"On each Obsidian startup, re-apply plugin settings from `community-plugins-settings.json` to all installed plugins. This keeps your plugin configurations in sync even if you've made manual changes. Useful for maintaining consistent settings across multiple devices."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -428,5 +356,34 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("📝 Logging level")
+			.setDesc(
+				"Control how much information is logged to the console. Use Debug for troubleshooting, Info for normal operation, or Error to see only problems. Open the developer console (Ctrl+Shift+I) to view logs."
+			)
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("debug", "🐛 Debug (most verbose)")
+					.addOption("info", "ℹ️ Info (recommended)")
+					.addOption("warn", "⚠️ Warn (warnings only)")
+					.addOption("error", "❌ Error (errors only)")
+					.addOption("none", "🔇 None (no logging)")
+					.setValue(this.plugin.settings.logLevel || "info")
+					.onChange(async (value: "debug" | "info" | "warn" | "error" | "none") => {
+						this.plugin.settings.logLevel = value;
+						await this.plugin.saveSettings();
+						
+						// Update logger level immediately
+						const logLevelMap: Record<string, LogLevel> = {
+							debug: LogLevel.DEBUG,
+							info: LogLevel.INFO,
+							warn: LogLevel.WARN,
+							error: LogLevel.ERROR,
+							none: LogLevel.NONE,
+						};
+						logger.setLevel(logLevelMap[value] || LogLevel.INFO);
+					});
+			});
 	}
 }

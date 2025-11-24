@@ -1,14 +1,22 @@
 {
-  "name": "Automatic installation of plugins",
+  "name": "automatic-plugin-manager",
   "version": "1.0.8",
   "main": "main.js",
-  "description": "Allows you to use `community-plugins.js` to search for and automatically install plugins when you launch `obsidian`.",
+  "description": "Automatically install, enable, and configure Obsidian community plugins from JSON configuration files. Perfect for syncing plugin setups across devices.",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
-  "keywords": [],
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "plugin-manager",
+    "automatic-installation",
+    "plugin-sync",
+    "vault-configuration",
+    "community-plugins"
+  ],
   "author": "Konstantin Volobuev",
   "license": "MIT",
   "devDependencies": {
