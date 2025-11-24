@@ -1,6 +1,6 @@
 {
   "name": "automatic-plugin-manager",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "main": "main.js",
   "description": "Automatically install, enable, and configure Obsidian community plugins from JSON configuration files. Perfect for syncing plugin setups across devices.",
   "scripts": {
