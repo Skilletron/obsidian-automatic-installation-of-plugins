@@ -85,7 +85,6 @@ jobs:
           echo "Plugin name: $PLUGIN_NAME"
       
       - name: Create Release
-        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
@@ -94,29 +93,12 @@ jobs:
             ## Release ${{ steps.version.outputs.version }}
             
             See [CHANGELOG.md](CHANGELOG.md) for details.
+          files: |
+            main.js
+            manifest.json
+            versions.json
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload main.js
-        uses: softprops/action-gh-release@v1
-        with:
-          files: main.js
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload manifest.json
-        uses: softprops/action-gh-release@v1
-        with:
-          files: manifest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload versions.json
-        uses: softprops/action-gh-release@v1
-        with:
-          files: versions.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
@@ -125,5 +107,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: styles.css
+          tag_name: ${{ steps.version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
