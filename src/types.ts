@@ -1,5 +1,3 @@
-import { App, FileSystemAdapter } from "obsidian";
-
 export interface InstallCommunityPluginsSettings {
 	loadSettingsOnInstall: boolean;
 	loadSettingsOnStartup: boolean;

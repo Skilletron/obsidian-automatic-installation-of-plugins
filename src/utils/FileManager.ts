@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { App, FileSystemAdapter, Notice } from "obsidian";
-import { PathInfo, PLUGINS_SETTINGS_FILE } from "../types";
+import { PathInfo } from "../types";
 import { logger } from "./Logger";
 
 /**

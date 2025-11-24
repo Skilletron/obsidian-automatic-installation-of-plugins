@@ -98,7 +98,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	/**
 	 * Applies settings from community-plugins-settings.json to installed plugins.
 	 */
-	async applySettingsToInstalledPlugins() {
+	applySettingsToInstalledPlugins() {
 		try {
 			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
 			const pluginsFolder = path.join(basePath, configDir, "plugins");

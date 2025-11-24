@@ -170,8 +170,6 @@ export class PluginEnabler {
 						}
 					} catch (error) {
 						if (attempt === 2) {
-							const errorMessage =
-								error instanceof Error ? error.message : "Unknown error";
 							logger.error(`Failed to enable plugin "${pluginId}":`, error);
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
