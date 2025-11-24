@@ -180,7 +180,7 @@ export class PluginInstaller {
 
 			// Apply settings if configured
 			if (this.loadSettingsOnInstall) {
-				await this.settingsManager.applySettingsForPlugin(
+				this.settingsManager.applySettingsForPlugin(
 					pluginId,
 					pluginFolder,
 					settingsFile

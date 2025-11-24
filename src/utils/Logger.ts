@@ -20,25 +20,25 @@ class Logger {
 		return this.level;
 	}
 
-	debug(...args: any[]): void {
+	debug(...args: unknown[]): void {
 		if (this.level <= LogLevel.DEBUG) {
-			console.log("[Installer] [DEBUG]", ...args);
+			console.debug("[Installer] [DEBUG]", ...args);
 		}
 	}
 
-	info(...args: any[]): void {
+	info(...args: unknown[]): void {
 		if (this.level <= LogLevel.INFO) {
-			console.log("[Installer] [INFO]", ...args);
+			console.debug("[Installer] [INFO]", ...args);
 		}
 	}
 
-	warn(...args: any[]): void {
+	warn(...args: unknown[]): void {
 		if (this.level <= LogLevel.WARN) {
 			console.warn("[Installer] [WARN]", ...args);
 		}
 	}
 
-	error(...args: any[]): void {
+	error(...args: unknown[]): void {
 		if (this.level <= LogLevel.ERROR) {
 			console.error("[Installer] [ERROR]", ...args);
 		}

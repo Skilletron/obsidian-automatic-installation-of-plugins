@@ -5,6 +5,44 @@ import { FileManager } from "../utils/FileManager";
 import { logger } from "../utils/Logger";
 
 /**
+ * Internal Obsidian plugins API interface (not officially documented).
+ */
+interface PluginsAPI {
+	manifests?: Record<string, unknown>;
+	enabledPlugins?: Set<string>;
+	plugins?: Record<string, unknown>;
+	enablePlugin?: (pluginId: string) => Promise<void>;
+	loadManifests?: () => Promise<void>;
+	loadAvailablePlugins?: () => Promise<void>;
+	reload?: () => Promise<void>;
+	requestSaveSettings?: () => Promise<void>;
+	updatePluginList?: () => void;
+}
+
+/**
+ * Internal Obsidian commands API interface (not officially documented).
+ */
+interface CommandsAPI {
+	executeCommandById?: (commandId: string) => Promise<void>;
+}
+
+/**
+ * Internal Obsidian settings API interface (not officially documented).
+ */
+interface SettingsAPI {
+	pluginTabs?: Array<{
+		id?: string;
+		name?: string;
+		display?: () => void;
+	}>;
+	activeTab?: {
+		id?: string;
+		name?: string;
+		display?: () => void;
+	};
+}
+
+/**
  * Manages enabling of installed plugins.
  */
 export class PluginEnabler {
@@ -31,7 +69,7 @@ export class PluginEnabler {
 			new Notice("[Installer] Reloading third-party plugins...");
 
 			// Access internal plugins API
-			const pluginsApi = (this.app as any).plugins;
+			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
 
 			if (!pluginsApi) {
 				new Notice(
@@ -114,7 +152,7 @@ export class PluginEnabler {
 							enabledCount++;
 							successfullyEnabled.add(pluginId);
 							if (result.actualId !== pluginId) {
-								console.log(
+								logger.debug(
 									`[Installer] Successfully enabled plugin "${pluginId}" (using ID: "${result.actualId}").`
 								);
 							}
@@ -183,12 +221,12 @@ export class PluginEnabler {
 	/**
 	 * Reloads the plugin list using various methods.
 	 */
-	private async reloadPlugins(pluginsApi: any): Promise<void> {
+	private async reloadPlugins(pluginsApi: PluginsAPI | undefined): Promise<void> {
 		let reloadSuccess = false;
 
 		// Method 1: Try to execute command through commands API
 		try {
-			const commands = (this.app as any).commands;
+			const commands = (this.app as { commands?: CommandsAPI }).commands;
 			if (commands && typeof commands.executeCommandById === "function") {
 				const commandId = "reload-plugins";
 				try {
@@ -199,13 +237,14 @@ export class PluginEnabler {
 					// After command, also call loadManifests to ensure manifests are updated
 					await new Promise((resolve) => setTimeout(resolve, 1000));
 					if (
+						pluginsApi &&
 						pluginsApi.loadManifests &&
 						typeof pluginsApi.loadManifests === "function"
 					) {
 						await pluginsApi.loadManifests();
 						logger.debug("Also called loadManifests() after reload command");
 					}
-				} catch (cmdError) {
+				} catch {
 					logger.debug(`Command ${commandId} not found, trying direct API methods`);
 				}
 			}
@@ -214,7 +253,7 @@ export class PluginEnabler {
 		}
 
 		// Method 2: Try direct API methods
-		if (!reloadSuccess) {
+		if (!reloadSuccess && pluginsApi) {
 			try {
 				if (
 					pluginsApi.loadManifests &&
@@ -256,12 +295,12 @@ export class PluginEnabler {
 	 */
 	private async enableSinglePlugin(
 		pluginId: string,
-		pluginsApi: any,
-		manifests: Record<string, any>,
+		pluginsApi: PluginsAPI | undefined,
+		manifests: Record<string, unknown>,
 		attempt: number
 	): Promise<{ enabled: boolean; failed: boolean; actualId: string }> {
 		// Check if plugin is installed by checking manifests
-		let isInstalled = manifests.hasOwnProperty(pluginId);
+		let isInstalled = Object.prototype.hasOwnProperty.call(manifests, pluginId);
 		let actualPluginId = pluginId;
 
 		// Try to find plugin with different ID variations
@@ -276,28 +315,32 @@ export class PluginEnabler {
 				) {
 					isInstalled = true;
 					actualPluginId = manifestId;
-								logger.debug(
-									`Found plugin "${pluginId}" with different ID in manifests: "${manifestId}"`
-								);
+					logger.debug(
+						`Found plugin "${pluginId}" with different ID in manifests: "${manifestId}"`
+					);
 					break;
 				}
 			}
 		}
 
 		// Alternative check: look for plugin in plugins list
-		if (!isInstalled && pluginsApi.plugins) {
+		if (!isInstalled && pluginsApi && pluginsApi.plugins) {
 			const pluginsList = pluginsApi.plugins;
-			if (typeof pluginsList === "object") {
+			if (typeof pluginsList === "object" && pluginsList !== null) {
 				for (const key in pluginsList) {
-					if (
-						key === pluginId ||
-						(pluginsList[key] &&
-							pluginsList[key].manifest &&
-							pluginsList[key].manifest.id === pluginId)
-					) {
+					if (key === pluginId) {
 						isInstalled = true;
 						actualPluginId = key;
 						break;
+					}
+					const plugin = pluginsList[key];
+					if (plugin && typeof plugin === "object" && "manifest" in plugin) {
+						const manifest = (plugin as { manifest?: { id?: string } }).manifest;
+						if (manifest && manifest.id === pluginId) {
+							isInstalled = true;
+							actualPluginId = key;
+							break;
+						}
 					}
 				}
 			}
@@ -305,43 +348,55 @@ export class PluginEnabler {
 
 		// Log for debugging
 		if (attempt === 0) {
-						logger.debug(
-							`Checking plugin "${pluginId}": installed=${isInstalled}, actualId="${actualPluginId}", manifests keys:`,
-							Object.keys(manifests).slice(0, 10)
-						);
+			logger.debug(
+				`Checking plugin "${pluginId}": installed=${isInstalled}, actualId="${actualPluginId}", manifests keys:`,
+				Object.keys(manifests).slice(0, 10)
+			);
 		}
 
 		if (!isInstalled) {
 			if (attempt === 2) {
-								logger.warn(
-									`Plugin "${pluginId}" not found in manifests after reload. Available plugins:`,
-									Object.keys(manifests)
-								);
+				logger.warn(
+					`Plugin "${pluginId}" not found in manifests after reload. Available plugins:`,
+					Object.keys(manifests)
+				);
 			}
 			return { enabled: false, failed: true, actualId: pluginId };
 		}
 
 		// Check if plugin is already enabled
 		let enabledPlugins: Set<string> = new Set<string>();
-		if (pluginsApi.enabledPlugins) {
-			enabledPlugins = pluginsApi.enabledPlugins;
-		} else if (pluginsApi.plugins && pluginsApi.plugins.enabledPlugins) {
-			enabledPlugins = pluginsApi.plugins.enabledPlugins;
+		if (pluginsApi) {
+			if (pluginsApi.enabledPlugins instanceof Set) {
+				enabledPlugins = pluginsApi.enabledPlugins;
+			} else if (
+				pluginsApi.plugins &&
+				typeof pluginsApi.plugins === "object" &&
+				pluginsApi.plugins !== null &&
+				"enabledPlugins" in pluginsApi.plugins &&
+				pluginsApi.plugins.enabledPlugins instanceof Set
+			) {
+				enabledPlugins = pluginsApi.plugins.enabledPlugins;
+			}
 		}
 
 		const isEnabled = enabledPlugins.has(actualPluginId);
 
 		if (isEnabled) {
 			if (attempt === 0) {
-								logger.debug(
-									`Plugin "${pluginId}" (${actualPluginId}) is already enabled.`
-								);
+				logger.debug(
+					`Plugin "${pluginId}" (${actualPluginId}) is already enabled.`
+				);
 			}
 			return { enabled: true, failed: false, actualId: actualPluginId };
 		}
 
 		// Enable the plugin using actualPluginId
-		if (pluginsApi.enablePlugin && typeof pluginsApi.enablePlugin === "function") {
+		if (
+			pluginsApi &&
+			pluginsApi.enablePlugin &&
+			typeof pluginsApi.enablePlugin === "function"
+		) {
 			await pluginsApi.enablePlugin(actualPluginId);
 			logger.info(
 				`Successfully enabled plugin "${pluginId}" (using ID: "${actualPluginId}").`
@@ -364,12 +419,12 @@ export class PluginEnabler {
 			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			// Access internal settings API
-			const settings = (this.app as any).setting;
+			const settings = (this.app as { setting?: SettingsAPI }).setting;
 			if (settings) {
 				// Try to find and refresh the Community plugins tab
-				if (settings.pluginTabs) {
+				if (settings.pluginTabs && Array.isArray(settings.pluginTabs)) {
 					const pluginTab = settings.pluginTabs.find(
-						(tab: any) =>
+						(tab) =>
 							tab &&
 							(tab.id === "community-plugins" ||
 								tab.name === "Community plugins" ||
@@ -398,7 +453,7 @@ export class PluginEnabler {
 			}
 
 			// Try to trigger UI update through plugins API
-			const pluginsApi = (this.app as any).plugins;
+			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
 			if (pluginsApi) {
 				// Request settings save which often triggers UI refresh
 				if (

@@ -47,7 +47,7 @@ export default class InstallCommunityPlugins extends Plugin {
 		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
 
 		if (this.settings.loadSettingsOnStartup) {
-			await this.applySettingsToInstalledPlugins();
+			this.applySettingsToInstalledPlugins();
 		}
 
 		if (this.settings.autoInstallPlugins) {
@@ -104,10 +104,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			const pluginsFolder = path.join(basePath, configDir, "plugins");
 			const settingsFile = path.join(basePath, configDir, PLUGINS_SETTINGS_FILE);
 
-			await this.settingsManager.applySettingsToInstalledPlugins(
-				pluginsFolder,
-				settingsFile
-			);
+		this.settingsManager.applySettingsToInstalledPlugins(
+			pluginsFolder,
+			settingsFile
+		);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : "Unknown error";
@@ -276,9 +276,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", {
-			text: "Automatic Plugin Manager Settings",
-		});
+		new Setting(containerEl).setHeading().setName("Automatic Plugin Manager Settings");
 
 		// Security warning
 		const warningDiv = containerEl.createDiv("setting-item-description");
@@ -288,11 +286,13 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		warningDiv.appendText(
 			"This plugin automatically downloads and installs plugins from the Obsidian Community Plugins registry. Only use this plugin with trusted vaults and review the community-plugins-list.json file before enabling."
 		);
-		warningDiv.style.color = "var(--text-warning)";
-		warningDiv.style.marginBottom = "1.5em";
-		warningDiv.style.padding = "0.75em";
-		warningDiv.style.backgroundColor = "var(--background-modifier-border)";
-		warningDiv.style.borderRadius = "4px";
+		warningDiv.setCssProps({
+			color: "var(--text-warning)",
+			marginBottom: "1.5em",
+			padding: "0.75em",
+			backgroundColor: "var(--background-modifier-border)",
+			borderRadius: "4px",
+		});
 
 		new Setting(containerEl)
 			.setName("🚀 Auto-install plugins on startup")

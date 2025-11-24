@@ -1,4 +1,3 @@
-import * as fs from "fs";
 import * as path from "path";
 import { Notice } from "obsidian";
 import { FileManager } from "../utils/FileManager";
@@ -16,10 +15,10 @@ export class SettingsManager {
 	 * @param pluginsFolder - Path to the plugins folder
 	 * @param settingsFile - Path to the settings file
 	 */
-	async applySettingsToInstalledPlugins(
+	applySettingsToInstalledPlugins(
 		pluginsFolder: string,
 		settingsFile: string
-	): Promise<void> {
+	): void {
 		if (!this.fileManager.fileExists(settingsFile)) {
 			new Notice(
 				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings on startup`
@@ -39,7 +38,7 @@ export class SettingsManager {
 			return;
 		}
 
-		const allSettings = this.fileManager.parseJsonWithValidation<Record<string, any>>(
+		const allSettings = this.fileManager.parseJsonWithValidation<Record<string, unknown>>(
 			rawSettings,
 			PLUGINS_SETTINGS_FILE
 		);
@@ -83,11 +82,11 @@ export class SettingsManager {
 	 * @param pluginFolder - Path to the plugin folder
 	 * @param settingsFile - Path to the settings file
 	 */
-	async applySettingsForPlugin(
+	applySettingsForPlugin(
 		pluginId: string,
 		pluginFolder: string,
 		settingsFile: string
-	): Promise<void> {
+	): void {
 		if (!this.fileManager.fileExists(settingsFile)) {
 			return;
 		}
@@ -98,7 +97,7 @@ export class SettingsManager {
 				return;
 			}
 
-			const allSettings = this.fileManager.parseJsonWithValidation<Record<string, any>>(
+			const allSettings = this.fileManager.parseJsonWithValidation<Record<string, unknown>>(
 				rawSettings,
 				PLUGINS_SETTINGS_FILE
 			);

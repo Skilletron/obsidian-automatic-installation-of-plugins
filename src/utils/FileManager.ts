@@ -57,7 +57,7 @@ export class FileManager {
 			const errorMessage =
 				error instanceof Error ? error.message : "Unknown error";
 			new Notice(`[Installer] Failed to read file: ${errorMessage}`);
-			console.error(`[Installer] File read error for ${filePath}:`, error);
+			logger.error(`[Installer] File read error for ${filePath}:`, error);
 			return null;
 		}
 	}
@@ -79,7 +79,7 @@ export class FileManager {
 			const errorMessage =
 				error instanceof Error ? error.message : "Unknown error";
 			new Notice(`[Installer] Failed to write file: ${errorMessage}`);
-			console.error(`[Installer] File write error for ${filePath}:`, error);
+			logger.error(`[Installer] File write error for ${filePath}:`, error);
 			return false;
 		}
 	}
