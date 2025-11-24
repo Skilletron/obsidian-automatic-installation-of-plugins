@@ -71,15 +71,59 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION=$(node -p "require('./manifest.json').version")
+            # Extract version from tag (remove refs/tags/ prefix)
+            VERSION="${GITHUB_REF#refs/tags/}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Using version: $VERSION"
       
-      - name: Create release
-        uses: obsidian-tools/obsidian-release-action@v1
+      - name: Get plugin name
+        id: plugin_name
+        run: |
+          PLUGIN_NAME=$(node -p "require('./manifest.json').id")
+          echo "plugin_name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
+          echo "Plugin name: $PLUGIN_NAME"
+      
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
         with:
-          manifest-path: manifest.json
-          main-js-path: main.js
-          versions-json-path: versions.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## Release ${{ steps.version.outputs.version }}
+            
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload main.js
+        uses: softprops/action-gh-release@v1
+        with:
+          files: main.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload manifest.json
+        uses: softprops/action-gh-release@v1
+        with:
+          files: manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload versions.json
+        uses: softprops/action-gh-release@v1
+        with:
+          files: versions.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload styles.css (if exists)
+        if: hashFiles('styles.css') != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          files: styles.css
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
