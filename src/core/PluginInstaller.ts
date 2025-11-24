@@ -9,7 +9,6 @@ import {
 	PluginRegistryEntry,
 	GitHubRelease,
 	PLUGIN_REGISTRY_URL,
-	PLUGINS_SETTINGS_FILE,
 	MAX_FILE_SIZE,
 } from "../types";
 import { logger } from "../utils/Logger";

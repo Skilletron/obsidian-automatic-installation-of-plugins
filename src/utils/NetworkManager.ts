@@ -1,6 +1,5 @@
 import * as https from "https";
 import * as fs from "fs";
-import { Notice } from "obsidian";
 import { MAX_REDIRECTS, USER_AGENT, NETWORK_TIMEOUT, DOWNLOAD_TIMEOUT, MAX_FILE_SIZE } from "../types";
 
 /**
