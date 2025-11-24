@@ -175,7 +175,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (pluginIds.length === 0) {
-				new Notice("[Installer] No plugins to install.");
+				new Notice("[Installer] no plugins to install.");
 				return;
 			}
 
@@ -281,7 +281,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		// Security warning
 		const warningDiv = containerEl.createDiv("setting-item-description");
 		warningDiv.createEl("strong", {
-			text: "⚠️ Security warning: ",
+			text: "⚠️ security warning: ",
 		});
 		warningDiv.appendText(
 			"This plugin automatically downloads and installs plugins from the Obsidian Community Plugins registry. Only use this plugin with trusted vaults and review the community-plugins-list.json file before enabling."

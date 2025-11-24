@@ -38,7 +38,7 @@ export class PluginInstaller {
 		onProgress?: (bytesDownloaded: number) => void
 	): Promise<boolean> {
 		if (!pluginId || typeof pluginId !== "string" || pluginId.trim() === "") {
-			new Notice("[Installer] Invalid plugin ID provided.");
+			new Notice("[Installer] invalid plugin ID provided.");
 			return false;
 		}
 
