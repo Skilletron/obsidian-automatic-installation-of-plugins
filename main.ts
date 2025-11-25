@@ -175,7 +175,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (pluginIds.length === 0) {
-				new Notice("[Installer] no plugins to install.");
+				new Notice("No plugins to install.");
 				return;
 			}
 

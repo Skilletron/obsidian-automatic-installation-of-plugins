@@ -66,14 +66,14 @@ export class PluginEnabler {
 		}
 
 		try {
-			new Notice("[Installer] reloading third-party plugins...");
+			new Notice("Reloading third-party plugins...");
 
 			// Access internal plugins API
 			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
 
 			if (!pluginsApi) {
 				new Notice(
-					"[Installer] cannot access plugins API. Plugins will need to be enabled manually."
+					"Cannot access plugins API. Plugins will need to be enabled manually."
 				);
 				logger.warn("Plugins API not available");
 				return { enabled: 0, failed: 0, failedPlugins: [] };
@@ -98,7 +98,7 @@ export class PluginEnabler {
 			}
 
 			if (installedPluginIds.length === 0) {
-				new Notice("[Installer] no installed plugins found to enable.");
+				new Notice("No installed plugins found to enable.");
 				return { enabled: 0, failed: 0, failedPlugins: [] };
 			}
 
