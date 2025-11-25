@@ -38,15 +38,6 @@ Perfect for:
 
 ## 🚀 Installation
 
-### Installation from Community Plugins (The plugin is currently under review and isn't available in Community Plugins yet, but it will be soon.)
-
-1. Open Obsidian Settings (`Ctrl/Cmd + ,`)
-2. Navigate to **Community plugins**
-3. Make sure **Safe mode** is **off**
-4. Click **Browse** and search for "Automatic Plugin Manager"
-5. Click **Install**
-6. Click **Enable**
-
 ### Manual Installation
 
 1. Download the latest release from the [GitHub repository](https://github.com/Skilletron/obsidian-automatic-installation-of-plugins)
