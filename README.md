@@ -38,7 +38,7 @@ Perfect for:
 
 ## 🚀 Installation
 
-### Installation from Community Plugins
+### Installation from Community Plugins (The plugin is currently under review and isn't available in Community Plugins yet, but it will be soon.)
 
 1. Open Obsidian Settings (`Ctrl/Cmd + ,`)
 2. Navigate to **Community plugins**
