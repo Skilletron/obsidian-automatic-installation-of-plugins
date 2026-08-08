@@ -1,9 +1,9 @@
 {
 	"id": "automatic-installation-of-plugins",
-	"name": "Automatic Plugin Manager",
-	"version": "1.1.5",
+	"name": "Community Install Manager",
+	"version": "1.1.6",
 	"minAppVersion": "1.0.3",
-	"description": "Automatically install, enable, and configure community plugins from a simple JSON file. Perfect for syncing plugin setups across devices or sharing vault configurations with predefined plugins and settings.",
+	"description": "Install, enable, and configure community plugins from a JSON file for syncing vault setups across devices.",
 	"author": "Konstantin Volobuev",
 	"authorUrl": "https://github.com/Skilletron",
 	"isDesktopOnly": true

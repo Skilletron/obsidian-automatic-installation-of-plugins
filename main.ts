@@ -87,7 +87,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			error: LogLevel.ERROR,
 			none: LogLevel.NONE,
 		};
-		const level = logLevelMap[this.settings.logLevel || "info"] || LogLevel.INFO;
+		const level = logLevelMap[this.settings.logLevel || "error"] || LogLevel.ERROR;
 		logger.setLevel(level);
 	}
 
@@ -262,7 +262,7 @@ export default class InstallCommunityPlugins extends Plugin {
 }
 
 /**
- * Settings tab for the Automatic Plugin Manager plugin.
+ * Settings tab for Community Install Manager.
  */
 class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 	plugin: InstallCommunityPlugins;
@@ -276,28 +276,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl).setHeading().setName("Automatic plugin manager settings");
-
-		// Security warning
-		const warningDiv = containerEl.createDiv("setting-item-description");
+		const warningDiv = containerEl.createDiv({
+			cls: "community-install-manager-warning setting-item-description",
+		});
 		warningDiv.createEl("strong", {
-			text: "⚠️ security warning: ",
+			text: "Security warning: ",
 		});
 		warningDiv.appendText(
-			"This plugin automatically downloads and installs plugins from the Obsidian Community Plugins registry. Only use this plugin with trusted vaults and review the community-plugins-list.json file before enabling."
+			"This downloads and installs community plugins from the Obsidian registry and GitHub releases. Only use it with trusted vaults, and review community-plugins-list.json before enabling."
 		);
-		warningDiv.setCssProps({
-			color: "var(--text-warning)",
-			marginBottom: "1.5em",
-			padding: "0.75em",
-			backgroundColor: "var(--background-modifier-border)",
-			borderRadius: "4px",
-		});
 
 		new Setting(containerEl)
-			.setName("🚀 auto-install plugins on startup")
+			.setName("Auto-install plugins on startup")
 			.setDesc(
-				"Automatically install missing plugins from your `community-plugins-list.json` file when Obsidian starts. Perfect for keeping your vault's plugin setup synchronized across devices."
+				"Install missing plugins listed in community-plugins-list.json when Obsidian starts."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -309,9 +301,9 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("⚡ auto-enable plugins after installation")
+			.setName("Auto-enable plugins after installation")
 			.setDesc(
-				"Automatically enable all installed plugins right after installation. The plugin list will be refreshed first to ensure newly installed plugins are recognized. This gives you a fully automated setup experience."
+				"Enable installed plugins after installation. The plugin list is refreshed first so newly installed plugins are recognized."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -323,16 +315,15 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("⚙️ apply settings on installation")
+			.setName("Apply settings on installation")
 			.setDesc(
-				"When a plugin is installed, automatically apply its configuration from `community-plugins-settings.json`. This ensures your plugins are configured exactly as you want them from the moment they're installed."
+				"After installing a plugin, apply its configuration from community-plugins-settings.json."
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.loadSettingsOnInstall)
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnInstall = value;
-						// Update pluginInstaller with new setting
 						this.plugin.pluginInstaller = new PluginInstaller(
 							this.plugin.fileManager,
 							this.plugin.networkManager,
@@ -344,9 +335,9 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("🔄 sync settings on every startup")
+			.setName("Sync settings on every startup")
 			.setDesc(
-				"On each Obsidian startup, re-apply plugin settings from `community-plugins-settings.json` to all installed plugins. This keeps your plugin configurations in sync even if you've made manual changes. Useful for maintaining consistent settings across multiple devices."
+				"On each startup, re-apply settings from community-plugins-settings.json to installed plugins."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -358,23 +349,22 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("📝 logging level")
+			.setName("Logging level")
 			.setDesc(
-				"Control how much information is logged to the console. Use Debug for troubleshooting, Info for normal operation, or Error to see only problems. Open the developer console (Ctrl+Shift+I) to view logs."
+				"How much to log to the developer console (Ctrl/Cmd+Shift+I). Use Debug only while troubleshooting."
 			)
 			.addDropdown((dropdown) => {
 				dropdown
-					.addOption("debug", "🐛 debug (most verbose)")
-					.addOption("info", "ℹ️ info (recommended)")
-					.addOption("warn", "⚠️ warn (warnings only)")
-					.addOption("error", "❌ error (errors only)")
-					.addOption("none", "🔇 none (no logging)")
-					.setValue(this.plugin.settings.logLevel || "info")
+					.addOption("debug", "Debug (most verbose)")
+					.addOption("info", "Info")
+					.addOption("warn", "Warn")
+					.addOption("error", "Error (recommended)")
+					.addOption("none", "None")
+					.setValue(this.plugin.settings.logLevel || "error")
 					.onChange(async (value: "debug" | "info" | "warn" | "error" | "none") => {
 						this.plugin.settings.logLevel = value;
 						await this.plugin.saveSettings();
-						
-						// Update logger level immediately
+
 						const logLevelMap: Record<string, LogLevel> = {
 							debug: LogLevel.DEBUG,
 							info: LogLevel.INFO,
@@ -382,7 +372,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							error: LogLevel.ERROR,
 							none: LogLevel.NONE,
 						};
-						logger.setLevel(logLevelMap[value] || LogLevel.INFO);
+						logger.setLevel(logLevelMap[value] || LogLevel.ERROR);
 					});
 			});
 	}

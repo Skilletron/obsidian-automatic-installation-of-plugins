@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-08-08
+
+### Changed
+- Renamed display name to **Community Install Manager** (Obsidian does not allow "Plugin" in plugin names)
+- Shortened manifest description for the community directory
+- Settings UI: sentence case, no emoji, removed redundant heading, warning styles moved to `styles.css`
+- Default logging level is now `error`
+- README: clearer network-use disclosure for the community registry and GitHub releases
+
 ## [1.0.8] - 2024-01-XX
 
 ### Added

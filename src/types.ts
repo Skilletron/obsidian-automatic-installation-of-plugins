@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
 	loadSettingsOnStartup: true,
 	autoInstallPlugins: true,
 	autoEnablePlugins: true,
-	logLevel: "info",
+	logLevel: "error",
 };
 
 // Constants
