@@ -14,7 +14,7 @@ export class NetworkManager {
 	 */
 	fetchJson<T>(url: string): Promise<T> {
 		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(() => {
+			const timeout = window.setTimeout(() => {
 				reject(new Error(`Request timeout for ${url}`));
 			}, NETWORK_TIMEOUT);
 
@@ -24,7 +24,7 @@ export class NetworkManager {
 					{ headers: { "User-Agent": USER_AGENT } },
 					(res) => {
 						if (res.statusCode === undefined || res.statusCode !== 200) {
-							clearTimeout(timeout);
+							window.clearTimeout(timeout);
 							reject(
 								new Error(
 									`HTTP ${res.statusCode || "unknown"}: ${url}. The server may be unavailable or the resource may not exist.`
@@ -34,13 +34,15 @@ export class NetworkManager {
 						}
 
 						let data = "";
-						res.on("data", (chunk) => (data += chunk));
+						res.on("data", (chunk: Buffer | string) => {
+							data += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
+						});
 						res.on("end", () => {
-							clearTimeout(timeout);
+							window.clearTimeout(timeout);
 							try {
 								const parsed = JSON.parse(data) as T;
 								resolve(parsed);
-							} catch (err) {
+							} catch (err: unknown) {
 								const errorMessage =
 									err instanceof Error ? err.message : "Unknown error";
 								reject(
@@ -52,18 +54,16 @@ export class NetworkManager {
 						});
 					}
 				)
-				.on("error", (err) => {
-					clearTimeout(timeout);
-					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
+				.on("error", (err: Error) => {
+					window.clearTimeout(timeout);
 					reject(
 						new Error(
-							`Network error while fetching ${url}: ${errorMessage}. Check your internet connection.`
+							`Network error while fetching ${url}: ${err.message}. Check your internet connection.`
 						)
 					);
 				})
 				.setTimeout(NETWORK_TIMEOUT, () => {
-					clearTimeout(timeout);
+					window.clearTimeout(timeout);
 					reject(new Error(`Request timeout for ${url}`));
 				});
 		});
@@ -99,7 +99,7 @@ export class NetworkManager {
 			const file = fs.createWriteStream(dest);
 			let bytesDownloaded = 0;
 
-			const timeout = setTimeout(() => {
+			const timeout = window.setTimeout(() => {
 				file.close();
 				fs.unlink(dest, () => {
 					reject(new Error(`Download timeout for ${url}`));
@@ -113,7 +113,7 @@ export class NetworkManager {
 					if (contentLength) {
 						const size = parseInt(contentLength, 10);
 						if (size > MAX_FILE_SIZE) {
-							clearTimeout(timeout);
+							window.clearTimeout(timeout);
 							file.close();
 							fs.unlink(dest, () => {
 								reject(
@@ -132,7 +132,7 @@ export class NetworkManager {
 					) {
 						const location = res.headers.location;
 						if (!location) {
-							clearTimeout(timeout);
+							window.clearTimeout(timeout);
 							reject(
 								new Error(
 									`Redirect status code ${res.statusCode} but no Location header found for ${url}`
@@ -156,7 +156,7 @@ export class NetworkManager {
 					}
 
 					if (res.statusCode !== 200) {
-						clearTimeout(timeout);
+						window.clearTimeout(timeout);
 						reject(
 							new Error(
 								`Failed to download file from ${url}: HTTP ${res.statusCode} ${res.statusMessage || "Unknown error"}`
@@ -165,10 +165,14 @@ export class NetworkManager {
 						return;
 					}
 
-					res.on("data", (chunk) => {
-						bytesDownloaded += chunk.length;
+					res.on("data", (chunk: Buffer | string) => {
+						const size =
+							typeof chunk === "string"
+								? Buffer.byteLength(chunk)
+								: chunk.length;
+						bytesDownloaded += size;
 						if (bytesDownloaded > MAX_FILE_SIZE) {
-							clearTimeout(timeout);
+							window.clearTimeout(timeout);
 							file.close();
 							fs.unlink(dest, () => {
 								reject(
@@ -186,37 +190,33 @@ export class NetworkManager {
 
 					res.pipe(file);
 					file.on("finish", () => {
-						clearTimeout(timeout);
+						window.clearTimeout(timeout);
 						file.close();
 						resolve();
 					});
-					file.on("error", (err) => {
-						clearTimeout(timeout);
+					file.on("error", (err: Error) => {
+						window.clearTimeout(timeout);
 						fs.unlink(dest, () => {
-							const errorMessage =
-								err instanceof Error ? err.message : "Unknown error";
 							reject(
 								new Error(
-									`File write error while downloading to ${dest}: ${errorMessage}`
+									`File write error while downloading to ${dest}: ${err.message}`
 								)
 							);
 						});
 					});
 				})
-				.on("error", (err) => {
-					clearTimeout(timeout);
+				.on("error", (err: Error) => {
+					window.clearTimeout(timeout);
 					fs.unlink(dest, () => {
-						const errorMessage =
-							err instanceof Error ? err.message : "Unknown error";
 						reject(
 							new Error(
-								`Network error while downloading from ${url}: ${errorMessage}`
+								`Network error while downloading from ${url}: ${err.message}`
 							)
 						);
 					});
 				})
 				.setTimeout(DOWNLOAD_TIMEOUT, () => {
-					clearTimeout(timeout);
+					window.clearTimeout(timeout);
 					file.close();
 					fs.unlink(dest, () => {
 						reject(new Error(`Download timeout for ${url}`));
@@ -225,4 +225,3 @@ export class NetworkManager {
 		});
 	}
 }
-

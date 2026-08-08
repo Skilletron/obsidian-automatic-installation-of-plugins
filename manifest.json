@@ -1,7 +1,7 @@
 {
 	"id": "automatic-installation-of-plugins",
 	"name": "Community Install Manager",
-	"version": "1.1.6",
+	"version": "1.1.7",
 	"minAppVersion": "1.0.3",
 	"description": "Install, enable, and configure community plugins from a JSON file for syncing vault setups across devices.",
 	"author": "Konstantin Volobuev",

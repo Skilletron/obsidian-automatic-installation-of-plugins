@@ -105,7 +105,9 @@ export class PluginEnabler {
 			for (let attempt = 0; attempt < 3; attempt++) {
 				if (attempt > 0) {
 					await this.reloadPlugins(pluginsApi);
-					await new Promise((resolve) => setTimeout(resolve, 1000));
+					await new Promise((resolve) =>
+						window.setTimeout(resolve, 1000)
+					);
 					logger.debug(`Retry attempt ${attempt + 1} to enable plugins...`);
 				}
 
@@ -133,7 +135,9 @@ export class PluginEnabler {
 								failedPlugins.splice(failIndex, 1);
 							}
 							// Let plugins that open side leaves settle before the next enable.
-							await new Promise((resolve) => setTimeout(resolve, 350));
+							await new Promise((resolve) =>
+								window.setTimeout(resolve, 350)
+							);
 						} else if (result.failed && attempt === 2) {
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
@@ -401,7 +405,7 @@ export class PluginEnabler {
 	 */
 	async refreshPluginsUI(): Promise<void> {
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 300));
+			await new Promise((resolve) => window.setTimeout(resolve, 300));
 
 			const settings = (this.app as { setting?: SettingsAPI }).setting;
 			if (settings) {

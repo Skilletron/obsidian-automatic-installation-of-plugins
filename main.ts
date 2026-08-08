@@ -97,11 +97,11 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData()
-		);
+		const data = (await this.loadData()) as
+			| Partial<InstallCommunityPluginsSettings>
+			| null
+			| undefined;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
 		
 		// Set log level from settings
 		const logLevelMap: Record<string, LogLevel> = {
