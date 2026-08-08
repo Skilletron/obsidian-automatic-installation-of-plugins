@@ -7,13 +7,19 @@ import { MAX_REDIRECTS, USER_AGENT, NETWORK_TIMEOUT, DOWNLOAD_TIMEOUT, MAX_FILE_
  */
 export class NetworkManager {
 	/**
-	 * Fetches JSON data from a URL.
-	 * @param url - URL to fetch JSON from
-	 * @returns Promise resolving to the parsed JSON data
-	 * @throws {Error} If the request fails or returns invalid JSON
+	 * Fetches JSON data from a URL (follows GitHub release asset redirects).
 	 */
-	fetchJson<T>(url: string): Promise<T> {
+	fetchJson<T>(url: string, maxRedirects = MAX_REDIRECTS): Promise<T> {
 		return new Promise((resolve, reject) => {
+			if (maxRedirects < 0) {
+				reject(
+					new Error(
+						`Too many redirects (max ${MAX_REDIRECTS}) while fetching ${url}`
+					)
+				);
+				return;
+			}
+
 			const timeout = window.setTimeout(() => {
 				reject(new Error(`Request timeout for ${url}`));
 			}, NETWORK_TIMEOUT);
@@ -21,13 +27,35 @@ export class NetworkManager {
 			https
 				.get(
 					url,
-					{ headers: { "User-Agent": USER_AGENT } },
+					{ headers: { "User-Agent": USER_AGENT, Accept: "application/json, */*" } },
 					(res) => {
-						if (res.statusCode === undefined || res.statusCode !== 200) {
+						const status = res.statusCode ?? 0;
+
+						if ([301, 302, 303, 307, 308].includes(status)) {
+							const location = res.headers.location;
 							window.clearTimeout(timeout);
+							res.resume();
+							if (!location) {
+								reject(
+									new Error(
+										`Redirect HTTP ${status} without Location header for ${url}`
+									)
+								);
+								return;
+							}
+							const nextUrl = new URL(location, url).toString();
+							this.fetchJson<T>(nextUrl, maxRedirects - 1)
+								.then(resolve)
+								.catch(reject);
+							return;
+						}
+
+						if (status !== 200) {
+							window.clearTimeout(timeout);
+							res.resume();
 							reject(
 								new Error(
-									`HTTP ${res.statusCode || "unknown"}: ${url}. The server may be unavailable or the resource may not exist.`
+									`HTTP ${status || "unknown"}: ${url}. The server may be unavailable or the resource may not exist.`
 								)
 							);
 							return;
@@ -35,7 +63,10 @@ export class NetworkManager {
 
 						let data = "";
 						res.on("data", (chunk: Buffer | string) => {
-							data += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
+							data +=
+								typeof chunk === "string"
+									? chunk
+									: chunk.toString("utf-8");
 						});
 						res.on("end", () => {
 							window.clearTimeout(timeout);
