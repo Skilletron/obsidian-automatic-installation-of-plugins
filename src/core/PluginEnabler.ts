@@ -8,22 +8,18 @@ import { logger } from "../utils/Logger";
  * Internal Obsidian plugins API interface (not officially documented).
  */
 interface PluginsAPI {
-	manifests?: Record<string, unknown>;
+	manifests?: Record<string, { id?: string }>;
 	enabledPlugins?: Set<string>;
 	plugins?: Record<string, unknown>;
 	enablePlugin?: (pluginId: string) => Promise<void>;
+	enablePluginAndSave?: (pluginId: string) => Promise<void>;
 	loadManifests?: () => Promise<void>;
+	loadManifest?: (pluginId: string) => Promise<void>;
+	loadPlugin?: (pluginId: string) => Promise<void>;
 	loadAvailablePlugins?: () => Promise<void>;
 	reload?: () => Promise<void>;
 	requestSaveSettings?: () => Promise<void>;
 	updatePluginList?: () => void;
-}
-
-/**
- * Internal Obsidian commands API interface (not officially documented).
- */
-interface CommandsAPI {
-	executeCommandById?: (commandId: string) => Promise<void>;
 }
 
 /**
@@ -53,9 +49,6 @@ export class PluginEnabler {
 
 	/**
 	 * Updates the plugin list and enables all plugins from the provided list.
-	 * Uses internal Obsidian API to manage plugins.
-	 * @param pluginIds - Array of plugin IDs to enable
-	 * @param onProgress - Optional progress callback
 	 */
 	async enableInstalledPlugins(
 		pluginIds: string[],
@@ -66,9 +59,6 @@ export class PluginEnabler {
 		}
 
 		try {
-			new Notice("Reloading third-party plugins...");
-
-			// Access internal plugins API
 			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
 
 			if (!pluginsApi) {
@@ -76,10 +66,9 @@ export class PluginEnabler {
 					"Cannot access plugins API. Plugins will need to be enabled manually."
 				);
 				logger.warn("Plugins API not available");
-				return { enabled: 0, failed: 0, failedPlugins: [] };
+				return { enabled: 0, failed: 0, failedPlugins: pluginIds };
 			}
 
-			// First, verify plugins are installed in filesystem
 			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
 			const pluginsFolder = path.join(basePath, configDir, "plugins");
 
@@ -90,8 +79,13 @@ export class PluginEnabler {
 				}
 				const normalizedId = pluginId.trim();
 				const pluginFolder = path.join(pluginsFolder, normalizedId);
-				if (fs.existsSync(pluginFolder)) {
+				const manifestPath = path.join(pluginFolder, "manifest.json");
+				if (fs.existsSync(manifestPath)) {
 					installedPluginIds.push(normalizedId);
+				} else if (fs.existsSync(pluginFolder)) {
+					logger.warn(
+						`Plugin folder exists but manifest.json is missing: ${pluginFolder}`
+					);
 				} else {
 					logger.warn(`Plugin folder not found: ${pluginFolder}`);
 				}
@@ -102,36 +96,21 @@ export class PluginEnabler {
 				return { enabled: 0, failed: 0, failedPlugins: [] };
 			}
 
-			// Reload plugins
+			await this.waitForLayoutReady();
 			await this.reloadPlugins(pluginsApi);
 
-			// Wait for plugins to be loaded
-			await new Promise((resolve) => setTimeout(resolve, 5000));
-
-			// Log available manifests for debugging
-			const manifests = pluginsApi.manifests || {};
-			logger.debug(
-				`Available plugins in manifests (${Object.keys(manifests).length}):`,
-				Object.keys(manifests)
-			);
-			logger.debug(`Looking for plugins:`, installedPluginIds);
-
-			let enabledCount = 0;
-			let failedCount = 0;
-			const failedPlugins: string[] = [];
 			const successfullyEnabled = new Set<string>();
+			const failedPlugins: string[] = [];
 
-			// Try multiple times to enable plugins (in case they're still loading)
 			for (let attempt = 0; attempt < 3; attempt++) {
 				if (attempt > 0) {
+					await this.reloadPlugins(pluginsApi);
 					await new Promise((resolve) => setTimeout(resolve, 1000));
 					logger.debug(`Retry attempt ${attempt + 1} to enable plugins...`);
 				}
 
 				for (let i = 0; i < installedPluginIds.length; i++) {
 					const pluginId = installedPluginIds[i];
-
-					// Skip if already successfully enabled
 					if (successfullyEnabled.has(pluginId)) {
 						continue;
 					}
@@ -144,48 +123,43 @@ export class PluginEnabler {
 						const result = await this.enableSinglePlugin(
 							pluginId,
 							pluginsApi,
-							manifests,
 							attempt
 						);
 
 						if (result.enabled) {
-							enabledCount++;
 							successfullyEnabled.add(pluginId);
-							if (result.actualId !== pluginId) {
-								logger.debug(
-									`[Installer] Successfully enabled plugin "${pluginId}" (using ID: "${result.actualId}").`
-								);
+							const failIndex = failedPlugins.indexOf(pluginId);
+							if (failIndex > -1) {
+								failedPlugins.splice(failIndex, 1);
 							}
-							// Remove from failed list if it was there
-							const index = failedPlugins.indexOf(pluginId);
-							if (index > -1) {
-								failedPlugins.splice(index, 1);
-								failedCount--;
-							}
+							// Let plugins that open side leaves settle before the next enable.
+							await new Promise((resolve) => setTimeout(resolve, 350));
 						} else if (result.failed && attempt === 2) {
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
-								failedCount++;
 							}
+							logger.error(
+								`Could not enable "${pluginId}": ${result.reason || "unknown reason"}`
+							);
 						}
 					} catch (error) {
 						if (attempt === 2) {
 							logger.error(`Failed to enable plugin "${pluginId}":`, error);
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
-								failedCount++;
 							}
 						}
 					}
 				}
 
-				// If all plugins are enabled, break early
 				if (successfullyEnabled.size === installedPluginIds.length) {
 					break;
 				}
 			}
 
-			// Show summary notice
+			const enabledCount = successfullyEnabled.size;
+			const failedCount = failedPlugins.length;
+
 			if (enabledCount > 0 && failedCount === 0) {
 				new Notice(
 					`[Installer] Successfully enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}.`
@@ -196,7 +170,7 @@ export class PluginEnabler {
 				);
 			} else if (failedCount > 0) {
 				new Notice(
-					`[Installer] Failed to enable ${failedCount} plugin${failedCount > 1 ? "s" : ""}. You may need to reload plugins manually.`
+					`[Installer] Failed to enable ${failedCount} plugin${failedCount > 1 ? "s" : ""}. Enable them manually or reload Obsidian.`
 				);
 			}
 
@@ -217,195 +191,209 @@ export class PluginEnabler {
 	}
 
 	/**
-	 * Reloads the plugin list using various methods.
+	 * Workspace must be ready before enabling plugins that open side leaves
+	 * (e.g. Recent Files calls ensureSideLeaf in onUserEnable).
 	 */
-	private async reloadPlugins(pluginsApi: PluginsAPI | undefined): Promise<void> {
-		let reloadSuccess = false;
+	private waitForLayoutReady(): Promise<void> {
+		return new Promise((resolve) => {
+			const workspace = this.app.workspace;
+			if (workspace.layoutReady) {
+				resolve();
+				return;
+			}
+			workspace.onLayoutReady(() => resolve());
+		});
+	}
 
-		// Method 1: Try to execute command through commands API
+	/**
+	 * Reloads plugin manifests so newly installed folders are recognized.
+	 */
+	private async reloadPlugins(pluginsApi: PluginsAPI): Promise<void> {
 		try {
-			const commands = (this.app as { commands?: CommandsAPI }).commands;
-			if (commands && typeof commands.executeCommandById === "function") {
-				const commandId = "reload-plugins";
-				try {
-					await commands.executeCommandById(commandId);
-					reloadSuccess = true;
-					logger.debug(`Successfully executed reload command: ${commandId}`);
-
-					// After command, also call loadManifests to ensure manifests are updated
-					await new Promise((resolve) => setTimeout(resolve, 1000));
-					if (
-						pluginsApi &&
-						pluginsApi.loadManifests &&
-						typeof pluginsApi.loadManifests === "function"
-					) {
-						await pluginsApi.loadManifests();
-						logger.debug("Also called loadManifests() after reload command");
-					}
-				} catch {
-					logger.debug(`Command ${commandId} not found, trying direct API methods`);
-				}
+			if (typeof pluginsApi.loadManifests === "function") {
+				await pluginsApi.loadManifests();
+				logger.debug("Reloaded manifests via loadManifests()");
+				return;
 			}
-		} catch (e) {
-			logger.warn("Command execution failed:", e);
+		} catch (error) {
+			logger.warn("loadManifests failed:", error);
 		}
 
-		// Method 2: Try direct API methods
-		if (!reloadSuccess && pluginsApi) {
-			try {
-				if (
-					pluginsApi.loadManifests &&
-					typeof pluginsApi.loadManifests === "function"
-				) {
-					await pluginsApi.loadManifests();
-					reloadSuccess = true;
-					logger.debug("Successfully reloaded manifests via loadManifests()");
-				}
-
-				if (
-					pluginsApi.loadAvailablePlugins &&
-					typeof pluginsApi.loadAvailablePlugins === "function"
-				) {
-					await pluginsApi.loadAvailablePlugins();
-					reloadSuccess = true;
-					logger.debug("Successfully reloaded plugins via loadAvailablePlugins()");
-				}
-
-				if (pluginsApi.reload && typeof pluginsApi.reload === "function") {
-					await pluginsApi.reload();
-					reloadSuccess = true;
-					logger.debug("Successfully reloaded via reload()");
-				}
-			} catch (reloadError) {
-				logger.warn("Direct API reload methods failed:", reloadError);
+		try {
+			if (typeof pluginsApi.loadAvailablePlugins === "function") {
+				await pluginsApi.loadAvailablePlugins();
+				logger.debug("Reloaded plugins via loadAvailablePlugins()");
 			}
-		}
-
-		if (!reloadSuccess) {
-			logger.warn(
-				"Could not reload plugins automatically. Plugins may not appear until manual reload."
-			);
+		} catch (error) {
+			logger.warn("loadAvailablePlugins failed:", error);
 		}
 	}
 
 	/**
-	 * Enables a single plugin.
+	 * Candidate IDs for a plugin folder: folder name + id from local manifest.json.
+	 */
+	private getCandidateIds(pluginId: string): string[] {
+		const candidates = [pluginId];
+		try {
+			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
+			const manifestPath = path.join(
+				basePath,
+				configDir,
+				"plugins",
+				pluginId,
+				"manifest.json"
+			);
+			if (fs.existsSync(manifestPath)) {
+				const raw = fs.readFileSync(manifestPath, "utf-8");
+				const manifest = JSON.parse(raw) as { id?: string };
+				if (
+					typeof manifest.id === "string" &&
+					manifest.id &&
+					!candidates.includes(manifest.id)
+				) {
+					candidates.push(manifest.id);
+				}
+			}
+		} catch (error) {
+			logger.debug(`Could not read local manifest for "${pluginId}":`, error);
+		}
+		return candidates;
+	}
+
+	/**
+	 * Resolves the registry/manifest ID for a folder plugin ID.
+	 */
+	private resolvePluginId(
+		pluginId: string,
+		pluginsApi: PluginsAPI
+	): string | null {
+		const manifests = pluginsApi.manifests || {};
+		const candidates = this.getCandidateIds(pluginId);
+
+		for (const candidate of candidates) {
+			if (Object.prototype.hasOwnProperty.call(manifests, candidate)) {
+				return candidate;
+			}
+		}
+
+		for (const manifestId of Object.keys(manifests)) {
+			for (const candidate of candidates) {
+				if (
+					manifestId === candidate ||
+					manifestId.replace(/^obsidian-/, "") ===
+						candidate.replace(/^obsidian-/, "") ||
+					manifestId === candidate.replace(/^obsidian-/, "") ||
+					`obsidian-${manifestId}` === candidate
+				) {
+					return manifestId;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private isPluginEnabled(pluginsApi: PluginsAPI, pluginId: string): boolean {
+		if (pluginsApi.enabledPlugins instanceof Set) {
+			return pluginsApi.enabledPlugins.has(pluginId);
+		}
+		if (pluginsApi.plugins && pluginId in pluginsApi.plugins) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Enables a single plugin using Obsidian's internal API.
 	 */
 	private async enableSinglePlugin(
 		pluginId: string,
-		pluginsApi: PluginsAPI | undefined,
-		manifests: Record<string, unknown>,
+		pluginsApi: PluginsAPI,
 		attempt: number
-	): Promise<{ enabled: boolean; failed: boolean; actualId: string }> {
-		// Check if plugin is installed by checking manifests
-		let isInstalled = Object.prototype.hasOwnProperty.call(manifests, pluginId);
-		let actualPluginId = pluginId;
+	): Promise<{
+		enabled: boolean;
+		failed: boolean;
+		actualId: string;
+		reason?: string;
+	}> {
+		let actualPluginId = this.resolvePluginId(pluginId, pluginsApi);
 
-		// Try to find plugin with different ID variations
-		if (!isInstalled) {
-			for (const manifestId in manifests) {
-				if (
-					manifestId === pluginId ||
-					manifestId.replace(/^obsidian-/, "") ===
-						pluginId.replace(/^obsidian-/, "") ||
-					manifestId === pluginId.replace(/^obsidian-/, "") ||
-					`obsidian-${manifestId}` === pluginId
-				) {
-					isInstalled = true;
-					actualPluginId = manifestId;
-					logger.debug(
-						`Found plugin "${pluginId}" with different ID in manifests: "${manifestId}"`
-					);
-					break;
+		if (!actualPluginId && typeof pluginsApi.loadManifest === "function") {
+			for (const candidate of this.getCandidateIds(pluginId)) {
+				try {
+					await pluginsApi.loadManifest(candidate);
+				} catch (error) {
+					logger.debug(`loadManifest("${candidate}") failed:`, error);
 				}
 			}
+			actualPluginId = this.resolvePluginId(pluginId, pluginsApi);
 		}
 
-		// Alternative check: look for plugin in plugins list
-		if (!isInstalled && pluginsApi && pluginsApi.plugins) {
-			const pluginsList = pluginsApi.plugins;
-			if (typeof pluginsList === "object" && pluginsList !== null) {
-				for (const key in pluginsList) {
-					if (key === pluginId) {
-						isInstalled = true;
-						actualPluginId = key;
-						break;
-					}
-					const plugin = pluginsList[key];
-					if (plugin && typeof plugin === "object" && "manifest" in plugin) {
-						const manifest = (plugin as { manifest?: { id?: string } }).manifest;
-						if (manifest && manifest.id === pluginId) {
-							isInstalled = true;
-							actualPluginId = key;
-							break;
-						}
-					}
-				}
+		// Folder exists with a valid manifest — try enabling even if manifests map lags.
+		if (!actualPluginId) {
+			const candidates = this.getCandidateIds(pluginId);
+			if (candidates.length > 0) {
+				actualPluginId = candidates[0];
 			}
 		}
 
-		// Log for debugging
-		if (attempt === 0) {
-			logger.debug(
-				`Checking plugin "${pluginId}": installed=${isInstalled}, actualId="${actualPluginId}", manifests keys:`,
-				Object.keys(manifests).slice(0, 10)
-			);
+		if (!actualPluginId) {
+			const available = Object.keys(pluginsApi.manifests || {});
+			return {
+				enabled: false,
+				failed: true,
+				actualId: pluginId,
+				reason:
+					attempt === 2
+						? `not found in manifests after reload. Available: ${available.join(", ") || "(none)"}`
+						: "not in manifests yet",
+			};
 		}
 
-		if (!isInstalled) {
-			if (attempt === 2) {
-				logger.warn(
-					`Plugin "${pluginId}" not found in manifests after reload. Available plugins:`,
-					Object.keys(manifests)
-				);
-			}
-			return { enabled: false, failed: true, actualId: pluginId };
-		}
-
-		// Check if plugin is already enabled
-		let enabledPlugins: Set<string> = new Set<string>();
-		if (pluginsApi) {
-			if (pluginsApi.enabledPlugins instanceof Set) {
-				enabledPlugins = pluginsApi.enabledPlugins;
-			} else if (
-				pluginsApi.plugins &&
-				typeof pluginsApi.plugins === "object" &&
-				pluginsApi.plugins !== null &&
-				"enabledPlugins" in pluginsApi.plugins &&
-				pluginsApi.plugins.enabledPlugins instanceof Set
-			) {
-				enabledPlugins = pluginsApi.plugins.enabledPlugins;
-			}
-		}
-
-		const isEnabled = enabledPlugins.has(actualPluginId);
-
-		if (isEnabled) {
-			if (attempt === 0) {
-				logger.debug(
-					`Plugin "${pluginId}" (${actualPluginId}) is already enabled.`
-				);
-			}
+		if (this.isPluginEnabled(pluginsApi, actualPluginId)) {
 			return { enabled: true, failed: false, actualId: actualPluginId };
 		}
 
-		// Enable the plugin using actualPluginId
-		if (
-			pluginsApi &&
-			pluginsApi.enablePlugin &&
-			typeof pluginsApi.enablePlugin === "function"
-		) {
-			await pluginsApi.enablePlugin(actualPluginId);
-			logger.info(
-				`Successfully enabled plugin "${pluginId}" (using ID: "${actualPluginId}").`
-			);
-			return { enabled: true, failed: false, actualId: actualPluginId };
-		} else {
-			if (attempt === 2) {
-				logger.warn(`enablePlugin method not available.`);
+		const enableIds = Array.from(
+			new Set([actualPluginId, ...this.getCandidateIds(pluginId)])
+		);
+		let lastError = "";
+
+		for (const enableId of enableIds) {
+			try {
+				if (typeof pluginsApi.enablePluginAndSave === "function") {
+					await pluginsApi.enablePluginAndSave(enableId);
+				} else if (typeof pluginsApi.enablePlugin === "function") {
+					await pluginsApi.enablePlugin(enableId);
+				} else {
+					return {
+						enabled: false,
+						failed: true,
+						actualId: actualPluginId,
+						reason: "enablePluginAndSave/enablePlugin not available",
+					};
+				}
+
+				if (this.isPluginEnabled(pluginsApi, enableId)) {
+					logger.debug(`Enabled plugin "${pluginId}" as "${enableId}".`);
+					return { enabled: true, failed: false, actualId: enableId };
+				}
+
+				// API call did not throw — treat as success even if Set lags.
+				return { enabled: true, failed: false, actualId: enableId };
+			} catch (error) {
+				lastError = error instanceof Error ? error.message : String(error);
+				logger.debug(`Enable "${enableId}" failed: ${lastError}`);
 			}
-			return { enabled: false, failed: true, actualId: actualPluginId };
 		}
+
+		return {
+			enabled: false,
+			failed: true,
+			actualId: actualPluginId,
+			reason: `enable threw: ${lastError || "unknown error"}`,
+		};
+
 	}
 
 	/**
@@ -413,13 +401,10 @@ export class PluginEnabler {
 	 */
 	async refreshPluginsUI(): Promise<void> {
 		try {
-			// Small delay to ensure all plugin state changes are processed
-			await new Promise((resolve) => setTimeout(resolve, 500));
+			await new Promise((resolve) => setTimeout(resolve, 300));
 
-			// Access internal settings API
 			const settings = (this.app as { setting?: SettingsAPI }).setting;
 			if (settings) {
-				// Try to find and refresh the Community plugins tab
 				if (settings.pluginTabs && Array.isArray(settings.pluginTabs)) {
 					const pluginTab = settings.pluginTabs.find(
 						(tab) =>
@@ -429,59 +414,44 @@ export class PluginEnabler {
 								tab.id === "plugins")
 					);
 
-					if (pluginTab && typeof pluginTab.display === "function") {
-						// Refresh the tab if it's currently open
-						if (settings.activeTab === pluginTab) {
-							pluginTab.display();
-							logger.debug("Refreshed Community plugins UI tab");
-						}
+					if (
+						pluginTab &&
+						typeof pluginTab.display === "function" &&
+						settings.activeTab === pluginTab
+					) {
+						pluginTab.display();
 					}
 				}
 
-				// Alternative: Try to refresh the active tab if it's related to plugins
-				if (settings.activeTab && typeof settings.activeTab.display === "function") {
+				if (
+					settings.activeTab &&
+					typeof settings.activeTab.display === "function"
+				) {
 					const activeTabId = (
-						settings.activeTab.id || settings.activeTab.name || ""
+						settings.activeTab.id ||
+						settings.activeTab.name ||
+						""
 					).toLowerCase();
-					if (activeTabId.includes("community") || activeTabId.includes("plugin")) {
+					if (
+						activeTabId.includes("community") ||
+						activeTabId.includes("plugin")
+					) {
 						settings.activeTab.display();
-						logger.debug("Refreshed active settings tab");
 					}
 				}
 			}
 
-			// Try to trigger UI update through plugins API
 			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
 			if (pluginsApi) {
-				// Request settings save which often triggers UI refresh
-				if (
-					pluginsApi.requestSaveSettings &&
-					typeof pluginsApi.requestSaveSettings === "function"
-				) {
+				if (typeof pluginsApi.requestSaveSettings === "function") {
 					await pluginsApi.requestSaveSettings();
 				}
-
-				// Try to trigger a manual refresh of the plugin list display
-				if (
-					pluginsApi.updatePluginList &&
-					typeof pluginsApi.updatePluginList === "function"
-				) {
+				if (typeof pluginsApi.updatePluginList === "function") {
 					pluginsApi.updatePluginList();
-					logger.debug("Called updatePluginList()");
 				}
 			}
-
-			// Use requestAnimationFrame to ensure UI updates are processed
-			requestAnimationFrame(() => {
-				// Force a re-render by dispatching a custom event
-				if (typeof window !== "undefined") {
-					window.dispatchEvent(new Event("resize"));
-				}
-			});
 		} catch (error) {
 			logger.warn("Could not refresh UI automatically:", error);
-			// UI refresh is not critical, so we don't throw
 		}
 	}
 }
-

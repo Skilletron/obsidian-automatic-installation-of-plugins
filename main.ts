@@ -46,23 +46,13 @@ export default class InstallCommunityPlugins extends Plugin {
 		);
 		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
 
-		if (this.settings.loadSettingsOnStartup) {
-			this.applySettingsToInstalledPlugins();
-		}
-
-		if (this.settings.autoInstallPlugins) {
-			new Notice("Starting community plugins installation...");
-			await this.installPluginsFromFile();
-			new Notice("Installation process finished.");
-		}
-
 		// Add command for manual installation
 		this.addCommand({
 			id: "install-plugins",
 			name: "Install plugins from list",
 			callback: async () => {
 				new Notice("Starting manual plugin installation...");
-				await this.installPluginsFromFile();
+				await this.runInstallPipeline();
 				new Notice("Manual installation finished.");
 			},
 		});
@@ -70,6 +60,40 @@ export default class InstallCommunityPlugins extends Plugin {
 		this.addSettingTab(
 			new InstallCommunityPluginsSettingTab(this.app, this)
 		);
+
+		// Wait for workspace layout — enabling plugins like Recent Files needs side leaves.
+		this.app.workspace.onLayoutReady(() => {
+			void this.onWorkspaceReady();
+		});
+	}
+
+	/**
+	 * Startup work that touches other plugins / the workspace.
+	 */
+	private async onWorkspaceReady(): Promise<void> {
+		try {
+			if (this.settings.loadSettingsOnStartup) {
+				this.applySettingsToInstalledPlugins();
+			}
+
+			if (this.settings.autoInstallPlugins) {
+				new Notice("Starting community plugins installation...");
+				await this.runInstallPipeline();
+				new Notice("Installation process finished.");
+			}
+		} catch (error) {
+			logger.error("Startup install pipeline failed:", error);
+			new Notice(
+				"[Installer] Startup install failed. See console for details."
+			);
+		}
+	}
+
+	/**
+	 * Install from list, then enable (shared by startup + command).
+	 */
+	private async runInstallPipeline(): Promise<void> {
+		await this.installPluginsFromFile();
 	}
 
 	async loadSettings() {

@@ -14,6 +14,9 @@ export interface PluginRegistryEntry {
 }
 
 export interface GitHubRelease {
+	tag_name?: string;
+	prerelease?: boolean;
+	draft?: boolean;
 	assets: Array<{
 		name: string;
 		browser_download_url: string;

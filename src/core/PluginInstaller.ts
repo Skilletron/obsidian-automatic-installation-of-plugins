@@ -43,10 +43,40 @@ export class PluginInstaller {
 		}
 
 		const pluginFolder = path.join(pluginsFolder, pluginId);
+		const manifestPath = path.join(pluginFolder, "manifest.json");
+		const mainPath = path.join(pluginFolder, "main.js");
 
+		if (
+			this.fileManager.fileExists(manifestPath) &&
+			this.fileManager.fileExists(mainPath)
+		) {
+			const existingId = this.readManifestId(manifestPath);
+			if (!existingId || existingId === pluginId) {
+				new Notice(`Plugin "${pluginId}" already installed.`);
+				return true;
+			}
+			logger.warn(
+				`Plugin folder "${pluginId}" has mismatched manifest id "${existingId}". Reinstalling stable build...`
+			);
+		}
+
+		// Incomplete / mismatched leftover folder — remove and retry.
 		if (this.fileManager.fileExists(pluginFolder)) {
-			new Notice(`Plugin "${pluginId}" already installed.`);
-			return true;
+			logger.warn(
+				`Removing existing folder for "${pluginId}" before install...`
+			);
+			try {
+				fs.rmSync(pluginFolder, { recursive: true, force: true });
+			} catch (error) {
+				logger.error(
+					`Failed to remove plugin folder ${pluginFolder}:`,
+					error
+				);
+				new Notice(
+					`[Installer] Cannot repair install of "${pluginId}". Remove the folder manually.`
+				);
+				return false;
+			}
 		}
 
 		try {
@@ -88,17 +118,17 @@ export class PluginInstaller {
 
 			const [owner, repo] = repoParts;
 
-			// Fetch latest release
-			const release = await this.networkManager.fetchJson<GitHubRelease>(
-				`https://api.github.com/repos/${owner}/${repo}/releases/latest`
-			);
-
+			const release = await this.selectRelease(owner, repo, pluginId);
 			if (!release || !release.assets || !Array.isArray(release.assets)) {
 				new Notice(
 					`No release assets found for plugin "${pluginId}". The plugin may not have any releases.`
 				);
 				return false;
 			}
+
+			logger.debug(
+				`Installing "${pluginId}" from ${owner}/${repo}@${release.tag_name || "unknown"}`
+			);
 
 			if (!this.fileManager.isFileSystemAccessible(pluginFolder)) {
 				new Notice(
@@ -177,6 +207,26 @@ export class PluginInstaller {
 				return false;
 			}
 
+			if (
+				!this.fileManager.fileExists(manifestPath) ||
+				!this.fileManager.fileExists(mainPath)
+			) {
+				new Notice(
+					`[Installer] Plugin "${pluginId}" downloaded but is missing main.js or manifest.json.`
+				);
+				logger.error(
+					`Incomplete install for ${pluginId}. manifest=${this.fileManager.fileExists(manifestPath)} main.js=${this.fileManager.fileExists(mainPath)}`
+				);
+				return false;
+			}
+
+			const installedManifestId = this.readManifestId(manifestPath);
+			if (installedManifestId && installedManifestId !== pluginId) {
+				logger.warn(
+					`Installed "${pluginId}" but manifest id is "${installedManifestId}". Enable will use the manifest id.`
+				);
+			}
+
 			// Apply settings if configured
 			if (this.loadSettingsOnInstall) {
 				this.settingsManager.applySettingsForPlugin(
@@ -196,6 +246,71 @@ export class PluginInstaller {
 			);
 			logger.error(`Installation error for ${pluginId}:`, error);
 			return false;
+		}
+	}
+
+	/**
+	 * Picks the best GitHub release for a registry plugin id.
+	 * Prefers non-draft, non-prerelease, non-beta tags — "latest" can be a beta
+	 * whose manifest id differs (e.g. calendar => calendar-beta).
+	 */
+	private async selectRelease(
+		owner: string,
+		repo: string,
+		pluginId: string
+	): Promise<GitHubRelease | null> {
+		try {
+			const releases = await this.networkManager.fetchJson<GitHubRelease[]>(
+				`https://api.github.com/repos/${owner}/${repo}/releases?per_page=20`
+			);
+
+			if (!Array.isArray(releases) || releases.length === 0) {
+				return await this.networkManager.fetchJson<GitHubRelease>(
+					`https://api.github.com/repos/${owner}/${repo}/releases/latest`
+				);
+			}
+
+			const withAssets = releases.filter(
+				(r) =>
+					!r.draft &&
+					Array.isArray(r.assets) &&
+					r.assets.length > 0
+			);
+
+			const isUnstable = (r: GitHubRelease) =>
+				!!r.prerelease ||
+				/beta|alpha|rc|preview/i.test(r.tag_name || "");
+
+			const stable = withAssets.find((r) => !isUnstable(r));
+			if (stable) {
+				return stable;
+			}
+
+			logger.warn(
+				`No stable release found for ${owner}/${repo}; using newest available for "${pluginId}".`
+			);
+			return withAssets[0] || null;
+		} catch (error) {
+			logger.warn(
+				`Failed to list releases for ${owner}/${repo}, falling back to /latest:`,
+				error
+			);
+			return await this.networkManager.fetchJson<GitHubRelease>(
+				`https://api.github.com/repos/${owner}/${repo}/releases/latest`
+			);
+		}
+	}
+
+	private readManifestId(manifestPath: string): string | null {
+		try {
+			const raw = this.fileManager.readFile(manifestPath);
+			if (!raw) {
+				return null;
+			}
+			const manifest = JSON.parse(raw) as { id?: string };
+			return typeof manifest.id === "string" ? manifest.id : null;
+		} catch {
+			return null;
 		}
 	}
 

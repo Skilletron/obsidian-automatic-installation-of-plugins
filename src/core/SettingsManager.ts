@@ -49,9 +49,13 @@ export class SettingsManager {
 
 		for (const pluginId of Object.keys(allSettings)) {
 			const pluginFolder = path.join(pluginsFolder, pluginId);
+			const manifestPath = path.join(pluginFolder, "manifest.json");
 			const dataJsonPath = path.join(pluginFolder, "data.json");
 
-			if (this.fileManager.fileExists(pluginFolder) && allSettings[pluginId]) {
+			if (
+				this.fileManager.fileExists(manifestPath) &&
+				allSettings[pluginId]
+			) {
 				try {
 					if (!this.fileManager.isFileSystemAccessible(dataJsonPath)) {
 						new Notice(
@@ -103,6 +107,14 @@ export class SettingsManager {
 			);
 
 			if (allSettings && allSettings[pluginId]) {
+				const manifestPath = path.join(pluginFolder, "manifest.json");
+				if (!this.fileManager.fileExists(manifestPath)) {
+					logger.warn(
+						`Skipping settings for "${pluginId}": plugin is not fully installed.`
+					);
+					return;
+				}
+
 				const dataJsonPath = path.join(pluginFolder, "data.json");
 				if (this.fileManager.isFileSystemAccessible(dataJsonPath)) {
 					this.fileManager.writeFile(
