@@ -21,9 +21,10 @@ This plugin makes network requests when installing plugins:
 | Remote service | Purpose |
 |---|---|
 | `https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json` | Look up community plugin IDs and their GitHub repositories |
-| `https://api.github.com/repos/.../releases/latest` (and GitHub release asset URLs) | Download `main.js`, `manifest.json`, and optional `styles.css` for each listed plugin |
+| `https://api.github.com/.../releases` and release `manifest.json` assets | Resolve a stable release version and manifest for each listed plugin |
+| Obsidian's built-in `installPlugin` | Download and install release files through Obsidian (same path as Community plugins UI) |
 
-No telemetry is sent. Downloads happen only for plugin IDs you put in `community-plugins-list.json` (and only when auto-install or the install command runs).
+No telemetry is sent. Installs happen only for plugin IDs you put in `community-plugins-list.json` (and only when auto-install or the install command runs).
 
 ## Security warning
 

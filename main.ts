@@ -39,6 +39,7 @@ export default class InstallCommunityPlugins extends Plugin {
 		this.networkManager = new NetworkManager();
 		this.settingsManager = new SettingsManager(this.fileManager);
 		this.pluginInstaller = new PluginInstaller(
+			this.app,
 			this.fileManager,
 			this.networkManager,
 			this.settingsManager,
@@ -349,6 +350,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnInstall = value;
 						this.plugin.pluginInstaller = new PluginInstaller(
+							this.plugin.app,
 							this.plugin.fileManager,
 							this.plugin.networkManager,
 							this.plugin.settingsManager,

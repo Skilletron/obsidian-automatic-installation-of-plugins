@@ -1,6 +1,6 @@
 {
 	"name": "automatic-plugin-manager",
-	"version": "1.1.7",
+	"version": "1.1.8",
 	"main": "main.js",
 	"description": "Install, enable, and configure Obsidian community plugins from JSON files for syncing vault setups across devices.",
 	"scripts": {
@@ -20,7 +20,6 @@
 	"author": "Konstantin Volobuev",
 	"license": "MIT",
 	"devDependencies": {
-		"@types/jszip": "^3.4.1",
 		"@types/node": "^16.11.6",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
@@ -28,8 +27,5 @@
 		"obsidian": "latest",
 		"tslib": "2.4.0",
 		"typescript": "4.7.4"
-	},
-	"dependencies": {
-		"jszip": "^3.10.1"
 	}
 }

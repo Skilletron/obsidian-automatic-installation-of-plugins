@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.8] - 2026-08-08
+
+### Changed
+- Install community plugins via Obsidian's `installPlugin` API (no ZIP / JSZip)
+- Removes false-positive automated review flags for self-update and dynamic `<script>` from JSZip
+
+## [1.1.7] - 2026-08-08
+
+### Fixed
+- Automated review: unsafe `any`, `window.setTimeout` / `window.clearTimeout`
+- Replace `builtin-modules` with `node:module`
+
 ## [1.1.6] - 2026-08-08
 
 ### Changed
