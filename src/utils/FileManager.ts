@@ -1,26 +1,17 @@
-import * as fs from "fs";
-import * as path from "path";
 import { App, FileSystemAdapter, Notice } from "obsidian";
-import { PathInfo } from "../types";
 import { logger } from "./Logger";
 
 /**
- * Utility class for file system operations.
+ * Vault-relative file helpers via Obsidian's DataAdapter (no Node fs).
  */
 export class FileManager {
 	constructor(private app: App) {}
 
 	/**
-	 * Gets the base path and config directory for file system operations.
-	 * @throws {Error} If the adapter is not a FileSystemAdapter (not desktop)
+	 * Ensures desktop FileSystemAdapter is available.
 	 */
-	getBasePathAndConfigDir(): PathInfo {
-		const adapter = this.app.vault.adapter;
-		if (adapter instanceof FileSystemAdapter) {
-			const basePath = adapter.getBasePath();
-			const configDir = this.app.vault.configDir;
-			return { basePath, configDir };
-		} else {
+	assertDesktopAdapter(): void {
+		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
 			throw new Error(
 				"Base path is only available on desktop. This plugin requires desktop version of Obsidian."
 			);
@@ -28,108 +19,111 @@ export class FileManager {
 	}
 
 	/**
-	 * Validates that the file system is accessible before operations.
-	 * @param filePath - Path to check
-	 * @returns True if accessible, false otherwise
+	 * Joins vault-relative path segments (Obsidian uses `/`).
 	 */
-	isFileSystemAccessible(filePath: string): boolean {
+	joinPath(...parts: string[]): string {
+		return parts
+			.filter((part) => part.length > 0)
+			.join("/")
+			.replace(/\\/g, "/")
+			.replace(/\/+/g, "/");
+	}
+
+	/**
+	 * Path under the vault config dir (usually `.obsidian/...`).
+	 */
+	configPath(...parts: string[]): string {
+		return this.joinPath(this.app.vault.configDir, ...parts);
+	}
+
+	/**
+	 * Path under `.obsidian/plugins/...`.
+	 */
+	pluginsPath(...parts: string[]): string {
+		return this.configPath("plugins", ...parts);
+	}
+
+	async exists(vaultPath: string): Promise<boolean> {
 		try {
-			const dir = path.dirname(filePath);
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir, { recursive: true });
-			}
-			return true;
-		} catch (error) {
-			logger.error(`File system not accessible at ${filePath}:`, error);
+			return await this.app.vault.adapter.exists(vaultPath);
+		} catch (err: unknown) {
+			logger.error(`exists() failed for ${vaultPath}:`, err);
 			return false;
 		}
 	}
 
 	/**
-	 * Reads a file and returns its content.
-	 * @param filePath - Path to the file
-	 * @returns File content or null if error
+	 * Ensures parent directories exist so a file can be written.
 	 */
-	readFile(filePath: string): string | null {
+	async ensureParentDir(vaultFilePath: string): Promise<boolean> {
+		const normalized = vaultFilePath.replace(/\\/g, "/");
+		const lastSlash = normalized.lastIndexOf("/");
+		if (lastSlash <= 0) {
+			return true;
+		}
+		return this.ensureDirectory(normalized.slice(0, lastSlash));
+	}
+
+	async ensureDirectory(vaultPath: string): Promise<boolean> {
 		try {
-			return fs.readFileSync(filePath, "utf-8");
-		} catch (error) {
+			if (await this.exists(vaultPath)) {
+				return true;
+			}
+			const parts = vaultPath.replace(/\\/g, "/").split("/").filter(Boolean);
+			let current = "";
+			for (const part of parts) {
+				current = current ? `${current}/${part}` : part;
+				if (!(await this.exists(current))) {
+					await this.app.vault.adapter.mkdir(current);
+				}
+			}
+			return true;
+		} catch (err: unknown) {
+			logger.error(`Failed to create directory ${vaultPath}:`, err);
+			return false;
+		}
+	}
+
+	async readFile(vaultPath: string): Promise<string | null> {
+		try {
+			return await this.app.vault.adapter.read(vaultPath);
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(`[Installer] Failed to read file: ${errorMessage}`);
-			logger.error(`[Installer] File read error for ${filePath}:`, error);
+			logger.error(`[Installer] File read error for ${vaultPath}:`, err);
 			return null;
 		}
 	}
 
-	/**
-	 * Writes content to a file.
-	 * @param filePath - Path to the file
-	 * @param content - Content to write
-	 * @returns True if successful, false otherwise
-	 */
-	writeFile(filePath: string, content: string): boolean {
+	async writeFile(vaultPath: string, content: string): Promise<boolean> {
 		try {
-			if (!this.isFileSystemAccessible(filePath)) {
+			if (!(await this.ensureParentDir(vaultPath))) {
 				return false;
 			}
-			fs.writeFileSync(filePath, content, "utf-8");
+			await this.app.vault.adapter.write(vaultPath, content);
 			return true;
-		} catch (error) {
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(`[Installer] Failed to write file: ${errorMessage}`);
-			logger.error(`[Installer] File write error for ${filePath}:`, error);
+			logger.error(`[Installer] File write error for ${vaultPath}:`, err);
 			return false;
 		}
 	}
 
-	/**
-	 * Checks if a file exists.
-	 * @param filePath - Path to check
-	 * @returns True if exists, false otherwise
-	 */
-	fileExists(filePath: string): boolean {
-		return fs.existsSync(filePath);
-	}
-
-	/**
-	 * Creates a directory if it doesn't exist.
-	 * @param dirPath - Path to the directory
-	 * @returns True if successful, false otherwise
-	 */
-	ensureDirectory(dirPath: string): boolean {
+	async removeRecursive(vaultPath: string): Promise<void> {
 		try {
-			if (!fs.existsSync(dirPath)) {
-				fs.mkdirSync(dirPath, { recursive: true });
+			if (await this.exists(vaultPath)) {
+				await this.app.vault.adapter.rmdir(vaultPath, true);
 			}
-			return true;
-		} catch (error) {
-			logger.error(`Failed to create directory ${dirPath}:`, error);
-			return false;
-		}
-	}
-
-	/**
-	 * Gets the size of a file in bytes.
-	 * @param filePath - Path to the file
-	 * @returns File size in bytes or null if error
-	 */
-	getFileSize(filePath: string): number | null {
-		try {
-			const stats = fs.statSync(filePath);
-			return stats.size;
-		} catch (error) {
-			logger.error(`Failed to get file size for ${filePath}:`, error);
-			return null;
+		} catch (err: unknown) {
+			logger.debug(`removeRecursive failed for ${vaultPath}:`, err);
 		}
 	}
 
 	/**
 	 * Validates and parses JSON content with detailed error messages.
-	 * @param content - JSON string to parse
-	 * @param fileName - Name of the file for error messages
-	 * @returns Parsed JSON object or null if invalid
 	 */
 	parseJsonWithValidation<T>(content: string, fileName: string): T | null {
 		if (!content || content.trim() === "") {
@@ -141,15 +135,14 @@ export class FileManager {
 
 		try {
 			return JSON.parse(content) as T;
-		} catch (error) {
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
 				`[Installer] Invalid JSON in ${fileName}: ${errorMessage}. Please check the file format.`
 			);
-			logger.error(`JSON parse error in ${fileName}:`, error);
+			logger.error(`JSON parse error in ${fileName}:`, err);
 			return null;
 		}
 	}
 }
-

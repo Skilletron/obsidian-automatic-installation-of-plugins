@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import { App, Notice } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { logger } from "../utils/Logger";
@@ -47,6 +45,10 @@ export class PluginEnabler {
 		private fileManager: FileManager
 	) {}
 
+	private getPluginsApi(): PluginsAPI | undefined {
+		return (this.app as App & { plugins?: PluginsAPI }).plugins;
+	}
+
 	/**
 	 * Updates the plugin list and enables all plugins from the provided list.
 	 */
@@ -59,7 +61,7 @@ export class PluginEnabler {
 		}
 
 		try {
-			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
+			const pluginsApi = this.getPluginsApi();
 
 			if (!pluginsApi) {
 				new Notice(
@@ -69,20 +71,20 @@ export class PluginEnabler {
 				return { enabled: 0, failed: 0, failedPlugins: pluginIds };
 			}
 
-			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
-			const pluginsFolder = path.join(basePath, configDir, "plugins");
-
 			const installedPluginIds: string[] = [];
 			for (const pluginId of pluginIds) {
 				if (typeof pluginId !== "string" || pluginId.trim() === "") {
 					continue;
 				}
 				const normalizedId = pluginId.trim();
-				const pluginFolder = path.join(pluginsFolder, normalizedId);
-				const manifestPath = path.join(pluginFolder, "manifest.json");
-				if (fs.existsSync(manifestPath)) {
+				const pluginFolder = this.fileManager.pluginsPath(normalizedId);
+				const manifestPath = this.fileManager.pluginsPath(
+					normalizedId,
+					"manifest.json"
+				);
+				if (await this.fileManager.exists(manifestPath)) {
 					installedPluginIds.push(normalizedId);
-				} else if (fs.existsSync(pluginFolder)) {
+				} else if (await this.fileManager.exists(pluginFolder)) {
 					logger.warn(
 						`Plugin folder exists but manifest.json is missing: ${pluginFolder}`
 					);
@@ -146,9 +148,9 @@ export class PluginEnabler {
 								`Could not enable "${pluginId}": ${result.reason || "unknown reason"}`
 							);
 						}
-					} catch (error) {
+					} catch (err: unknown) {
 						if (attempt === 2) {
-							logger.error(`Failed to enable plugin "${pluginId}":`, error);
+							logger.error(`Failed to enable plugin "${pluginId}":`, err);
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
 							}
@@ -183,13 +185,13 @@ export class PluginEnabler {
 			}
 
 			return { enabled: enabledCount, failed: failedCount, failedPlugins };
-		} catch (error) {
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
 				`[Installer] Error while enabling plugins: ${errorMessage}. See console for details.`
 			);
-			logger.error("Error enabling plugins:", error);
+			logger.error("Error enabling plugins:", err);
 			return { enabled: 0, failed: pluginIds.length, failedPlugins: pluginIds };
 		}
 	}
@@ -219,8 +221,8 @@ export class PluginEnabler {
 				logger.debug("Reloaded manifests via loadManifests()");
 				return;
 			}
-		} catch (error) {
-			logger.warn("loadManifests failed:", error);
+		} catch (err: unknown) {
+			logger.warn("loadManifests failed:", err);
 		}
 
 		try {
@@ -228,38 +230,36 @@ export class PluginEnabler {
 				await pluginsApi.loadAvailablePlugins();
 				logger.debug("Reloaded plugins via loadAvailablePlugins()");
 			}
-		} catch (error) {
-			logger.warn("loadAvailablePlugins failed:", error);
+		} catch (err: unknown) {
+			logger.warn("loadAvailablePlugins failed:", err);
 		}
 	}
 
 	/**
 	 * Candidate IDs for a plugin folder: folder name + id from local manifest.json.
 	 */
-	private getCandidateIds(pluginId: string): string[] {
+	private async getCandidateIds(pluginId: string): Promise<string[]> {
 		const candidates = [pluginId];
 		try {
-			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
-			const manifestPath = path.join(
-				basePath,
-				configDir,
-				"plugins",
+			const manifestPath = this.fileManager.pluginsPath(
 				pluginId,
 				"manifest.json"
 			);
-			if (fs.existsSync(manifestPath)) {
-				const raw = fs.readFileSync(manifestPath, "utf-8");
-				const manifest = JSON.parse(raw) as { id?: string };
-				if (
-					typeof manifest.id === "string" &&
-					manifest.id &&
-					!candidates.includes(manifest.id)
-				) {
-					candidates.push(manifest.id);
+			if (await this.fileManager.exists(manifestPath)) {
+				const raw = await this.fileManager.readFile(manifestPath);
+				if (raw) {
+					const manifest = JSON.parse(raw) as { id?: string };
+					if (
+						typeof manifest.id === "string" &&
+						manifest.id &&
+						!candidates.includes(manifest.id)
+					) {
+						candidates.push(manifest.id);
+					}
 				}
 			}
-		} catch (error) {
-			logger.debug(`Could not read local manifest for "${pluginId}":`, error);
+		} catch (err: unknown) {
+			logger.debug(`Could not read local manifest for "${pluginId}":`, err);
 		}
 		return candidates;
 	}
@@ -267,12 +267,12 @@ export class PluginEnabler {
 	/**
 	 * Resolves the registry/manifest ID for a folder plugin ID.
 	 */
-	private resolvePluginId(
+	private async resolvePluginId(
 		pluginId: string,
 		pluginsApi: PluginsAPI
-	): string | null {
+	): Promise<string | null> {
 		const manifests = pluginsApi.manifests || {};
-		const candidates = this.getCandidateIds(pluginId);
+		const candidates = await this.getCandidateIds(pluginId);
 
 		for (const candidate of candidates) {
 			if (Object.prototype.hasOwnProperty.call(manifests, candidate)) {
@@ -320,22 +320,22 @@ export class PluginEnabler {
 		actualId: string;
 		reason?: string;
 	}> {
-		let actualPluginId = this.resolvePluginId(pluginId, pluginsApi);
+		let actualPluginId = await this.resolvePluginId(pluginId, pluginsApi);
 
 		if (!actualPluginId && typeof pluginsApi.loadManifest === "function") {
-			for (const candidate of this.getCandidateIds(pluginId)) {
+			for (const candidate of await this.getCandidateIds(pluginId)) {
 				try {
 					await pluginsApi.loadManifest(candidate);
-				} catch (error) {
-					logger.debug(`loadManifest("${candidate}") failed:`, error);
+				} catch (err: unknown) {
+					logger.debug(`loadManifest("${candidate}") failed:`, err);
 				}
 			}
-			actualPluginId = this.resolvePluginId(pluginId, pluginsApi);
+			actualPluginId = await this.resolvePluginId(pluginId, pluginsApi);
 		}
 
 		// Folder exists with a valid manifest — try enabling even if manifests map lags.
 		if (!actualPluginId) {
-			const candidates = this.getCandidateIds(pluginId);
+			const candidates = await this.getCandidateIds(pluginId);
 			if (candidates.length > 0) {
 				actualPluginId = candidates[0];
 			}
@@ -359,7 +359,7 @@ export class PluginEnabler {
 		}
 
 		const enableIds = Array.from(
-			new Set([actualPluginId, ...this.getCandidateIds(pluginId)])
+			new Set([actualPluginId, ...(await this.getCandidateIds(pluginId))])
 		);
 		let lastError = "";
 
@@ -385,8 +385,8 @@ export class PluginEnabler {
 
 				// API call did not throw — treat as success even if Set lags.
 				return { enabled: true, failed: false, actualId: enableId };
-			} catch (error) {
-				lastError = error instanceof Error ? error.message : String(error);
+			} catch (err: unknown) {
+				lastError = err instanceof Error ? err.message : String(err);
 				logger.debug(`Enable "${enableId}" failed: ${lastError}`);
 			}
 		}
@@ -397,7 +397,6 @@ export class PluginEnabler {
 			actualId: actualPluginId,
 			reason: `enable threw: ${lastError || "unknown error"}`,
 		};
-
 	}
 
 	/**
@@ -407,7 +406,7 @@ export class PluginEnabler {
 		try {
 			await new Promise((resolve) => window.setTimeout(resolve, 300));
 
-			const settings = (this.app as { setting?: SettingsAPI }).setting;
+			const settings = (this.app as App & { setting?: SettingsAPI }).setting;
 			if (settings) {
 				if (settings.pluginTabs && Array.isArray(settings.pluginTabs)) {
 					const pluginTab = settings.pluginTabs.find(
@@ -445,7 +444,7 @@ export class PluginEnabler {
 				}
 			}
 
-			const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
+			const pluginsApi = this.getPluginsApi();
 			if (pluginsApi) {
 				if (typeof pluginsApi.requestSaveSettings === "function") {
 					await pluginsApi.requestSaveSettings();
@@ -454,8 +453,8 @@ export class PluginEnabler {
 					pluginsApi.updatePluginList();
 				}
 			}
-		} catch (error) {
-			logger.warn("Could not refresh UI automatically:", error);
+		} catch (err: unknown) {
+			logger.warn("Could not refresh UI automatically:", err);
 		}
 	}
 }

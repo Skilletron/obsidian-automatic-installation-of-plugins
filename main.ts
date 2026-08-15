@@ -5,7 +5,6 @@ import {
 	Setting,
 	Notice,
 } from "obsidian";
-import * as path from "path";
 import { FileManager } from "./src/utils/FileManager";
 import { NetworkManager } from "./src/utils/NetworkManager";
 import { SettingsManager } from "./src/core/SettingsManager";
@@ -15,7 +14,6 @@ import {
 	InstallCommunityPluginsSettings,
 	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
-	PLUGINS_SETTINGS_FILE,
 } from "./src/types";
 import { logger, LogLevel } from "./src/utils/Logger";
 
@@ -43,7 +41,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			this.fileManager,
 			this.networkManager,
 			this.settingsManager,
-			this.settings.loadSettingsOnInstall
+			() => this.settings.loadSettingsOnInstall
 		);
 		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
 
@@ -74,7 +72,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	private async onWorkspaceReady(): Promise<void> {
 		try {
 			if (this.settings.loadSettingsOnStartup) {
-				this.applySettingsToInstalledPlugins();
+				await this.applySettingsToInstalledPlugins();
 			}
 
 			if (this.settings.autoInstallPlugins) {
@@ -82,8 +80,8 @@ export default class InstallCommunityPlugins extends Plugin {
 				await this.runInstallPipeline();
 				new Notice("Installation process finished.");
 			}
-		} catch (error) {
-			logger.error("Startup install pipeline failed:", error);
+		} catch (err: unknown) {
+			logger.error("Startup install pipeline failed:", err);
 			new Notice(
 				"[Installer] Startup install failed. See console for details."
 			);
@@ -103,8 +101,15 @@ export default class InstallCommunityPlugins extends Plugin {
 			| null
 			| undefined;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
-		
-		// Set log level from settings
+
+		this.applyLogLevel(this.settings.logLevel || "error");
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+
+	applyLogLevel(level: InstallCommunityPluginsSettings["logLevel"]): void {
 		const logLevelMap: Record<string, LogLevel> = {
 			debug: LogLevel.DEBUG,
 			info: LogLevel.INFO,
@@ -112,34 +117,23 @@ export default class InstallCommunityPlugins extends Plugin {
 			error: LogLevel.ERROR,
 			none: LogLevel.NONE,
 		};
-		const level = logLevelMap[this.settings.logLevel || "error"] || LogLevel.ERROR;
-		logger.setLevel(level);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
+		logger.setLevel(logLevelMap[level || "error"] || LogLevel.ERROR);
 	}
 
 	/**
 	 * Applies settings from community-plugins-settings.json to installed plugins.
 	 */
-	applySettingsToInstalledPlugins() {
+	async applySettingsToInstalledPlugins(): Promise<void> {
 		try {
-			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
-			const pluginsFolder = path.join(basePath, configDir, "plugins");
-			const settingsFile = path.join(basePath, configDir, PLUGINS_SETTINGS_FILE);
-
-		this.settingsManager.applySettingsToInstalledPlugins(
-			pluginsFolder,
-			settingsFile
-		);
-		} catch (error) {
+			this.fileManager.assertDesktopAdapter();
+			await this.settingsManager.applySettingsToInstalledPlugins();
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
 				`[Installer] Cannot access file system: ${errorMessage}`
 			);
-			logger.error("File system access error:", error);
+			logger.error("File system access error:", err);
 		}
 	}
 
@@ -148,37 +142,34 @@ export default class InstallCommunityPlugins extends Plugin {
 	 */
 	async installPluginsFromFile() {
 		try {
-			const { basePath, configDir } = this.fileManager.getBasePathAndConfigDir();
-			const pluginsJsonPath = path.join(
-				basePath,
-				configDir,
-				PLUGINS_LIST_FILE
-			);
-			const pluginsFolder = path.join(basePath, configDir, "plugins");
-			const settingsFile = path.join(basePath, configDir, PLUGINS_SETTINGS_FILE);
+			this.fileManager.assertDesktopAdapter();
+			const pluginsJsonPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
 
-			if (!this.fileManager.fileExists(pluginsJsonPath)) {
+			if (!(await this.fileManager.exists(pluginsJsonPath))) {
 				try {
-					if (!this.fileManager.isFileSystemAccessible(pluginsJsonPath)) {
+					const created = await this.fileManager.writeFile(
+						pluginsJsonPath,
+						"[]"
+					);
+					if (!created) {
 						new Notice(
 							`[Installer] Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`
 						);
 						return;
 					}
-					this.fileManager.writeFile(pluginsJsonPath, "[]");
 					new Notice(`[Installer] Created empty ${PLUGINS_LIST_FILE}`);
-				} catch (error) {
+				} catch (err: unknown) {
 					const errorMessage =
-						error instanceof Error ? error.message : "Unknown error";
+						err instanceof Error ? err.message : "Unknown error";
 					new Notice(
 						`[Installer] Failed to create ${PLUGINS_LIST_FILE}: ${errorMessage}`
 					);
-				logger.error(`Failed to create ${PLUGINS_LIST_FILE}:`, error);
+					logger.error(`Failed to create ${PLUGINS_LIST_FILE}:`, err);
 				}
 				return;
 			}
 
-			const content = this.fileManager.readFile(pluginsJsonPath);
+			const content = await this.fileManager.readFile(pluginsJsonPath);
 			if (!content) {
 				return;
 			}
@@ -230,16 +221,8 @@ export default class InstallCommunityPlugins extends Plugin {
 					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${pluginId}...`
 				);
 
-				const success = await this.pluginInstaller.installPluginById(
-					pluginId,
-					pluginsFolder,
-					settingsFile,
-					(bytesDownloaded) => {
-						// Progress callback for download
-						const mb = (bytesDownloaded / 1024 / 1024).toFixed(2);
-						logger.debug(`Downloaded ${mb} MB for ${pluginId}`);
-					}
-				);
+				const success =
+					await this.pluginInstaller.installPluginById(pluginId);
 
 				if (success) {
 					installedCount++;
@@ -275,13 +258,13 @@ export default class InstallCommunityPlugins extends Plugin {
 					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.`
 				);
 			}
-		} catch (error) {
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
 				`[Installer] Error during installation: ${errorMessage}. See console for details.`
 			);
-			logger.error("Installation error:", error);
+			logger.error("Installation error:", err);
 		}
 	}
 }
@@ -297,6 +280,77 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Obsidian 1.13.0+: declarative settings (searchable). Skips display().
+	 */
+	getSettingDefinitions() {
+		return [
+			{
+				name: "Security warning",
+				desc: "This downloads and installs community plugins from the Obsidian registry and GitHub releases. Only use it with trusted vaults, and review community-plugins-list.json before enabling.",
+			},
+			{
+				name: "Auto-install plugins on startup",
+				desc: "Install missing plugins listed in community-plugins-list.json when Obsidian starts.",
+				control: {
+					type: "toggle" as const,
+					key: "autoInstallPlugins",
+				},
+			},
+			{
+				name: "Auto-enable plugins after installation",
+				desc: "Enable installed plugins after installation. The plugin list is refreshed first so newly installed plugins are recognized.",
+				control: {
+					type: "toggle" as const,
+					key: "autoEnablePlugins",
+				},
+			},
+			{
+				name: "Apply settings on installation",
+				desc: "After installing a plugin, apply its configuration from community-plugins-settings.json.",
+				control: {
+					type: "toggle" as const,
+					key: "loadSettingsOnInstall",
+				},
+			},
+			{
+				name: "Sync settings on every startup",
+				desc: "On each startup, re-apply settings from community-plugins-settings.json to installed plugins.",
+				control: {
+					type: "toggle" as const,
+					key: "loadSettingsOnStartup",
+				},
+			},
+			{
+				name: "Logging level",
+				desc: "How much to log to the developer console (Ctrl/Cmd+Shift+I). Use Debug only while troubleshooting.",
+				render: (setting: Setting) => {
+					setting.addDropdown((dropdown) => {
+						dropdown
+							.addOption("debug", "Debug (most verbose)")
+							.addOption("info", "Info")
+							.addOption("warn", "Warn")
+							.addOption("error", "Error (recommended)")
+							.addOption("none", "None")
+							.setValue(this.plugin.settings.logLevel || "error")
+							.onChange(
+								async (
+									value: "debug" | "info" | "warn" | "error" | "none"
+								) => {
+									this.plugin.settings.logLevel = value;
+									await this.plugin.saveSettings();
+									this.plugin.applyLogLevel(value);
+								}
+							);
+					});
+				},
+			},
+		];
+	}
+
+	/**
+	 * Pre-1.13.0: imperative settings UI.
+	 */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -349,13 +403,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.loadSettingsOnInstall)
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnInstall = value;
-						this.plugin.pluginInstaller = new PluginInstaller(
-							this.plugin.app,
-							this.plugin.fileManager,
-							this.plugin.networkManager,
-							this.plugin.settingsManager,
-							value
-						);
 						await this.plugin.saveSettings();
 					})
 			);
@@ -387,19 +434,15 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.addOption("error", "Error (recommended)")
 					.addOption("none", "None")
 					.setValue(this.plugin.settings.logLevel || "error")
-					.onChange(async (value: "debug" | "info" | "warn" | "error" | "none") => {
-						this.plugin.settings.logLevel = value;
-						await this.plugin.saveSettings();
-
-						const logLevelMap: Record<string, LogLevel> = {
-							debug: LogLevel.DEBUG,
-							info: LogLevel.INFO,
-							warn: LogLevel.WARN,
-							error: LogLevel.ERROR,
-							none: LogLevel.NONE,
-						};
-						logger.setLevel(logLevelMap[value] || LogLevel.ERROR);
-					});
+					.onChange(
+						async (
+							value: "debug" | "info" | "warn" | "error" | "none"
+						) => {
+							this.plugin.settings.logLevel = value;
+							await this.plugin.saveSettings();
+							this.plugin.applyLogLevel(value);
+						}
+					);
 			});
 	}
 }

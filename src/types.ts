@@ -23,11 +23,6 @@ export interface GitHubRelease {
 	}>;
 }
 
-export interface PathInfo {
-	basePath: string;
-	configDir: string;
-}
-
 export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
 	loadSettingsOnInstall: true,
 	loadSettingsOnStartup: true,
@@ -41,9 +36,5 @@ export const PLUGIN_REGISTRY_URL =
 	"https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json";
 export const PLUGINS_LIST_FILE = "community-plugins-list.json";
 export const PLUGINS_SETTINGS_FILE = "community-plugins-settings.json";
-export const MAX_REDIRECTS = 5;
 export const USER_AGENT = "obsidian-plugin-installer";
-export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
-export const NETWORK_TIMEOUT = 30000; // 30 seconds
-export const DOWNLOAD_TIMEOUT = 60000; // 60 seconds
 

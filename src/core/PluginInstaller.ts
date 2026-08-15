@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import { App, Notice, PluginManifest } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { NetworkManager } from "../utils/NetworkManager";
@@ -34,22 +32,21 @@ export class PluginInstaller {
 		private fileManager: FileManager,
 		private networkManager: NetworkManager,
 		private settingsManager: SettingsManager,
-		private loadSettingsOnInstall: boolean
+		private shouldLoadSettingsOnInstall: () => boolean
 	) {}
 
-	async installPluginById(
-		pluginId: string,
-		pluginsFolder: string,
-		settingsFile: string,
-		_onProgress?: (bytesDownloaded: number) => void
-	): Promise<boolean> {
+	private getPluginsApi(): PluginsAPI | undefined {
+		return (this.app as App & { plugins?: PluginsAPI }).plugins;
+	}
+
+	async installPluginById(pluginId: string): Promise<boolean> {
 		if (!pluginId || typeof pluginId !== "string" || pluginId.trim() === "") {
 			new Notice("Invalid plugin ID provided.");
 			return false;
 		}
 
 		const normalizedId = pluginId.trim();
-		const pluginsApi = (this.app as { plugins?: PluginsAPI }).plugins;
+		const pluginsApi = this.getPluginsApi();
 
 		if (
 			pluginsApi?.manifests &&
@@ -59,13 +56,16 @@ export class PluginInstaller {
 			return true;
 		}
 
-		const pluginFolder = path.join(pluginsFolder, normalizedId);
-		const manifestPath = path.join(pluginFolder, "manifest.json");
-		const mainPath = path.join(pluginFolder, "main.js");
+		const pluginFolder = this.fileManager.pluginsPath(normalizedId);
+		const manifestPath = this.fileManager.pluginsPath(
+			normalizedId,
+			"manifest.json"
+		);
+		const mainPath = this.fileManager.pluginsPath(normalizedId, "main.js");
 
 		if (
-			this.fileManager.fileExists(manifestPath) &&
-			this.fileManager.fileExists(mainPath)
+			(await this.fileManager.exists(manifestPath)) &&
+			(await this.fileManager.exists(mainPath))
 		) {
 			new Notice(`Plugin "${normalizedId}" already installed.`);
 			return true;
@@ -149,44 +149,39 @@ export class PluginInstaller {
 
 			await pluginsApi.installPlugin(pluginMeta.repo, version, manifest);
 
-			if (this.loadSettingsOnInstall) {
-				const installedFolder = path.join(pluginsFolder, manifest.id);
-				this.settingsManager.applySettingsForPlugin(
+			if (this.shouldLoadSettingsOnInstall()) {
+				const installedFolderId = (await this.fileManager.exists(
+					this.fileManager.pluginsPath(manifest.id)
+				))
+					? manifest.id
+					: normalizedId;
+
+				await this.settingsManager.applySettingsForPlugin(
 					normalizedId,
-					this.fileManager.fileExists(installedFolder)
-						? installedFolder
-						: pluginFolder,
-					settingsFile
+					installedFolderId
 				);
-				// Also try registry id folder if different from manifest id
 				if (manifest.id !== normalizedId) {
-					this.settingsManager.applySettingsForPlugin(
+					await this.settingsManager.applySettingsForPlugin(
 						manifest.id,
-						installedFolder,
-						settingsFile
+						installedFolderId
 					);
 				}
 			}
 
 			new Notice(`Plugin "${normalizedId}" installed successfully.`);
 			return true;
-		} catch (error) {
+		} catch (err: unknown) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
 				`[Installer] Failed to install plugin "${normalizedId}": ${errorMessage}. See console for details.`
 			);
-			logger.error(`Installation error for ${normalizedId}:`, error);
-			// Clean incomplete folder if any
+			logger.error(`Installation error for ${normalizedId}:`, err);
 			if (
-				this.fileManager.fileExists(pluginFolder) &&
-				!this.fileManager.fileExists(mainPath)
+				(await this.fileManager.exists(pluginFolder)) &&
+				!(await this.fileManager.exists(mainPath))
 			) {
-				try {
-					fs.rmSync(pluginFolder, { recursive: true, force: true });
-				} catch {
-					// ignore
-				}
+				await this.fileManager.removeRecursive(pluginFolder);
 			}
 			return false;
 		}
@@ -232,10 +227,10 @@ export class PluginInstaller {
 			}
 
 			return null;
-		} catch (error) {
+		} catch (err: unknown) {
 			logger.warn(
 				`Failed to list releases for ${owner}/${repo}, falling back to /latest:`,
-				error
+				err
 			);
 			return await this.networkManager.fetchJson<GitHubRelease>(
 				`https://api.github.com/repos/${owner}/${repo}/releases/latest`
