@@ -43,6 +43,17 @@ export class NetworkManager {
 		}
 	}
 
+	async tryFetchJson<T>(url: string): Promise<T | null> {
+		try {
+			return await this.fetchJson<T>(url);
+		} catch (err: unknown) {
+			if (err instanceof NetworkError && err.status === 404) {
+				return null;
+			}
+			throw err;
+		}
+	}
+
 	private statusHint(status: number): string {
 		if (status === 403 || status === 429) {
 			return " GitHub may be rate-limiting unauthenticated requests; wait and try again.";

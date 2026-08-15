@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional version pins in `community-plugins-list.json` (`{ "id", "version" }`)
 - Merge plugin settings into existing `data.json` (toggle; on for new installs)
 
+### Fixed
+- Obsidian 1.13 settings search skipped `display()`, so toggles with `control.key` did not save; auto-enable stayed off and Import never turned plugins on
+- Enable plugins via `loadManifest` + `enablePluginAndSave` / `saveConfig` so Community plugins toggles update without a reload
+
 ### Changed
 - Safer review defaults: auto-install, auto-enable, and settings sync remain off by default
 - Cache the community plugins registry for a single import run

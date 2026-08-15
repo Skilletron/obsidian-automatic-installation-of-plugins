@@ -4,7 +4,6 @@ import { NetworkManager } from "../utils/NetworkManager";
 import { SettingsManager } from "./SettingsManager";
 import {
 	PluginRegistryEntry,
-	GitHubRelease,
 	PluginListEntry,
 	PLUGIN_REGISTRY_URL,
 } from "../types";
@@ -95,14 +94,6 @@ export class PluginInstaller {
 	}
 
 	private async isFullyInstalled(pluginId: string): Promise<boolean> {
-		const pluginsApi = this.getPluginsApi();
-		if (
-			pluginsApi?.manifests &&
-			Object.prototype.hasOwnProperty.call(pluginsApi.manifests, pluginId)
-		) {
-			return true;
-		}
-
 		const manifestPath = this.fileManager.pluginsPath(
 			pluginId,
 			"manifest.json",
@@ -196,16 +187,16 @@ export class PluginInstaller {
 			}
 
 			const [owner, repo] = repoParts;
-			const release = await this.selectRelease(
+			const resolved = await this.resolveManifest(
 				owner,
 				repo,
 				normalizedId,
 				pinnedVersion,
 			);
-			if (!release?.tag_name || !release.assets?.length) {
+			if (!resolved) {
 				if (pinnedVersion) {
 					new Notice(
-						`[Installer] No GitHub release found for "${normalizedId}" version ${pinnedVersion}.`,
+						`[Installer] Could not fetch manifest for "${normalizedId}" ${pinnedVersion}. GitHub may be rate-limiting requests.`,
 					);
 				} else {
 					new Notice(
@@ -215,34 +206,10 @@ export class PluginInstaller {
 				return false;
 			}
 
-			const manifestAsset = release.assets.find(
-				(a) => a.name === "manifest.json",
-			);
-			if (!manifestAsset) {
-				new Notice(
-					`[Installer] Release for "${normalizedId}" has no manifest.json asset.`,
-				);
-				return false;
-			}
-
-			const manifest =
-				await this.networkManager.fetchJson<PluginManifest>(
-					manifestAsset.browser_download_url,
-				);
-			if (!manifest?.id) {
+			const { manifest, version } = resolved;
+			if (!manifest?.id || !version) {
 				new Notice(
 					`[Installer] Invalid manifest.json for "${normalizedId}".`,
-				);
-				return false;
-			}
-
-			const version =
-				(typeof manifest.version === "string" &&
-					manifest.version.trim()) ||
-				normalizeVersion(release.tag_name || "");
-			if (!version) {
-				new Notice(
-					`[Installer] Could not resolve version for "${normalizedId}".`,
 				);
 				return false;
 			}
@@ -251,32 +218,38 @@ export class PluginInstaller {
 				`Installing "${normalizedId}" via Obsidian installPlugin (${pluginMeta.repo}@${version})`,
 			);
 
-			await pluginsApi.installPlugin(pluginMeta.repo, version, manifest);
-
-			const installedFolderId = (await this.fileManager.exists(
-				this.fileManager.pluginsPath(manifest.id, "main.js"),
-			))
-				? manifest.id
-				: normalizedId;
-
-			if (
-				!(await this.fileManager.exists(
-					this.fileManager.pluginsPath(installedFolderId, "main.js"),
-				))
-			) {
-				new Notice(
-					`[Installer] Plugin "${normalizedId}" did not land on disk after install.`,
+			try {
+				await pluginsApi.installPlugin(
+					pluginMeta.repo,
+					version,
+					manifest,
 				);
-				return false;
+			} catch (firstErr: unknown) {
+				const alt = version.startsWith("v")
+					? version.slice(1)
+					: `v${version}`;
+				logger.debug(
+					`installPlugin(${version}) failed, retrying with ${alt}`,
+					firstErr,
+				);
+				await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
 			}
 
-			await this.recognizeInstalledPlugin(pluginsApi, [
-				installedFolderId,
-				manifest.id,
-				normalizedId,
-			]);
+			if (typeof pluginsApi.loadManifests === "function") {
+				try {
+					await pluginsApi.loadManifests();
+				} catch (err: unknown) {
+					logger.debug("loadManifests after install failed:", err);
+				}
+			}
 
 			if (this.shouldLoadSettingsOnInstall()) {
+				const installedFolderId = (await this.fileManager.exists(
+					this.fileManager.pluginsPath(manifest.id, "main.js"),
+				))
+					? manifest.id
+					: normalizedId;
+
 				await this.settingsManager.applySettingsForPlugin(
 					normalizedId,
 					installedFolderId,
@@ -311,171 +284,78 @@ export class PluginInstaller {
 		}
 	}
 
-	private async recognizeInstalledPlugin(
-		pluginsApi: PluginsAPI,
-		ids: string[],
-	): Promise<void> {
-		const unique = [...new Set(ids.filter(Boolean))];
-		for (const id of unique) {
-			if (!isSafePluginId(id)) {
-				continue;
-			}
-			const folderPath = this.fileManager.pluginsPath(id);
-			if (typeof pluginsApi.loadManifest === "function") {
-				try {
-					await pluginsApi.loadManifest(folderPath);
-				} catch (err: unknown) {
-					logger.debug(
-						`loadManifest("${folderPath}") failed:`,
-						err,
-					);
-					try {
-						await pluginsApi.loadManifest(id);
-					} catch (err2: unknown) {
-						logger.debug(`loadManifest("${id}") failed:`, err2);
-					}
-				}
-			}
-		}
-		if (typeof pluginsApi.loadManifests === "function") {
-			try {
-				await pluginsApi.loadManifests();
-			} catch (err: unknown) {
-				logger.debug("loadManifests after install failed:", err);
-			}
-		}
-		if (typeof pluginsApi.loadAvailablePlugins === "function") {
-			try {
-				await pluginsApi.loadAvailablePlugins();
-			} catch (err: unknown) {
-				logger.debug(
-					"loadAvailablePlugins after install failed:",
-					err,
-				);
-			}
-		}
-	}
-
-	private releaseMatchesVersion(
-		release: GitHubRelease,
-		pinnedVersion: string,
-	): boolean {
-		const tag = release.tag_name || "";
-		return normalizeVersion(tag) === pinnedVersion;
-	}
-
-	private async fetchReleaseByTag(
-		owner: string,
-		repo: string,
-		tag: string,
-	): Promise<GitHubRelease | null> {
-		try {
-			return await this.networkManager.fetchJson<GitHubRelease>(
-				`https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`,
-			);
-		} catch {
-			return null;
-		}
-	}
-
-	private async selectRelease(
+	private async resolveManifest(
 		owner: string,
 		repo: string,
 		pluginId: string,
 		pinnedVersion?: string,
-	): Promise<GitHubRelease | null> {
+	): Promise<{ manifest: PluginManifest; version: string } | null> {
 		if (pinnedVersion) {
-			const byTag =
-				(await this.fetchReleaseByTag(owner, repo, pinnedVersion)) ||
-				(await this.fetchReleaseByTag(
-					owner,
-					repo,
-					`v${pinnedVersion}`,
-				));
-
-			if (
-				byTag &&
-				!byTag.draft &&
-				(byTag.assets || []).some((a) => a.name === "manifest.json")
-			) {
-				return byTag;
+			const manifest = await this.fetchReleaseManifest(
+				owner,
+				repo,
+				pinnedVersion,
+			);
+			if (manifest) {
+				return { manifest, version: pinnedVersion };
 			}
-
-			try {
-				const releases = await this.networkManager.fetchJson<
-					GitHubRelease[]
-				>(
-					`https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
-				);
-
-				if (Array.isArray(releases)) {
-					const match = releases.find(
-						(r) =>
-							!r.draft &&
-							this.releaseMatchesVersion(r, pinnedVersion) &&
-							(r.assets || []).some(
-								(a) => a.name === "manifest.json",
-							),
-					);
-					if (match) {
-						return match;
-					}
-				}
-			} catch (err: unknown) {
-				logger.warn(
-					`Failed to list releases while resolving pin ${pluginId}@${pinnedVersion}:`,
-					err,
-				);
-			}
-
 			return null;
 		}
 
-		try {
-			const releases = await this.networkManager.fetchJson<
-				GitHubRelease[]
-			>(
-				`https://api.github.com/repos/${owner}/${repo}/releases?per_page=20`,
-			);
-
-			if (!Array.isArray(releases) || releases.length === 0) {
-				return await this.networkManager.fetchJson<GitHubRelease>(
-					`https://api.github.com/repos/${owner}/${repo}/releases/latest`,
-				);
-			}
-
-			const isUnstable = (r: GitHubRelease) =>
-				!!r.prerelease ||
-				/beta|alpha|rc|preview/i.test(r.tag_name || "");
-
-			const hasManifest = (r: GitHubRelease) =>
-				(r.assets || []).some((a) => a.name === "manifest.json");
-
-			const candidates = releases.filter(
-				(r) => !r.draft && hasManifest(r),
-			);
-
-			const stable = candidates.find((r) => !isUnstable(r));
-			if (stable) {
-				return stable;
-			}
-
-			if (candidates[0]) {
-				logger.warn(
-					`No stable release for ${owner}/${repo}; using newest for "${pluginId}".`,
-				);
-				return candidates[0];
-			}
-
+		const headManifest = await this.fetchRepoHeadManifest(owner, repo);
+		const latestVersion =
+			typeof headManifest?.version === "string"
+				? normalizeVersion(headManifest.version)
+				: "";
+		if (!latestVersion) {
+			logger.warn(`No version in repo manifest for ${pluginId}`);
 			return null;
-		} catch (err: unknown) {
-			logger.warn(
-				`Failed to list releases for ${owner}/${repo}, falling back to /latest:`,
-				err,
-			);
-			return await this.networkManager.fetchJson<GitHubRelease>(
-				`https://api.github.com/repos/${owner}/${repo}/releases/latest`,
-			);
 		}
+
+		const releaseManifest = await this.fetchReleaseManifest(
+			owner,
+			repo,
+			latestVersion,
+		);
+		return {
+			manifest: releaseManifest || headManifest!,
+			version: latestVersion,
+		};
+	}
+
+	private async fetchReleaseManifest(
+		owner: string,
+		repo: string,
+		version: string,
+	): Promise<PluginManifest | null> {
+		const tags = [...new Set([version, `v${version}`, version.replace(/^v/i, "")])];
+		for (const tag of tags) {
+			const url = `https://github.com/${owner}/${repo}/releases/download/${encodeURIComponent(tag)}/manifest.json`;
+			const manifest =
+				await this.networkManager.tryFetchJson<PluginManifest>(url);
+			if (manifest?.id) {
+				return manifest;
+			}
+		}
+		return null;
+	}
+
+	private async fetchRepoHeadManifest(
+		owner: string,
+		repo: string,
+	): Promise<PluginManifest | null> {
+		const urls = [
+			`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/manifest.json`,
+			`https://raw.githubusercontent.com/${owner}/${repo}/master/manifest.json`,
+			`https://raw.githubusercontent.com/${owner}/${repo}/main/manifest.json`,
+		];
+		for (const url of urls) {
+			const manifest =
+				await this.networkManager.tryFetchJson<PluginManifest>(url);
+			if (manifest?.id) {
+				return manifest;
+			}
+		}
+		return null;
 	}
 }

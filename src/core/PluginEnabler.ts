@@ -1,4 +1,4 @@
-import { App, Notice } from "obsidian";
+import { App, Notice, normalizePath } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { PLUGIN_ID } from "../types";
 import { isSafePluginId } from "../utils/parsePluginList";
@@ -6,7 +6,7 @@ import { logger } from "../utils/Logger";
 
 interface PluginsAPI {
 	manifests?: Record<string, { id?: string }>;
-	enabledPlugins?: Set<string>;
+	enabledPlugins?: Set<string> | string[];
 	plugins?: Record<string, unknown>;
 	enablePlugin?: (pluginId: string) => Promise<void>;
 	enablePluginAndSave?: (pluginId: string) => Promise<void>;
@@ -17,6 +17,7 @@ interface PluginsAPI {
 	loadPlugin?: (pluginId: string) => Promise<void>;
 	loadAvailablePlugins?: () => Promise<void>;
 	reload?: () => Promise<void>;
+	saveConfig?: () => Promise<void>;
 	saveEnabledPlugins?: () => Promise<void>;
 	requestSaveSettings?: () => Promise<void>;
 	updatePluginList?: () => void;
@@ -36,6 +37,9 @@ interface SettingsAPI {
 }
 
 export class PluginEnabler {
+	private pendingLoadIds: string[] = [];
+	private waitingForSettingsClose = false;
+
 	constructor(
 		private app: App,
 		private fileManager: FileManager,
@@ -45,48 +49,8 @@ export class PluginEnabler {
 		return (this.app as App & { plugins?: PluginsAPI }).plugins;
 	}
 
-	async enablePluginById(pluginId: string): Promise<boolean> {
-		if (!isSafePluginId(pluginId)) {
-			return false;
-		}
-		const pluginsApi = this.getPluginsApi();
-		if (!pluginsApi) {
-			return false;
-		}
-
-		await this.waitForLayoutReady();
-
-		const folderPath = this.fileManager.pluginsPath(pluginId);
-		if (typeof pluginsApi.loadManifest === "function") {
-			try {
-				await pluginsApi.loadManifest(folderPath);
-			} catch {
-				try {
-					await pluginsApi.loadManifest(pluginId);
-				} catch {
-					/* ignore */
-				}
-			}
-		}
-		if (typeof pluginsApi.loadManifests === "function") {
-			try {
-				await pluginsApi.loadManifests();
-			} catch {
-				/* ignore */
-			}
-		}
-
-		const actualId =
-			(await this.resolvePluginId(pluginId, pluginsApi)) || pluginId;
-
-		try {
-			await this.forceEnable(pluginsApi, actualId);
-			await this.saveEnabledSet(pluginsApi);
-			return true;
-		} catch (err: unknown) {
-			logger.warn(`enablePluginById("${actualId}") failed:`, err);
-			return false;
-		}
+	private isSettingsOpen(): boolean {
+		return !!document.querySelector(".mod-settings");
 	}
 
 	async enableInstalledPlugins(
@@ -97,103 +61,180 @@ export class PluginEnabler {
 			return { enabled: 0, failed: 0, failedPlugins: [] };
 		}
 
-		try {
-			const pluginsApi = this.getPluginsApi();
-
-			if (!pluginsApi) {
-				new Notice(
-					"Cannot access plugins API. Plugins will need to be enabled manually.",
-				);
-				logger.warn("Plugins API not available");
-				return { enabled: 0, failed: 0, failedPlugins: pluginIds };
-			}
-
-			const installedPluginIds: string[] = [];
-			for (const pluginId of pluginIds) {
-				if (
-					typeof pluginId !== "string" ||
-					pluginId.trim() === "" ||
-					!isSafePluginId(pluginId.trim())
-				) {
-					continue;
-				}
-				const normalizedId = pluginId.trim();
-				const manifestPath = this.fileManager.pluginsPath(
-					normalizedId,
-					"manifest.json",
-				);
-				if (await this.fileManager.exists(manifestPath)) {
-					installedPluginIds.push(normalizedId);
-				}
-			}
-
-			if (installedPluginIds.length === 0) {
-				new Notice("No installed plugins found to enable.");
-				return { enabled: 0, failed: 0, failedPlugins: [] };
-			}
-
-			await this.waitForLayoutReady();
-			await this.reloadPlugins(pluginsApi);
-
-			const enabledIds: string[] = [];
-			const failedPlugins: string[] = [];
-
-			for (let i = 0; i < installedPluginIds.length; i++) {
-				const pluginId = installedPluginIds[i];
-				if (onProgress) {
-					onProgress(i + 1, installedPluginIds.length, pluginId);
-				}
-
-				const actualId =
-					(await this.resolvePluginId(pluginId, pluginsApi)) ||
-					pluginId;
-
-				try {
-					await this.forceEnable(pluginsApi, actualId);
-					enabledIds.push(actualId);
-				} catch (err: unknown) {
-					logger.error(`Failed to enable plugin "${pluginId}":`, err);
-					failedPlugins.push(pluginId);
-				}
-			}
-
-			await this.saveEnabledSet(pluginsApi);
-
-			const enabledCount = enabledIds.length;
-			const failedCount = failedPlugins.length;
-
-			if (enabledCount > 0 && failedCount === 0) {
-				new Notice(
-					`[Installer] Successfully enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}.`,
-				);
-			} else if (enabledCount > 0 && failedCount > 0) {
-				new Notice(
-					`[Installer] Enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}, failed to enable ${failedCount}. See console for details.`,
-				);
-			} else if (failedCount > 0) {
-				new Notice(
-					`[Installer] Failed to enable ${failedCount} plugin${failedCount > 1 ? "s" : ""}. Enable them manually or reload Obsidian.`,
-				);
-			}
-
-			return {
-				enabled: enabledCount,
-				failed: failedCount,
-				failedPlugins,
-			};
-		} catch (err: unknown) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+		const pluginsApi = this.getPluginsApi();
+		if (!pluginsApi) {
 			new Notice(
-				`[Installer] Error while enabling plugins: ${errorMessage}. See console for details.`,
+				"Cannot access plugins API. Plugins will need to be enabled manually.",
 			);
-			logger.error("Error enabling plugins:", err);
-			return {
-				enabled: 0,
-				failed: pluginIds.length,
-				failedPlugins: pluginIds,
-			};
+			return { enabled: 0, failed: 0, failedPlugins: pluginIds };
 		}
+
+		const ids = pluginIds
+			.filter(
+				(id): id is string =>
+					typeof id === "string" && isSafePluginId(id.trim()),
+			)
+			.map((id) => id.trim());
+
+		if (ids.length === 0) {
+			return { enabled: 0, failed: 0, failedPlugins: [] };
+		}
+
+		await this.waitForLayoutReady();
+		await this.reloadPlugins(pluginsApi);
+
+		const enabledIds: string[] = [];
+		const failedPlugins: string[] = [];
+
+		for (let i = 0; i < ids.length; i++) {
+			const pluginId = ids[i];
+			if (onProgress) {
+				onProgress(i + 1, ids.length, pluginId);
+			}
+
+			const actualId =
+				(await this.resolvePluginId(pluginId, pluginsApi)) || pluginId;
+
+			await this.loadPluginManifest(pluginsApi, actualId);
+
+			try {
+				if (typeof pluginsApi.enablePluginAndSave === "function") {
+					await pluginsApi.enablePluginAndSave(actualId);
+				} else if (typeof pluginsApi.enablePlugin === "function") {
+					await pluginsApi.enablePlugin(actualId);
+				}
+			} catch (err: unknown) {
+				logger.warn(`enablePlugin("${actualId}") failed:`, err);
+				failedPlugins.push(pluginId);
+			}
+
+			this.markEnabled(pluginsApi, actualId);
+			enabledIds.push(actualId);
+
+			await new Promise((resolve) => window.setTimeout(resolve, 200));
+		}
+
+		await this.saveEnabledSet(pluginsApi);
+		await this.showCommunityPluginsTab();
+
+		new Notice(
+			`[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length > 1 ? "s" : ""}.`,
+		);
+
+		return {
+			enabled: enabledIds.length,
+			failed: failedPlugins.length,
+			failedPlugins,
+		};
+	}
+
+	private async loadPluginManifest(
+		pluginsApi: PluginsAPI,
+		pluginId: string,
+	): Promise<void> {
+		if (typeof pluginsApi.loadManifest !== "function") {
+			return;
+		}
+		const folderPath = normalizePath(
+			`${this.app.vault.configDir}/plugins/${pluginId}`,
+		);
+		try {
+			await pluginsApi.loadManifest(folderPath);
+			return;
+		} catch (err: unknown) {
+			logger.debug(`loadManifest("${folderPath}") failed:`, err);
+		}
+		try {
+			await pluginsApi.loadManifest(pluginId);
+		} catch (err: unknown) {
+			logger.debug(`loadManifest("${pluginId}") failed:`, err);
+		}
+	}
+
+	private markEnabled(pluginsApi: PluginsAPI, pluginId: string): void {
+		if (pluginsApi.enabledPlugins instanceof Set) {
+			pluginsApi.enabledPlugins.add(pluginId);
+			return;
+		}
+		if (Array.isArray(pluginsApi.enabledPlugins)) {
+			if (!pluginsApi.enabledPlugins.includes(pluginId)) {
+				pluginsApi.enabledPlugins.push(pluginId);
+			}
+		}
+	}
+
+	private queuePluginStart(pluginIds: string[]): void {
+		this.pendingLoadIds = [
+			...new Set([...this.pendingLoadIds, ...pluginIds]),
+		];
+		if (this.waitingForSettingsClose) {
+			return;
+		}
+		this.waitingForSettingsClose = true;
+		const poll = () => {
+			if (this.isSettingsOpen()) {
+				window.setTimeout(poll, 400);
+				return;
+			}
+			this.waitingForSettingsClose = false;
+			const ids = this.pendingLoadIds;
+			this.pendingLoadIds = [];
+			void this.startPlugins(ids);
+		};
+		window.setTimeout(poll, 400);
+	}
+
+	private async startPlugins(pluginIds: string[]): Promise<void> {
+		const pluginsApi = this.getPluginsApi();
+		if (!pluginsApi || typeof pluginsApi.enablePlugin !== "function") {
+			return;
+		}
+		await this.waitForLayoutReady();
+		for (const pluginId of pluginIds) {
+			if (pluginId === PLUGIN_ID) {
+				continue;
+			}
+			try {
+				await pluginsApi.enablePlugin(pluginId);
+			} catch (err: unknown) {
+				logger.debug(`enablePlugin("${pluginId}") failed:`, err);
+			}
+			await new Promise((resolve) => window.setTimeout(resolve, 350));
+		}
+	}
+
+	async reloadEnabledPlugins(pluginIds: string[]): Promise<number> {
+		const pluginsApi = this.getPluginsApi();
+		if (!pluginsApi || pluginIds.length === 0) {
+			return 0;
+		}
+
+		if (this.isSettingsOpen()) {
+			this.queuePluginStart(pluginIds.filter((id) => id !== PLUGIN_ID));
+			return 0;
+		}
+
+		let reloaded = 0;
+		for (const pluginId of pluginIds) {
+			if (!isSafePluginId(pluginId) || pluginId === PLUGIN_ID) {
+				continue;
+			}
+			const actualId =
+				(await this.resolvePluginId(pluginId, pluginsApi)) || pluginId;
+			try {
+				if (typeof pluginsApi.disablePlugin === "function") {
+					await pluginsApi.disablePlugin(actualId);
+				}
+				await new Promise((resolve) => window.setTimeout(resolve, 50));
+				if (typeof pluginsApi.enablePlugin === "function") {
+					await pluginsApi.enablePlugin(actualId);
+				}
+				reloaded++;
+			} catch (err: unknown) {
+				logger.warn(`Failed to reload plugin "${pluginId}":`, err);
+			}
+		}
+		return reloaded;
 	}
 
 	private waitForLayoutReady(): Promise<void> {
@@ -211,20 +252,25 @@ export class PluginEnabler {
 		try {
 			if (typeof pluginsApi.loadManifests === "function") {
 				await pluginsApi.loadManifests();
-				logger.debug("Reloaded manifests via loadManifests()");
 			}
 		} catch (err: unknown) {
 			logger.warn("loadManifests failed:", err);
 		}
-
 		try {
 			if (typeof pluginsApi.loadAvailablePlugins === "function") {
 				await pluginsApi.loadAvailablePlugins();
-				logger.debug("Reloaded plugins via loadAvailablePlugins()");
 			}
 		} catch (err: unknown) {
 			logger.warn("loadAvailablePlugins failed:", err);
 		}
+	}
+
+	async reloadManifests(): Promise<void> {
+		const pluginsApi = this.getPluginsApi();
+		if (!pluginsApi) {
+			return;
+		}
+		await this.reloadPlugins(pluginsApi);
 	}
 
 	private async getCandidateIds(pluginId: string): Promise<string[]> {
@@ -286,33 +332,15 @@ export class PluginEnabler {
 		return null;
 	}
 
-	private async forceEnable(
-		pluginsApi: PluginsAPI,
-		pluginId: string,
-	): Promise<void> {
-		if (pluginsApi.enabledPlugins instanceof Set) {
-			pluginsApi.enabledPlugins.add(pluginId);
-		}
-
-		if (typeof pluginsApi.enablePlugin === "function") {
-			try {
-				await pluginsApi.enablePlugin(pluginId);
-			} catch (err: unknown) {
-				logger.debug(`enablePlugin("${pluginId}") failed:`, err);
-			}
-		} else if (typeof pluginsApi.enablePluginAndSave === "function") {
-			try {
-				await pluginsApi.enablePluginAndSave(pluginId);
-			} catch (err: unknown) {
-				logger.debug(
-					`enablePluginAndSave("${pluginId}") failed:`,
-					err,
-				);
-			}
-		}
-	}
-
 	private async saveEnabledSet(pluginsApi: PluginsAPI): Promise<void> {
+		if (typeof pluginsApi.saveConfig === "function") {
+			try {
+				await pluginsApi.saveConfig();
+				return;
+			} catch (err: unknown) {
+				logger.debug("saveConfig failed:", err);
+			}
+		}
 		if (typeof pluginsApi.saveEnabledPlugins === "function") {
 			try {
 				await pluginsApi.saveEnabledPlugins();
@@ -323,29 +351,9 @@ export class PluginEnabler {
 		}
 		if (pluginsApi.enabledPlugins instanceof Set) {
 			await this.persistEnabledIds([...pluginsApi.enabledPlugins]);
+		} else if (Array.isArray(pluginsApi.enabledPlugins)) {
+			await this.persistEnabledIds(pluginsApi.enabledPlugins);
 		}
-	}
-
-	private async callEnable(
-		pluginsApi: PluginsAPI,
-		pluginId: string,
-	): Promise<void> {
-		if (typeof pluginsApi.enablePluginAndSave === "function") {
-			try {
-				await pluginsApi.enablePluginAndSave(pluginId);
-				return;
-			} catch (err: unknown) {
-				logger.debug(
-					`enablePluginAndSave("${pluginId}") failed, trying enablePlugin:`,
-					err,
-				);
-			}
-		}
-		if (typeof pluginsApi.enablePlugin === "function") {
-			await pluginsApi.enablePlugin(pluginId);
-			return;
-		}
-		throw new Error("enablePluginAndSave/enablePlugin not available");
 	}
 
 	private async persistEnabledIds(pluginIds: string[]): Promise<void> {
@@ -375,211 +383,40 @@ export class PluginEnabler {
 		);
 	}
 
-	private isPluginEnabled(pluginsApi: PluginsAPI, pluginId: string): boolean {
-		if (pluginsApi.enabledPlugins instanceof Set) {
-			return pluginsApi.enabledPlugins.has(pluginId);
-		}
-		if (pluginsApi.plugins && pluginId in pluginsApi.plugins) {
-			return true;
-		}
-		return false;
-	}
-
-	private async enableSinglePlugin(
-		pluginId: string,
-		pluginsApi: PluginsAPI,
-		attempt: number,
-	): Promise<{
-		enabled: boolean;
-		failed: boolean;
-		actualId: string;
-		reason?: string;
-	}> {
-		let actualPluginId = await this.resolvePluginId(pluginId, pluginsApi);
-
-		if (!actualPluginId && typeof pluginsApi.loadManifest === "function") {
-			for (const candidate of await this.getCandidateIds(pluginId)) {
-				try {
-					await pluginsApi.loadManifest(
-						this.fileManager.pluginsPath(candidate),
-					);
-				} catch (err: unknown) {
-					logger.debug(
-						`loadManifest("${candidate}") path failed:`,
-						err,
-					);
-					try {
-						await pluginsApi.loadManifest(candidate);
-					} catch (err2: unknown) {
-						logger.debug(
-							`loadManifest("${candidate}") failed:`,
-							err2,
-						);
-					}
-				}
-			}
-			actualPluginId = await this.resolvePluginId(pluginId, pluginsApi);
-		}
-
-		if (!actualPluginId) {
-			const candidates = await this.getCandidateIds(pluginId);
-			if (candidates.length > 0) {
-				actualPluginId = candidates[0];
-			}
-		}
-
-		if (!actualPluginId) {
-			const available = Object.keys(pluginsApi.manifests || {});
-			return {
-				enabled: false,
-				failed: true,
-				actualId: pluginId,
-				reason:
-					attempt === 2
-						? `not found in manifests after reload. Available: ${available.join(", ") || "(none)"}`
-						: "not in manifests yet",
-			};
-		}
-
-		if (this.isPluginEnabled(pluginsApi, actualPluginId)) {
-			return { enabled: true, failed: false, actualId: actualPluginId };
-		}
-
-		const enableIds = Array.from(
-			new Set([
-				actualPluginId,
-				...(await this.getCandidateIds(pluginId)),
-			]),
-		);
-		let lastError = "";
-
-		for (const enableId of enableIds) {
-			try {
-				await this.callEnable(pluginsApi, enableId);
-
-				if (this.isPluginEnabled(pluginsApi, enableId)) {
-					logger.debug(
-						`Enabled plugin "${pluginId}" as "${enableId}".`,
-					);
-					return { enabled: true, failed: false, actualId: enableId };
-				}
-
-				return { enabled: true, failed: false, actualId: enableId };
-			} catch (err: unknown) {
-				lastError = err instanceof Error ? err.message : String(err);
-				logger.debug(`Enable "${enableId}" failed: ${lastError}`);
-			}
-		}
-
-		return {
-			enabled: false,
-			failed: true,
-			actualId: actualPluginId,
-			reason: `enable threw: ${lastError || "unknown error"}`,
-		};
-	}
-
-	async reloadEnabledPlugins(pluginIds: string[]): Promise<number> {
-		const pluginsApi = this.getPluginsApi();
-		if (!pluginsApi || pluginIds.length === 0) {
-			return 0;
-		}
-
-		let reloaded = 0;
-		for (const pluginId of pluginIds) {
-			if (
-				!isSafePluginId(pluginId) ||
-				pluginId === PLUGIN_ID
-			) {
-				continue;
-			}
-
-			const actualId =
-				(await this.resolvePluginId(pluginId, pluginsApi)) || pluginId;
-
-			if (!this.isPluginEnabled(pluginsApi, actualId)) {
-				continue;
-			}
-
-			try {
-				if (typeof pluginsApi.disablePluginAndSave === "function") {
-					await pluginsApi.disablePluginAndSave(actualId);
-				} else if (typeof pluginsApi.disablePlugin === "function") {
-					await pluginsApi.disablePlugin(actualId);
-				} else {
-					continue;
-				}
-
-				await new Promise((resolve) =>
-					window.setTimeout(resolve, 50),
-				);
-
-				if (typeof pluginsApi.enablePluginAndSave === "function") {
-					await pluginsApi.enablePluginAndSave(actualId);
-				} else if (typeof pluginsApi.enablePlugin === "function") {
-					await pluginsApi.enablePlugin(actualId);
-				} else {
-					continue;
-				}
-
-				reloaded++;
-			} catch (err: unknown) {
-				logger.warn(`Failed to reload plugin "${pluginId}":`, err);
-			}
-		}
-
-		return reloaded;
-	}
-
-	async reloadManifests(): Promise<void> {
-		const pluginsApi = this.getPluginsApi();
-		if (!pluginsApi) {
-			return;
-		}
-		await this.reloadPlugins(pluginsApi);
-	}
-
 	async refreshPluginsUI(): Promise<void> {
+		await this.showCommunityPluginsTab();
+	}
+
+	private async showCommunityPluginsTab(): Promise<void> {
 		try {
-			await new Promise((resolve) => window.setTimeout(resolve, 300));
+			await new Promise((resolve) => window.setTimeout(resolve, 150));
 
 			const pluginsApi = this.getPluginsApi();
 			if (pluginsApi && typeof pluginsApi.updatePluginList === "function") {
 				pluginsApi.updatePluginList();
 			}
 
-			const settings = (this.app as App & { setting?: SettingsAPI })
-				.setting;
-			if (settings?.pluginTabs && Array.isArray(settings.pluginTabs)) {
-				const pluginTab = settings.pluginTabs.find(
-					(tab) =>
-						tab &&
-						(tab.id === "community-plugins" ||
-							tab.name === "Community plugins" ||
-							tab.id === "plugins"),
-				);
-				if (pluginTab && typeof pluginTab.display === "function") {
-					pluginTab.display();
-				}
+			const settings = this.app as App & {
+				setting?: SettingsAPI & {
+					openTabById?: (id: string) => void;
+				};
+			};
+
+			if (typeof settings.setting?.openTabById === "function") {
+				settings.setting.openTabById("community-plugins");
 			}
-			if (
-				settings?.activeTab &&
-				typeof settings.activeTab.display === "function"
-			) {
-				const activeTabId = (
-					settings.activeTab.id ||
-					settings.activeTab.name ||
-					""
-				).toLowerCase();
-				if (
-					activeTabId.includes("community") ||
-					activeTabId.includes("plugin")
-				) {
-					settings.activeTab.display();
-				}
+
+			const pluginTab = settings.setting?.pluginTabs?.find(
+				(tab) =>
+					tab &&
+					(tab.id === "community-plugins" ||
+						tab.name === "Community plugins"),
+			);
+			if (pluginTab && typeof pluginTab.display === "function") {
+				pluginTab.display();
 			}
 		} catch (err: unknown) {
-			logger.warn("Could not refresh UI automatically:", err);
+			logger.warn("Could not refresh Community plugins tab:", err);
 		}
 	}
 }

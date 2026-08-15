@@ -300,6 +300,10 @@ export default class InstallCommunityPlugins extends Plugin {
 						result.failedPlugins,
 					);
 				}
+			} else {
+				new Notice(
+					"[Installer] Auto-enable is off; plugins were installed but not turned on.",
+				);
 			}
 
 			await this.pluginEnabler.refreshPluginsUI();
@@ -445,41 +449,71 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			{
 				name: "Auto-install plugins on startup",
 				desc: "When Obsidian starts, install any plugins from your list that are not installed yet.",
-				control: {
-					type: "toggle" as const,
-					key: "autoInstallPlugins",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.autoInstallPlugins)
+							.onChange(async (value) => {
+								this.plugin.settings.autoInstallPlugins = value;
+								await this.plugin.saveSettings();
+							}),
+					);
 				},
 			},
 			{
 				name: "Auto-enable plugins after installation",
 				desc: "Turn plugins on after they are installed.",
-				control: {
-					type: "toggle" as const,
-					key: "autoEnablePlugins",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.autoEnablePlugins)
+							.onChange(async (value) => {
+								this.plugin.settings.autoEnablePlugins = value;
+								await this.plugin.saveSettings();
+							}),
+					);
 				},
 			},
 			{
 				name: "Apply settings on installation",
 				desc: "After installing a plugin, apply its settings from your settings file.",
-				control: {
-					type: "toggle" as const,
-					key: "loadSettingsOnInstall",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.loadSettingsOnInstall)
+							.onChange(async (value) => {
+								this.plugin.settings.loadSettingsOnInstall = value;
+								await this.plugin.saveSettings();
+							}),
+					);
 				},
 			},
 			{
 				name: "Merge settings instead of replace",
 				desc: "Update matching settings and keep the rest. When off, the plugin’s saved settings are replaced entirely.",
-				control: {
-					type: "toggle" as const,
-					key: "mergePluginSettings",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.mergePluginSettings)
+							.onChange(async (value) => {
+								this.plugin.settings.mergePluginSettings = value;
+								await this.plugin.saveSettings();
+							}),
+					);
 				},
 			},
 			{
 				name: "Sync settings on every startup",
 				desc: "Each time Obsidian starts, apply your settings file to installed plugins.",
-				control: {
-					type: "toggle" as const,
-					key: "loadSettingsOnStartup",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.loadSettingsOnStartup)
+							.onChange(async (value) => {
+								this.plugin.settings.loadSettingsOnStartup = value;
+								await this.plugin.saveSettings();
+							}),
+					);
 				},
 			},
 			{
