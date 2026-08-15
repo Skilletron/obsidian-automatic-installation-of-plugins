@@ -13,7 +13,7 @@ export class FileManager {
 	assertDesktopAdapter(): void {
 		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
 			throw new Error(
-				"Base path is only available on desktop. This plugin requires desktop version of Obsidian."
+				"Base path is only available on desktop. This plugin requires desktop version of Obsidian.",
 			);
 		}
 	}
@@ -69,7 +69,10 @@ export class FileManager {
 			if (await this.exists(vaultPath)) {
 				return true;
 			}
-			const parts = vaultPath.replace(/\\/g, "/").split("/").filter(Boolean);
+			const parts = vaultPath
+				.replace(/\\/g, "/")
+				.split("/")
+				.filter(Boolean);
 			let current = "";
 			for (const part of parts) {
 				current = current ? `${current}/${part}` : part;
@@ -123,12 +126,32 @@ export class FileManager {
 	}
 
 	/**
+	 * Lists immediate subdirectory names under a vault-relative path.
+	 */
+	async listDirs(vaultPath: string): Promise<string[]> {
+		try {
+			if (!(await this.exists(vaultPath))) {
+				return [];
+			}
+			const listed = await this.app.vault.adapter.list(vaultPath);
+			return listed.folders.map((folderPath) => {
+				const normalized = folderPath.replace(/\\/g, "/");
+				const parts = normalized.split("/").filter(Boolean);
+				return parts[parts.length - 1] ?? folderPath;
+			});
+		} catch (err: unknown) {
+			logger.error(`listDirs() failed for ${vaultPath}:`, err);
+			return [];
+		}
+	}
+
+	/**
 	 * Validates and parses JSON content with detailed error messages.
 	 */
 	parseJsonWithValidation<T>(content: string, fileName: string): T | null {
 		if (!content || content.trim() === "") {
 			new Notice(
-				`[Installer] ${fileName} is empty. Please add content or the file will be recreated.`
+				`[Installer] ${fileName} is empty. Please add content or the file will be recreated.`,
 			);
 			return null;
 		}
@@ -139,7 +162,7 @@ export class FileManager {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Invalid JSON in ${fileName}: ${errorMessage}. Please check the file format.`
+				`[Installer] Invalid JSON in ${fileName}: ${errorMessage}. Please check the file format.`,
 			);
 			logger.error(`JSON parse error in ${fileName}:`, err);
 			return null;

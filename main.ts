@@ -1,20 +1,17 @@
-import {
-	App,
-	Plugin,
-	PluginSettingTab,
-	Setting,
-	Notice,
-} from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, Notice } from "obsidian";
 import { FileManager } from "./src/utils/FileManager";
 import { NetworkManager } from "./src/utils/NetworkManager";
 import { SettingsManager } from "./src/core/SettingsManager";
 import { PluginInstaller } from "./src/core/PluginInstaller";
 import { PluginEnabler } from "./src/core/PluginEnabler";
+import { SetupExporter } from "./src/core/SetupExporter";
+import { SetupPreview, SetupPreviewModal } from "./src/core/SetupPreview";
 import {
 	InstallCommunityPluginsSettings,
 	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
 } from "./src/types";
+import { parsePluginList } from "./src/utils/parsePluginList";
 import { logger, LogLevel } from "./src/utils/Logger";
 
 /**
@@ -22,12 +19,14 @@ import { logger, LogLevel } from "./src/utils/Logger";
  * based on configuration files in the vault.
  */
 export default class InstallCommunityPlugins extends Plugin {
-	settings: InstallCommunityPluginsSettings;
-	fileManager: FileManager;
-	networkManager: NetworkManager;
-	settingsManager: SettingsManager;
-	pluginInstaller: PluginInstaller;
-	pluginEnabler: PluginEnabler;
+	settings!: InstallCommunityPluginsSettings;
+	fileManager!: FileManager;
+	networkManager!: NetworkManager;
+	settingsManager!: SettingsManager;
+	pluginInstaller!: PluginInstaller;
+	pluginEnabler!: PluginEnabler;
+	setupExporter!: SetupExporter;
+	setupPreview!: SetupPreview;
 
 	async onload() {
 		await this.loadSettings();
@@ -35,29 +34,70 @@ export default class InstallCommunityPlugins extends Plugin {
 		// Initialize managers
 		this.fileManager = new FileManager(this.app);
 		this.networkManager = new NetworkManager();
-		this.settingsManager = new SettingsManager(this.fileManager);
+		this.settingsManager = new SettingsManager(
+			this.fileManager,
+			() => this.settings.mergePluginSettings,
+		);
 		this.pluginInstaller = new PluginInstaller(
 			this.app,
 			this.fileManager,
 			this.networkManager,
 			this.settingsManager,
-			() => this.settings.loadSettingsOnInstall
+			() => this.settings.loadSettingsOnInstall,
 		);
 		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
+		this.setupExporter = new SetupExporter(this.fileManager);
+		this.setupPreview = new SetupPreview(this.fileManager);
 
-		// Add command for manual installation
+		this.addCommand({
+			id: "export-plugin-setup",
+			name: "Export plugin setup to JSON",
+			callback: async () => {
+				await this.exportPluginSetup();
+			},
+		});
+
+		this.addCommand({
+			id: "preview-plugin-setup",
+			name: "Preview plugin setup import",
+			callback: async () => {
+				await this.previewPluginSetup();
+			},
+		});
+
+		this.addCommand({
+			id: "import-plugin-setup",
+			name: "Import plugin setup from JSON",
+			callback: async () => {
+				new Notice("Starting plugin setup import...");
+				await this.runImportPipeline();
+				new Notice("Plugin setup import finished.");
+			},
+		});
+
+		// Kept for existing hotkeys / muscle memory
 		this.addCommand({
 			id: "install-plugins",
-			name: "Install plugins from list",
+			name: "Import plugin setup from JSON",
 			callback: async () => {
-				new Notice("Starting manual plugin installation...");
-				await this.runInstallPipeline();
-				new Notice("Manual installation finished.");
+				new Notice("Starting plugin setup import...");
+				await this.runImportPipeline();
+				new Notice("Plugin setup import finished.");
+			},
+		});
+
+		this.addCommand({
+			id: "apply-plugin-settings",
+			name: "Apply settings from JSON",
+			callback: async () => {
+				new Notice("Applying plugin settings...");
+				await this.applySettingsToInstalledPlugins();
+				new Notice("Finished applying plugin settings.");
 			},
 		});
 
 		this.addSettingTab(
-			new InstallCommunityPluginsSettingTab(this.app, this)
+			new InstallCommunityPluginsSettingTab(this.app, this),
 		);
 
 		// Wait for workspace layout — enabling plugins like Recent Files needs side leaves.
@@ -77,22 +117,57 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			if (this.settings.autoInstallPlugins) {
 				new Notice("Starting community plugins installation...");
-				await this.runInstallPipeline();
+				await this.runImportPipeline();
 				new Notice("Installation process finished.");
 			}
 		} catch (err: unknown) {
 			logger.error("Startup install pipeline failed:", err);
 			new Notice(
-				"[Installer] Startup install failed. See console for details."
+				"[Installer] Startup install failed. See console for details.",
 			);
 		}
 	}
 
 	/**
-	 * Install from list, then enable (shared by startup + command).
+	 * Install from list, then enable (shared by startup + import command).
 	 */
-	private async runInstallPipeline(): Promise<void> {
+	async runImportPipeline(): Promise<void> {
 		await this.installPluginsFromFile();
+	}
+
+	async exportPluginSetup(): Promise<void> {
+		try {
+			await this.setupExporter.exportSetup();
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			new Notice(`[Installer] Export failed: ${errorMessage}`);
+			logger.error("Export failed:", err);
+		}
+	}
+
+	async previewPluginSetup(): Promise<void> {
+		try {
+			const report = await this.setupPreview.buildReport(
+				this.settings.loadSettingsOnInstall,
+			);
+			if (!report) {
+				return;
+			}
+			logger.info(
+				"Import preview:\n" +
+					this.setupPreview.formatReportText(report),
+			);
+			new SetupPreviewModal(this.app, report).open();
+			new Notice(
+				`[Installer] Preview: install ${report.summary.install}, skip ${report.summary.skip}, re-pin ${report.summary.repin}.`,
+			);
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			new Notice(`[Installer] Preview failed: ${errorMessage}`);
+			logger.error("Preview failed:", err);
+		}
 	}
 
 	async loadSettings() {
@@ -101,6 +176,12 @@ export default class InstallCommunityPlugins extends Plugin {
 			| null
 			| undefined;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
+
+		// Existing installs (pre-merge toggle): keep replace behavior.
+		// New installs have no data.json yet → merge stays on from DEFAULT_SETTINGS.
+		if (data && data.mergePluginSettings === undefined) {
+			this.settings.mergePluginSettings = false;
+		}
 
 		this.applyLogLevel(this.settings.logLevel || "error");
 	}
@@ -131,7 +212,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Cannot access file system: ${errorMessage}`
+				`[Installer] Cannot access file system: ${errorMessage}`,
 			);
 			logger.error("File system access error:", err);
 		}
@@ -143,26 +224,29 @@ export default class InstallCommunityPlugins extends Plugin {
 	async installPluginsFromFile() {
 		try {
 			this.fileManager.assertDesktopAdapter();
-			const pluginsJsonPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
+			const pluginsJsonPath =
+				this.fileManager.configPath(PLUGINS_LIST_FILE);
 
 			if (!(await this.fileManager.exists(pluginsJsonPath))) {
 				try {
 					const created = await this.fileManager.writeFile(
 						pluginsJsonPath,
-						"[]"
+						"[]",
 					);
 					if (!created) {
 						new Notice(
-							`[Installer] Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`
+							`[Installer] Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`,
 						);
 						return;
 					}
-					new Notice(`[Installer] Created empty ${PLUGINS_LIST_FILE}`);
+					new Notice(
+						`[Installer] Created empty ${PLUGINS_LIST_FILE}`,
+					);
 				} catch (err: unknown) {
 					const errorMessage =
 						err instanceof Error ? err.message : "Unknown error";
 					new Notice(
-						`[Installer] Failed to create ${PLUGINS_LIST_FILE}: ${errorMessage}`
+						`[Installer] Failed to create ${PLUGINS_LIST_FILE}: ${errorMessage}`,
 					);
 					logger.error(`Failed to create ${PLUGINS_LIST_FILE}:`, err);
 				}
@@ -174,70 +258,61 @@ export default class InstallCommunityPlugins extends Plugin {
 				return;
 			}
 
-			const pluginIds = this.fileManager.parseJsonWithValidation<string[]>(
-				content,
-				PLUGINS_LIST_FILE
-			);
-
-			if (!pluginIds) {
-				return;
-			}
-
-			if (!Array.isArray(pluginIds)) {
+			let rawList: unknown;
+			try {
+				rawList = JSON.parse(content) as unknown;
+			} catch (err: unknown) {
+				const errorMessage =
+					err instanceof Error ? err.message : "Unknown error";
 				new Notice(
-					`[Installer] ${PLUGINS_LIST_FILE} must contain an array of plugin IDs.`
+					`[Installer] Invalid JSON in ${PLUGINS_LIST_FILE}: ${errorMessage}.`,
 				);
+				logger.error(`JSON parse error in ${PLUGINS_LIST_FILE}:`, err);
 				return;
 			}
 
-			if (pluginIds.length === 0) {
+			const entries = parsePluginList(rawList);
+			if (!entries) {
+				return;
+			}
+
+			if (entries.length === 0) {
 				new Notice("No plugins to install.");
 				return;
 			}
 
-			// Validate plugin IDs are strings
-			const invalidIds = pluginIds.filter(
-				(id) => typeof id !== "string" || id.trim() === ""
-			);
-			if (invalidIds.length > 0) {
-				new Notice(
-					`[Installer] Invalid plugin IDs found in ${PLUGINS_LIST_FILE}. All entries must be non-empty strings.`
-				);
-				logger.warn("Invalid plugin IDs:", invalidIds);
-			}
-
-			// Install plugins with progress tracking
-			const validPluginIds = pluginIds.filter(
-				(id) => typeof id === "string" && id.trim() !== ""
-			);
-			const totalPlugins = validPluginIds.length;
+			const totalPlugins = entries.length;
 			let installedCount = 0;
 
-			for (let i = 0; i < validPluginIds.length; i++) {
-				const pluginId = validPluginIds[i].trim();
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
 				const current = i + 1;
+				const label = entry.version
+					? `${entry.id}@${entry.version}`
+					: entry.id;
 
 				new Notice(
-					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${pluginId}...`
+					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${label}...`,
 				);
 
-				const success =
-					await this.pluginInstaller.installPluginById(pluginId);
+				const success = await this.pluginInstaller.installPlugin(entry);
 
 				if (success) {
 					installedCount++;
 				}
 			}
 
+			const pluginIds = entries.map((e) => e.id);
+
 			// Auto-enable plugins if setting is enabled
 			if (this.settings.autoEnablePlugins) {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
-					validPluginIds,
+					pluginIds,
 					(current, total, pluginId) => {
 						new Notice(
-							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`
+							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`,
 						);
-					}
+					},
 				);
 
 				if (result.enabled > 0) {
@@ -251,18 +326,18 @@ export default class InstallCommunityPlugins extends Plugin {
 			// Show final summary
 			if (installedCount === totalPlugins) {
 				new Notice(
-					`[Installer] Successfully installed ${installedCount} plugin${installedCount > 1 ? "s" : ""}.`
+					`[Installer] Successfully installed ${installedCount} plugin${installedCount > 1 ? "s" : ""}.`,
 				);
 			} else {
 				new Notice(
-					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.`
+					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.`,
 				);
 			}
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Error during installation: ${errorMessage}. See console for details.`
+				`[Installer] Error during installation: ${errorMessage}. See console for details.`,
 			);
 			logger.error("Installation error:", err);
 		}
@@ -280,6 +355,78 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	private addExportImportButtons(containerEl?: HTMLElement): void {
+		const target = containerEl ?? this.containerEl;
+
+		new Setting(target)
+			.setName("Preview import")
+			.setDesc(
+				"See which plugins would be installed, skipped, or updated, and which settings would change — without changing your vault.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Preview").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await this.plugin.previewPluginSetup();
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(target)
+			.setName("Export plugin setup")
+			.setDesc(
+				"Save your installed community plugins and their settings into the JSON files in the vault .obsidian folder.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Export").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await this.plugin.exportPluginSetup();
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(target)
+			.setName("Import plugin setup")
+			.setDesc(
+				"Install plugins from the list file. Enabling and applying settings follow the options below.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Import").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						new Notice("Starting plugin setup import...");
+						await this.plugin.runImportPipeline();
+						new Notice("Plugin setup import finished.");
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(target)
+			.setName("Apply settings")
+			.setDesc(
+				"Update installed plugins from the settings file without reinstalling them.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Apply").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						new Notice("Applying plugin settings...");
+						await this.plugin.applySettingsToInstalledPlugins();
+						new Notice("Finished applying plugin settings.");
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+	}
+
 	/**
 	 * Obsidian 1.13.0+: declarative settings (searchable). Skips display().
 	 */
@@ -287,11 +434,45 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		return [
 			{
 				name: "Security warning",
-				desc: "This downloads and installs community plugins from the Obsidian registry and GitHub releases. Only use it with trusted vaults, and review community-plugins-list.json before enabling.",
+				desc: "This can download and install community plugins. Only use it with trusted vaults, and review your plugin list before enabling auto-install.",
+			},
+			{
+				name: "Export / Import",
+				desc: "Manage the plugin list and settings files in your vault’s .obsidian folder.",
+				render: (setting: Setting) => {
+					setting.addButton((button) =>
+						button.setButtonText("Preview").onClick(async () => {
+							await this.plugin.previewPluginSetup();
+						}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Export").onClick(async () => {
+							await this.plugin.exportPluginSetup();
+						}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Import").onClick(async () => {
+							new Notice("Starting plugin setup import...");
+							await this.plugin.runImportPipeline();
+							new Notice("Plugin setup import finished.");
+						}),
+					);
+					setting.addButton((button) =>
+						button
+							.setButtonText("Apply settings")
+							.onClick(async () => {
+								new Notice("Applying plugin settings...");
+								await this.plugin.applySettingsToInstalledPlugins();
+								new Notice(
+									"Finished applying plugin settings.",
+								);
+							}),
+					);
+				},
 			},
 			{
 				name: "Auto-install plugins on startup",
-				desc: "Install missing plugins listed in community-plugins-list.json when Obsidian starts.",
+				desc: "When Obsidian starts, install any plugins from your list that are not installed yet.",
 				control: {
 					type: "toggle" as const,
 					key: "autoInstallPlugins",
@@ -299,7 +480,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Auto-enable plugins after installation",
-				desc: "Enable installed plugins after installation. The plugin list is refreshed first so newly installed plugins are recognized.",
+				desc: "Turn plugins on after they are installed.",
 				control: {
 					type: "toggle" as const,
 					key: "autoEnablePlugins",
@@ -307,15 +488,23 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Apply settings on installation",
-				desc: "After installing a plugin, apply its configuration from community-plugins-settings.json.",
+				desc: "After installing a plugin, apply its settings from your settings file.",
 				control: {
 					type: "toggle" as const,
 					key: "loadSettingsOnInstall",
 				},
 			},
 			{
+				name: "Merge settings instead of replace",
+				desc: "Update matching settings and keep the rest. When off, the plugin’s saved settings are replaced entirely.",
+				control: {
+					type: "toggle" as const,
+					key: "mergePluginSettings",
+				},
+			},
+			{
 				name: "Sync settings on every startup",
-				desc: "On each startup, re-apply settings from community-plugins-settings.json to installed plugins.",
+				desc: "Each time Obsidian starts, apply your settings file to installed plugins.",
 				control: {
 					type: "toggle" as const,
 					key: "loadSettingsOnStartup",
@@ -323,11 +512,11 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Logging level",
-				desc: "How much to log to the developer console (Ctrl/Cmd+Shift+I). Use Debug only while troubleshooting.",
+				desc: "How much detail to show in the console if something goes wrong. Leave on Error unless you are troubleshooting.",
 				render: (setting: Setting) => {
 					setting.addDropdown((dropdown) => {
 						dropdown
-							.addOption("debug", "Debug (most verbose)")
+							.addOption("debug", "Debug (most detail)")
 							.addOption("info", "Info")
 							.addOption("warn", "Warn")
 							.addOption("error", "Error (recommended)")
@@ -335,12 +524,17 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							.setValue(this.plugin.settings.logLevel || "error")
 							.onChange(
 								async (
-									value: "debug" | "info" | "warn" | "error" | "none"
+									value:
+										| "debug"
+										| "info"
+										| "warn"
+										| "error"
+										| "none",
 								) => {
 									this.plugin.settings.logLevel = value;
 									await this.plugin.saveSettings();
 									this.plugin.applyLogLevel(value);
-								}
+								},
 							);
 					});
 				},
@@ -362,13 +556,15 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			text: "Security warning: ",
 		});
 		warningDiv.appendText(
-			"This downloads and installs community plugins from the Obsidian registry and GitHub releases. Only use it with trusted vaults, and review community-plugins-list.json before enabling."
+			"This can download and install community plugins. Only use it with trusted vaults, and review your plugin list before enabling auto-install.",
 		);
+
+		this.addExportImportButtons(containerEl);
 
 		new Setting(containerEl)
 			.setName("Auto-install plugins on startup")
 			.setDesc(
-				"Install missing plugins listed in community-plugins-list.json when Obsidian starts."
+				"When Obsidian starts, install any plugins from your list that are not installed yet.",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -376,27 +572,25 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.autoInstallPlugins = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Auto-enable plugins after installation")
-			.setDesc(
-				"Enable installed plugins after installation. The plugin list is refreshed first so newly installed plugins are recognized."
-			)
+			.setDesc("Turn plugins on after they are installed.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.autoEnablePlugins)
 					.onChange(async (value) => {
 						this.plugin.settings.autoEnablePlugins = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Apply settings on installation")
 			.setDesc(
-				"After installing a plugin, apply its configuration from community-plugins-settings.json."
+				"After installing a plugin, apply its settings from your settings file.",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -404,13 +598,27 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnInstall = value;
 						await this.plugin.saveSettings();
-					})
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Merge settings instead of replace")
+			.setDesc(
+				"Update matching settings and keep the rest. When off, the plugin’s saved settings are replaced entirely.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.mergePluginSettings)
+					.onChange(async (value) => {
+						this.plugin.settings.mergePluginSettings = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Sync settings on every startup")
 			.setDesc(
-				"On each startup, re-apply settings from community-plugins-settings.json to installed plugins."
+				"Each time Obsidian starts, apply your settings file to installed plugins.",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -418,17 +626,17 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnStartup = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Logging level")
 			.setDesc(
-				"How much to log to the developer console (Ctrl/Cmd+Shift+I). Use Debug only while troubleshooting."
+				"How much detail to show in the console if something goes wrong. Leave on Error unless you are troubleshooting.",
 			)
 			.addDropdown((dropdown) => {
 				dropdown
-					.addOption("debug", "Debug (most verbose)")
+					.addOption("debug", "Debug (most detail)")
 					.addOption("info", "Info")
 					.addOption("warn", "Warn")
 					.addOption("error", "Error (recommended)")
@@ -436,12 +644,12 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.logLevel || "error")
 					.onChange(
 						async (
-							value: "debug" | "info" | "warn" | "error" | "none"
+							value: "debug" | "info" | "warn" | "error" | "none",
 						) => {
 							this.plugin.settings.logLevel = value;
 							await this.plugin.saveSettings();
 							this.plugin.applyLogLevel(value);
-						}
+						},
 					);
 			});
 	}

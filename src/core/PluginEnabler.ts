@@ -42,7 +42,7 @@ interface SettingsAPI {
 export class PluginEnabler {
 	constructor(
 		private app: App,
-		private fileManager: FileManager
+		private fileManager: FileManager,
 	) {}
 
 	private getPluginsApi(): PluginsAPI | undefined {
@@ -54,7 +54,7 @@ export class PluginEnabler {
 	 */
 	async enableInstalledPlugins(
 		pluginIds: string[],
-		onProgress?: (current: number, total: number, pluginId: string) => void
+		onProgress?: (current: number, total: number, pluginId: string) => void,
 	): Promise<{ enabled: number; failed: number; failedPlugins: string[] }> {
 		if (!pluginIds || pluginIds.length === 0) {
 			return { enabled: 0, failed: 0, failedPlugins: [] };
@@ -65,7 +65,7 @@ export class PluginEnabler {
 
 			if (!pluginsApi) {
 				new Notice(
-					"Cannot access plugins API. Plugins will need to be enabled manually."
+					"Cannot access plugins API. Plugins will need to be enabled manually.",
 				);
 				logger.warn("Plugins API not available");
 				return { enabled: 0, failed: 0, failedPlugins: pluginIds };
@@ -80,13 +80,13 @@ export class PluginEnabler {
 				const pluginFolder = this.fileManager.pluginsPath(normalizedId);
 				const manifestPath = this.fileManager.pluginsPath(
 					normalizedId,
-					"manifest.json"
+					"manifest.json",
 				);
 				if (await this.fileManager.exists(manifestPath)) {
 					installedPluginIds.push(normalizedId);
 				} else if (await this.fileManager.exists(pluginFolder)) {
 					logger.warn(
-						`Plugin folder exists but manifest.json is missing: ${pluginFolder}`
+						`Plugin folder exists but manifest.json is missing: ${pluginFolder}`,
 					);
 				} else {
 					logger.warn(`Plugin folder not found: ${pluginFolder}`);
@@ -108,9 +108,11 @@ export class PluginEnabler {
 				if (attempt > 0) {
 					await this.reloadPlugins(pluginsApi);
 					await new Promise((resolve) =>
-						window.setTimeout(resolve, 1000)
+						window.setTimeout(resolve, 1000),
 					);
-					logger.debug(`Retry attempt ${attempt + 1} to enable plugins...`);
+					logger.debug(
+						`Retry attempt ${attempt + 1} to enable plugins...`,
+					);
 				}
 
 				for (let i = 0; i < installedPluginIds.length; i++) {
@@ -127,7 +129,7 @@ export class PluginEnabler {
 						const result = await this.enableSinglePlugin(
 							pluginId,
 							pluginsApi,
-							attempt
+							attempt,
 						);
 
 						if (result.enabled) {
@@ -138,19 +140,22 @@ export class PluginEnabler {
 							}
 							// Let plugins that open side leaves settle before the next enable.
 							await new Promise((resolve) =>
-								window.setTimeout(resolve, 350)
+								window.setTimeout(resolve, 350),
 							);
 						} else if (result.failed && attempt === 2) {
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
 							}
 							logger.error(
-								`Could not enable "${pluginId}": ${result.reason || "unknown reason"}`
+								`Could not enable "${pluginId}": ${result.reason || "unknown reason"}`,
 							);
 						}
 					} catch (err: unknown) {
 						if (attempt === 2) {
-							logger.error(`Failed to enable plugin "${pluginId}":`, err);
+							logger.error(
+								`Failed to enable plugin "${pluginId}":`,
+								err,
+							);
 							if (!failedPlugins.includes(pluginId)) {
 								failedPlugins.push(pluginId);
 							}
@@ -168,15 +173,15 @@ export class PluginEnabler {
 
 			if (enabledCount > 0 && failedCount === 0) {
 				new Notice(
-					`[Installer] Successfully enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}.`
+					`[Installer] Successfully enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}.`,
 				);
 			} else if (enabledCount > 0 && failedCount > 0) {
 				new Notice(
-					`[Installer] Enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}, failed to enable ${failedCount}. See console for details.`
+					`[Installer] Enabled ${enabledCount} plugin${enabledCount > 1 ? "s" : ""}, failed to enable ${failedCount}. See console for details.`,
 				);
 			} else if (failedCount > 0) {
 				new Notice(
-					`[Installer] Failed to enable ${failedCount} plugin${failedCount > 1 ? "s" : ""}. Enable them manually or reload Obsidian.`
+					`[Installer] Failed to enable ${failedCount} plugin${failedCount > 1 ? "s" : ""}. Enable them manually or reload Obsidian.`,
 				);
 			}
 
@@ -184,15 +189,23 @@ export class PluginEnabler {
 				logger.error("Failed to enable plugins:", failedPlugins);
 			}
 
-			return { enabled: enabledCount, failed: failedCount, failedPlugins };
+			return {
+				enabled: enabledCount,
+				failed: failedCount,
+				failedPlugins,
+			};
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Error while enabling plugins: ${errorMessage}. See console for details.`
+				`[Installer] Error while enabling plugins: ${errorMessage}. See console for details.`,
 			);
 			logger.error("Error enabling plugins:", err);
-			return { enabled: 0, failed: pluginIds.length, failedPlugins: pluginIds };
+			return {
+				enabled: 0,
+				failed: pluginIds.length,
+				failedPlugins: pluginIds,
+			};
 		}
 	}
 
@@ -243,7 +256,7 @@ export class PluginEnabler {
 		try {
 			const manifestPath = this.fileManager.pluginsPath(
 				pluginId,
-				"manifest.json"
+				"manifest.json",
 			);
 			if (await this.fileManager.exists(manifestPath)) {
 				const raw = await this.fileManager.readFile(manifestPath);
@@ -259,7 +272,10 @@ export class PluginEnabler {
 				}
 			}
 		} catch (err: unknown) {
-			logger.debug(`Could not read local manifest for "${pluginId}":`, err);
+			logger.debug(
+				`Could not read local manifest for "${pluginId}":`,
+				err,
+			);
 		}
 		return candidates;
 	}
@@ -269,7 +285,7 @@ export class PluginEnabler {
 	 */
 	private async resolvePluginId(
 		pluginId: string,
-		pluginsApi: PluginsAPI
+		pluginsApi: PluginsAPI,
 	): Promise<string | null> {
 		const manifests = pluginsApi.manifests || {};
 		const candidates = await this.getCandidateIds(pluginId);
@@ -313,7 +329,7 @@ export class PluginEnabler {
 	private async enableSinglePlugin(
 		pluginId: string,
 		pluginsApi: PluginsAPI,
-		attempt: number
+		attempt: number,
 	): Promise<{
 		enabled: boolean;
 		failed: boolean;
@@ -359,7 +375,10 @@ export class PluginEnabler {
 		}
 
 		const enableIds = Array.from(
-			new Set([actualPluginId, ...(await this.getCandidateIds(pluginId))])
+			new Set([
+				actualPluginId,
+				...(await this.getCandidateIds(pluginId)),
+			]),
 		);
 		let lastError = "";
 
@@ -379,7 +398,9 @@ export class PluginEnabler {
 				}
 
 				if (this.isPluginEnabled(pluginsApi, enableId)) {
-					logger.debug(`Enabled plugin "${pluginId}" as "${enableId}".`);
+					logger.debug(
+						`Enabled plugin "${pluginId}" as "${enableId}".`,
+					);
 					return { enabled: true, failed: false, actualId: enableId };
 				}
 
@@ -406,41 +427,22 @@ export class PluginEnabler {
 		try {
 			await new Promise((resolve) => window.setTimeout(resolve, 300));
 
-			const settings = (this.app as App & { setting?: SettingsAPI }).setting;
-			if (settings) {
-				if (settings.pluginTabs && Array.isArray(settings.pluginTabs)) {
-					const pluginTab = settings.pluginTabs.find(
-						(tab) =>
-							tab &&
-							(tab.id === "community-plugins" ||
-								tab.name === "Community plugins" ||
-								tab.id === "plugins")
-					);
-
-					if (
-						pluginTab &&
-						typeof pluginTab.display === "function" &&
-						settings.activeTab === pluginTab
-					) {
-						pluginTab.display();
-					}
-				}
+			const settings = (this.app as App & { setting?: SettingsAPI })
+				.setting;
+			if (settings?.pluginTabs && Array.isArray(settings.pluginTabs)) {
+				const communityPluginsTab = settings.pluginTabs.find(
+					(tab) =>
+						tab &&
+						(tab.id === "community-plugins" ||
+							tab.name === "Community plugins"),
+				);
 
 				if (
-					settings.activeTab &&
-					typeof settings.activeTab.display === "function"
+					communityPluginsTab &&
+					typeof communityPluginsTab.display === "function" &&
+					settings.activeTab === communityPluginsTab
 				) {
-					const activeTabId = (
-						settings.activeTab.id ||
-						settings.activeTab.name ||
-						""
-					).toLowerCase();
-					if (
-						activeTabId.includes("community") ||
-						activeTabId.includes("plugin")
-					) {
-						settings.activeTab.display();
-					}
+					communityPluginsTab.display();
 				}
 			}
 

@@ -3,7 +3,13 @@ export interface InstallCommunityPluginsSettings {
 	loadSettingsOnStartup: boolean;
 	autoInstallPlugins: boolean;
 	autoEnablePlugins: boolean;
+	mergePluginSettings: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error" | "none";
+}
+
+export interface PluginListEntry {
+	id: string;
+	version?: string;
 }
 
 export interface PluginRegistryEntry {
@@ -24,17 +30,17 @@ export interface GitHubRelease {
 }
 
 export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
-	loadSettingsOnInstall: true,
-	loadSettingsOnStartup: true,
-	autoInstallPlugins: true,
-	autoEnablePlugins: true,
+	loadSettingsOnInstall: false,
+	loadSettingsOnStartup: false,
+	autoInstallPlugins: false,
+	autoEnablePlugins: false,
+	mergePluginSettings: true,
 	logLevel: "error",
 };
 
-// Constants
 export const PLUGIN_REGISTRY_URL =
 	"https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json";
+export const PLUGIN_ID = "automatic-installation-of-plugins";
 export const PLUGINS_LIST_FILE = "community-plugins-list.json";
 export const PLUGINS_SETTINGS_FILE = "community-plugins-settings.json";
 export const USER_AGENT = "obsidian-plugin-installer";
-

@@ -1,162 +1,163 @@
 # Community Install Manager
 
-Install, enable, and configure Obsidian community plugins from simple JSON files. Useful for syncing vault setups across devices or sharing a predefined configuration.
+Install, enable, and configure Obsidian community plugins from JSON files in your vault. Useful for syncing the same plugin setup across devices or sharing a ready-made configuration.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Overview
+**Desktop only.**
 
-**Community Install Manager** reads plugin IDs and optional settings from JSON files in your vault's `.obsidian` folder, then installs missing community plugins, enables them, and applies configuration.
+## What it does
+
+The plugin reads two files in your vault’s `.obsidian` folder:
+
+- `community-plugins-list.json` — which community plugins to install (optionally with pinned versions)
+- `community-plugins-settings.json` — settings to apply to those plugins
+
+You can **export** your current vault setup into those files, **preview** what an import would do, then **import** on another machine.
 
 Typical uses:
 
-- Sync plugin setups across multiple devices
-- Share vault configurations with a team
-- Bootstrap a new vault with a known set of plugins
-
-## Network use
-
-This plugin makes network requests when installing plugins:
-
-| Remote service | Purpose |
-|---|---|
-| `https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json` | Look up community plugin IDs and their GitHub repositories |
-| `https://api.github.com/.../releases` and release `manifest.json` assets | Resolve a stable release version and manifest for each listed plugin |
-| Obsidian's built-in `installPlugin` | Download and install release files through Obsidian (same path as Community plugins UI) |
-
-No telemetry is sent. Installs happen only for plugin IDs you put in `community-plugins-list.json` (and only when auto-install or the install command runs).
+- Keep the same plugins on several computers
+- Share a team vault starter setup
+- Bootstrap a new vault from a known list
 
 ## Security warning
 
-**Important:** this plugin can download and install other community plugins into your vault.
+This plugin can download and install other community plugins.
 
-- Only use it in vaults where you trust the source of `community-plugins-list.json`
-- Review that file before enabling auto-install
-- Installed plugins may access your vault data and, on desktop, the file system
-- The latest release of each listed plugin is installed, which may include breaking changes
+- Only use it with vaults and JSON files you trust
+- Review `community-plugins-list.json` before turning on auto-install
+- Installed plugins can access your notes (and more on desktop)
+- Unpinned plugins install the latest suitable release, which may include breaking changes
 - Use at your own risk; the author is not responsible for plugins installed on your behalf
 
 ## Features
 
-- Install missing plugins from the Obsidian Community Plugins registry
-- Optionally enable plugins after installation
-- Apply settings from a JSON file after install and/or on startup
-- Refresh the Obsidian UI after install/enable
-- Manual install command from the Command Palette
+- Install plugins from the Obsidian Community Plugins registry (via Obsidian’s own installer)
+- Optional version pins so setups stay reproducible
+- Export / import / preview of your plugin list and settings
+- Optional auto-install, auto-enable, and settings sync (all **off** by default)
+- Merge plugin settings into existing ones (on by default for new installs)
+
+## Network use
+
+| Remote service | Purpose |
+|---|---|
+| Community plugins registry on GitHub | Look up plugin IDs and repositories |
+| GitHub Releases API and release assets | Resolve versions and manifests |
+| Obsidian’s built-in installer | Download and install plugin files (same path as Community plugins) |
+
+No telemetry. Network use happens only when you import/install (or when auto-install is enabled).
 
 ## Installation
 
-### Manual installation
-
-1. Download the latest release from the [GitHub repository](https://github.com/Skilletron/obsidian-automatic-installation-of-plugins)
-2. Extract the archive to your vault's `.obsidian/plugins/` folder
-3. Rename the extracted folder to `automatic-installation-of-plugins`
-4. Open Obsidian Settings → Community plugins
-5. Turn **Safe mode** off
-6. Enable **Community Install Manager**
+1. Install from Community plugins when available, **or** download the latest [GitHub release](https://github.com/Skilletron/obsidian-automatic-installation-of-plugins/releases) (`main.js`, `manifest.json`, `styles.css`) into `.obsidian/plugins/automatic-installation-of-plugins/`
+2. Settings → Community plugins → turn Restricted mode off
+3. Enable **Community Install Manager**
 
 ## Configuration files
 
-Place these files in your vault's `.obsidian` folder:
-
 ```
 .vault/
-├── .obsidian/
-│   ├── plugins/
-│   ├── community-plugins-list.json
-│   └── community-plugins-settings.json
+└── .obsidian/
+    ├── community-plugins-list.json
+    └── community-plugins-settings.json
 ```
 
-### `community-plugins-list.json`
+### Plugin list — `community-plugins-list.json`
 
-Array of plugin IDs to install and enable:
+**Simple list** (install latest if missing; leave alone if already installed):
 
 ```json
 [
-  "advanced-tables",
+  "calendar",
+  "dataview",
   "templater-obsidian",
-  "obsidian-linter",
   "obsidian-git"
 ]
 ```
 
-### `community-plugins-settings.json`
+**Pinned versions** (install or change to that version):
 
-Object mapping plugin IDs to settings written into each plugin's `data.json`:
+```json
+[
+  { "id": "calendar", "version": "1.5.10" },
+  { "id": "dataview", "version": "0.5.68" },
+  "obsidian-git"
+]
+```
+
+You can mix plain IDs and `{ "id", "version" }` objects. Export writes pinned objects from your currently installed versions.
+
+### Plugin settings — `community-plugins-settings.json`
+
+Maps plugin IDs to settings objects applied to each plugin:
 
 ```json
 {
   "templater-obsidian": {
     "templates_folder": "Templates",
-    "trigger_on_file_open": true,
     "command_timeout": 5
   },
-  "obsidian-linter": {
-    "auto_format_on_save": true,
-    "lint_on_load": false
-  },
   "obsidian-git": {
-    "pullInterval": 60,
-    "autoPullInterval": 0
+    "pullInterval": 60
   }
 }
 ```
 
-## Example workflow
+## Quick start
 
-1. Create `community-plugins-list.json` with the plugin IDs you want.
-2. Optionally create `community-plugins-settings.json` with per-plugin settings.
-3. Enable **Community Install Manager** (and the auto-install / auto-enable options you want).
-4. Restart Obsidian, or run **Install plugins from list** from the Command Palette.
+1. On a vault that already has the plugins you want: Command Palette → **Export plugin setup to JSON**
+2. Copy the two JSON files (or the whole vault config) to another device
+3. There: **Preview plugin setup import**, review the report, then **Import plugin setup from JSON**
+4. Turn on only the automatic options you need in Settings
+
+## Commands
+
+| Command | Action |
+|---|---|
+| Preview plugin setup import | Shows what would be installed, skipped, re-pinned, or updated in settings — without changing anything |
+| Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
+| Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
+| Apply settings from JSON | Applies settings from the settings file without reinstalling plugins |
 
 ## Settings
 
+Automatic options are **off** by default so nothing runs until you choose it.
+
 | Setting | Description |
 |---|---|
-| Auto-install plugins on startup | Install missing plugins from `community-plugins-list.json` on startup |
-| Auto-enable plugins after installation | Enable plugins after install and refresh the plugin list |
-| Apply settings on installation | Write settings from `community-plugins-settings.json` after each install |
-| Sync settings on every startup | Re-apply settings from that file on each startup |
-| Logging level | Console verbosity (default: Error) |
-
-## How it works
-
-1. On startup (if enabled), the plugin reads `community-plugins-list.json` from `.obsidian`.
-2. Missing plugins are resolved via the community registry, then downloaded from their GitHub releases.
-3. If auto-enable is on, installed plugins are enabled and the UI is refreshed.
-4. If settings sync is on, values from `community-plugins-settings.json` are written to each plugin's `data.json`.
+| Preview / Export / Import / Apply | Buttons for the actions above |
+| Auto-install plugins on startup | When Obsidian starts, install any missing plugins from the list |
+| Auto-enable plugins after installation | Turn installed plugins on after import |
+| Apply settings on installation | After each install, apply that plugin’s settings from the settings file |
+| Merge settings instead of replace | Combine settings with what the plugin already has, instead of replacing them entirely |
+| Sync settings on every startup | Re-apply the settings file every time Obsidian starts |
+| Logging level | How much detail to write to the console if something goes wrong (default: Error) |
 
 ## Finding plugin IDs
 
-1. Open the [Obsidian Community Plugins](https://obsidian.md/plugins) site
-2. Open the plugin page; the ID is usually in the URL or the plugin's `manifest.json`
-
-Examples: `obsidian-git`, `templater-obsidian`, `obsidian-linter`, `calendar`, `dataview`
+Use the ID from the plugin’s Community plugins page or its `manifest.json` (for example `dataview`, `templater-obsidian`, `obsidian-git`).
 
 ## Troubleshooting
 
-### Plugins not installing
+**Nothing installs**
 
-- Confirm `community-plugins-list.json` exists and contains valid IDs
-- IDs are case-sensitive
-- Check the developer console (Ctrl/Cmd+Shift+I) for errors
-- Confirm you have network access to GitHub
+- Check that `community-plugins-list.json` exists and the IDs are correct
+- Use **Preview** to see planned actions
+- Confirm network access to GitHub
+- Open the console (Ctrl/Cmd+Shift+I) if import fails
 
-### Plugins not enabling
+**Plugins stay disabled**
 
-- Confirm **Auto-enable plugins after installation** is on
-- Check the console during enable
-- Try **Reload** under Settings → Community plugins
+- Turn on **Auto-enable plugins after installation**, or enable them under Community plugins
+- Reload Obsidian if the list looks stale
 
-### Settings not applying
+**Settings look wrong**
 
-- Confirm `community-plugins-settings.json` is valid JSON
-- IDs in that file must match installed plugin IDs
-- Confirm **Apply settings on installation** or **Sync settings on every startup** is on
-
-## Desktop only
-
-This plugin uses Node.js APIs (`fs`, `path`, `https`) and is desktop-only (`isDesktopOnly: true`).
+- Confirm IDs in `community-plugins-settings.json` match the installed plugins
+- With **Merge** on, only listed keys are updated; with it off, the whole settings file for that plugin is replaced
+- Turn on **Apply settings on installation** and/or **Sync settings on every startup**, or run **Apply settings from JSON**
 
 ## Links
 
