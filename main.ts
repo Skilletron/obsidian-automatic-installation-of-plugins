@@ -360,7 +360,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		new Setting(target)
 			.setName("Export plugin setup")
 			.setDesc(
-				"Save your installed community plugins and their settings into the JSON files in the vault .obsidian folder.",
+				`Save your installed community plugins and their settings into the JSON files in ${this.app.vault.configDir}.`,
 			)
 			.addButton((button) =>
 				button.setButtonText("Export").onClick(async () => {
@@ -417,7 +417,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Export / Import",
-				desc: "Manage the plugin list and settings files in your vault’s .obsidian folder.",
+				desc: `Manage the plugin list and settings files in ${this.app.vault.configDir}.`,
 				render: (setting: Setting) => {
 					setting.addButton((button) =>
 						button.setButtonText("Preview").onClick(async () => {
