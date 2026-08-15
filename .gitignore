@@ -18,5 +18,9 @@ main.js
 # obsidian
 data.json
 
+# Local Obsidian test vaults (not part of the release)
+e2e/
+test-vault/
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
