@@ -70,19 +70,19 @@ export class SettingsManager {
 		}
 	}
 
-	async applySettingsToInstalledPlugins(): Promise<number> {
+	async applySettingsToInstalledPlugins(): Promise<string[]> {
 		const settingsFile = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
 		if (!(await this.fileManager.exists(settingsFile))) {
 			new Notice(
 				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings on startup`,
 			);
-			return 0;
+			return [];
 		}
 
 		const rawSettings = await this.fileManager.readFile(settingsFile);
 		if (!rawSettings) {
-			return 0;
+			return [];
 		}
 
 		const allSettings = this.fileManager.parseJsonWithValidation<
@@ -90,10 +90,10 @@ export class SettingsManager {
 		>(rawSettings, PLUGINS_SETTINGS_FILE);
 
 		if (!allSettings) {
-			return 0;
+			return [];
 		}
 
-		let applied = 0;
+		const applied: string[] = [];
 
 		for (const pluginId of Object.keys(allSettings)) {
 			if (!isSafePluginId(pluginId)) {
@@ -130,7 +130,7 @@ export class SettingsManager {
 							`[Installer] Cannot write settings for plugin ${pluginId}. Check file permissions.`,
 						);
 					} else {
-						applied++;
+						applied.push(pluginId);
 					}
 				} catch (err: unknown) {
 					const errorMessage =

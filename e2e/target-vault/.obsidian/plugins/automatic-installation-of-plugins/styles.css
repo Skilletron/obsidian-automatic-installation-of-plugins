@@ -1,0 +1,223 @@
+.community-install-manager-warning {
+  color: var(--text-warning);
+  margin-bottom: 1.5em;
+  padding: 0.75em;
+  background-color: var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+
+.community-install-manager-preview-modal {
+  max-width: 560px;
+}
+
+.community-install-manager-preview-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.community-install-manager-preview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.65rem 0.35rem;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.community-install-manager-preview-stat-value {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.community-install-manager-preview-stat-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.community-install-manager-preview-stat.is-install
+  .community-install-manager-preview-stat-value {
+  color: var(--color-accent);
+}
+
+.community-install-manager-preview-stat.is-repin
+  .community-install-manager-preview-stat-value {
+  color: var(--text-warning);
+}
+
+.community-install-manager-preview-stat.is-ok
+  .community-install-manager-preview-stat-value,
+.community-install-manager-preview-stat.is-settings
+  .community-install-manager-preview-stat-value {
+  color: var(--text-success, var(--color-green));
+}
+
+.community-install-manager-preview-note {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  border-left: 3px solid var(--text-warning);
+}
+
+.community-install-manager-preview-list {
+  max-height: 52vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding-right: 0.15rem;
+}
+
+.community-install-manager-preview-empty {
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border-radius: var(--radius-m);
+}
+
+.community-install-manager-preview-row {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-left-width: 3px;
+  border-left-color: var(--text-faint);
+}
+
+.community-install-manager-preview-row.is-install {
+  border-left-color: var(--color-accent);
+}
+
+.community-install-manager-preview-row.is-repin {
+  border-left-color: var(--text-warning);
+}
+
+.community-install-manager-preview-row.is-ok-pinned {
+  border-left-color: var(--text-success, var(--color-green));
+}
+
+.community-install-manager-preview-row.is-skip {
+  border-left-color: var(--text-faint);
+}
+
+.community-install-manager-preview-row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.community-install-manager-preview-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.community-install-manager-preview-id {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.community-install-manager-preview-version {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.community-install-manager-preview-version.is-local {
+  color: var(--text-muted);
+}
+
+.community-install-manager-preview-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.community-install-manager-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-s);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.community-install-manager-preview-badge.is-install {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, var(--text-normal));
+}
+
+.community-install-manager-preview-badge.is-repin {
+  background: var(--background-modifier-error);
+  color: var(--text-normal);
+}
+
+.community-install-manager-preview-badge.is-ok-pinned {
+  background: var(--background-modifier-border);
+  color: var(--text-success, var(--color-green));
+  box-shadow: inset 0 0 0 1px var(--text-success, var(--color-green));
+}
+
+.community-install-manager-preview-badge.is-skip {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.community-install-manager-preview-badge.is-settings-would-apply {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.community-install-manager-preview-badge.is-settings-no-settings-entry,
+.community-install-manager-preview-badge.is-settings-plugin-not-installed,
+.community-install-manager-preview-badge.is-settings-settings-file-missing {
+  background: var(--background-modifier-border);
+  color: var(--text-faint);
+}
+
+.community-install-manager-preview-row-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  line-height: 1.4;
+}
+
+.community-install-manager-preview-row-meta.is-settings {
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 520px) {
+  .community-install-manager-preview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .community-install-manager-preview-row-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .community-install-manager-preview-badges {
+    justify-content: flex-start;
+  }
+}

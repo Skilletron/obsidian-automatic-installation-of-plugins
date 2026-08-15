@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache the community plugins registry for a single import run
 - Clearer Notices for GitHub rate limits (HTTP 403/429)
 - Use `normalizePath()` and reject unsafe plugin IDs / path segments
-- After applying settings, notify that plugins need a reload for in-memory settings
+- After applying settings, reload enabled plugins so changes take effect immediately
 - Remove duplicate Command palette entry for import
 - Desktop adapter error message no longer mentions “base path”
 

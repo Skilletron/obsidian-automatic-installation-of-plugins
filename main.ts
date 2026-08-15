@@ -180,11 +180,19 @@ export default class InstallCommunityPlugins extends Plugin {
 			this.fileManager.assertDesktopAdapter();
 			const applied =
 				await this.settingsManager.applySettingsToInstalledPlugins();
-			if (applied > 0) {
-				new Notice(
-					`[Installer] Wrote settings for ${applied} plugin${applied === 1 ? "" : "s"}. Disable and re-enable those plugins (or restart Obsidian) for changes to take effect.`,
-				);
+			if (applied.length === 0) {
+				return;
 			}
+
+			const reloaded =
+				await this.pluginEnabler.reloadEnabledPlugins(applied);
+			await this.pluginEnabler.refreshPluginsUI();
+
+			new Notice(
+				reloaded > 0
+					? `[Installer] Applied settings to ${applied.length} plugin${applied.length === 1 ? "" : "s"} (${reloaded} reloaded).`
+					: `[Installer] Applied settings to ${applied.length} plugin${applied.length === 1 ? "" : "s"}.`,
+			);
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
@@ -277,24 +285,24 @@ export default class InstallCommunityPlugins extends Plugin {
 				}
 			}
 
-			const pluginIds = entries.map((e) => e.id);
-
 			if (this.settings.autoEnablePlugins) {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
-					pluginIds,
+					entries.map((e) => e.id),
 					(current, total, pluginId) => {
 						new Notice(
 							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`,
 						);
 					},
 				);
-
-				if (result.enabled > 0) {
-					await this.pluginEnabler.refreshPluginsUI();
+				if (result.failed > 0) {
+					logger.warn(
+						"Some plugins failed to enable:",
+						result.failedPlugins,
+					);
 				}
-			} else {
-				await this.pluginEnabler.refreshPluginsUI();
 			}
+
+			await this.pluginEnabler.refreshPluginsUI();
 
 			if (installedCount === totalPlugins) {
 				new Notice(

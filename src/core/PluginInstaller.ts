@@ -18,6 +18,10 @@ interface PluginsAPI {
 		version: string,
 		manifest: PluginManifest,
 	) => Promise<void>;
+	loadManifest?: (pluginFolderPath: string) => Promise<void>;
+	loadManifests?: () => Promise<void>;
+	loadAvailablePlugins?: () => Promise<void>;
+	getPluginFolder?: () => string;
 }
 
 export class PluginInstaller {
@@ -232,20 +236,47 @@ export class PluginInstaller {
 				return false;
 			}
 
-			const version = normalizeVersion(release.tag_name);
+			const version =
+				(typeof manifest.version === "string" &&
+					manifest.version.trim()) ||
+				normalizeVersion(release.tag_name || "");
+			if (!version) {
+				new Notice(
+					`[Installer] Could not resolve version for "${normalizedId}".`,
+				);
+				return false;
+			}
+
 			logger.debug(
 				`Installing "${normalizedId}" via Obsidian installPlugin (${pluginMeta.repo}@${version})`,
 			);
 
 			await pluginsApi.installPlugin(pluginMeta.repo, version, manifest);
 
-			if (this.shouldLoadSettingsOnInstall()) {
-				const installedFolderId = (await this.fileManager.exists(
-					this.fileManager.pluginsPath(manifest.id),
-				))
-					? manifest.id
-					: normalizedId;
+			const installedFolderId = (await this.fileManager.exists(
+				this.fileManager.pluginsPath(manifest.id, "main.js"),
+			))
+				? manifest.id
+				: normalizedId;
 
+			if (
+				!(await this.fileManager.exists(
+					this.fileManager.pluginsPath(installedFolderId, "main.js"),
+				))
+			) {
+				new Notice(
+					`[Installer] Plugin "${normalizedId}" did not land on disk after install.`,
+				);
+				return false;
+			}
+
+			await this.recognizeInstalledPlugin(pluginsApi, [
+				installedFolderId,
+				manifest.id,
+				normalizedId,
+			]);
+
+			if (this.shouldLoadSettingsOnInstall()) {
 				await this.settingsManager.applySettingsForPlugin(
 					normalizedId,
 					installedFolderId,
@@ -277,6 +308,51 @@ export class PluginInstaller {
 				await this.fileManager.removeRecursive(pluginFolder);
 			}
 			return false;
+		}
+	}
+
+	private async recognizeInstalledPlugin(
+		pluginsApi: PluginsAPI,
+		ids: string[],
+	): Promise<void> {
+		const unique = [...new Set(ids.filter(Boolean))];
+		for (const id of unique) {
+			if (!isSafePluginId(id)) {
+				continue;
+			}
+			const folderPath = this.fileManager.pluginsPath(id);
+			if (typeof pluginsApi.loadManifest === "function") {
+				try {
+					await pluginsApi.loadManifest(folderPath);
+				} catch (err: unknown) {
+					logger.debug(
+						`loadManifest("${folderPath}") failed:`,
+						err,
+					);
+					try {
+						await pluginsApi.loadManifest(id);
+					} catch (err2: unknown) {
+						logger.debug(`loadManifest("${id}") failed:`, err2);
+					}
+				}
+			}
+		}
+		if (typeof pluginsApi.loadManifests === "function") {
+			try {
+				await pluginsApi.loadManifests();
+			} catch (err: unknown) {
+				logger.debug("loadManifests after install failed:", err);
+			}
+		}
+		if (typeof pluginsApi.loadAvailablePlugins === "function") {
+			try {
+				await pluginsApi.loadAvailablePlugins();
+			} catch (err: unknown) {
+				logger.debug(
+					"loadAvailablePlugins after install failed:",
+					err,
+				);
+			}
 		}
 	}
 

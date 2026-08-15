@@ -30,10 +30,10 @@ export interface GitHubRelease {
 }
 
 export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
-	loadSettingsOnInstall: false,
+	loadSettingsOnInstall: true,
 	loadSettingsOnStartup: false,
 	autoInstallPlugins: false,
-	autoEnablePlugins: false,
+	autoEnablePlugins: true,
 	mergePluginSettings: true,
 	logLevel: "error",
 };
