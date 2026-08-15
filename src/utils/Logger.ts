@@ -1,6 +1,3 @@
-/**
- * Simple logger utility with log levels.
- */
 export enum LogLevel {
 	DEBUG = 0,
 	INFO = 1,

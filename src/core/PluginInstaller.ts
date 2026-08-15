@@ -8,12 +8,9 @@ import {
 	PluginListEntry,
 	PLUGIN_REGISTRY_URL,
 } from "../types";
-import { normalizeVersion } from "../utils/parsePluginList";
+import { isSafePluginId, normalizeVersion } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
-/**
- * Undocumented Obsidian plugins API used by the Community plugins browser.
- */
 interface PluginsAPI {
 	manifests?: Record<string, PluginManifest>;
 	installPlugin?: (
@@ -23,12 +20,9 @@ interface PluginsAPI {
 	) => Promise<void>;
 }
 
-/**
- * Installs community plugins via Obsidian's own installer API.
- * Does not download/extract ZIP or write main.js itself (avoids automated
- * "self-update" / obfuscation false positives).
- */
 export class PluginInstaller {
+	private registryCache: PluginRegistryEntry[] | null = null;
+
 	constructor(
 		private app: App,
 		private fileManager: FileManager,
@@ -41,14 +35,29 @@ export class PluginInstaller {
 		return (this.app as App & { plugins?: PluginsAPI }).plugins;
 	}
 
-	/**
-	 * Reads local installed version from manifest.json, if present.
-	 */
+	clearCaches(): void {
+		this.registryCache = null;
+	}
+
+	private async getPluginRegistry(): Promise<PluginRegistryEntry[]> {
+		if (this.registryCache) {
+			return this.registryCache;
+		}
+		const pluginRegistry =
+			await this.networkManager.fetchJson<PluginRegistryEntry[]>(
+				PLUGIN_REGISTRY_URL,
+			);
+		if (!Array.isArray(pluginRegistry)) {
+			throw new Error("Plugin registry is not an array");
+		}
+		this.registryCache = pluginRegistry;
+		return pluginRegistry;
+	}
+
 	private async getLocalInstalledVersion(
 		pluginId: string,
 	): Promise<string | null> {
 		const candidates = [pluginId];
-		// Folder may match id; also try reading any existing path
 		for (const folder of candidates) {
 			const manifestPath = this.fileManager.pluginsPath(
 				folder,
@@ -112,6 +121,11 @@ export class PluginInstaller {
 		}
 
 		const normalizedId = entry.id.trim();
+		if (!isSafePluginId(normalizedId)) {
+			new Notice(`Invalid plugin ID: "${normalizedId}".`);
+			return false;
+		}
+
 		const pinnedVersion = entry.version
 			? normalizeVersion(entry.version)
 			: undefined;
@@ -120,7 +134,6 @@ export class PluginInstaller {
 		const fullyInstalled = await this.isFullyInstalled(normalizedId);
 
 		if (fullyInstalled && !pinnedVersion) {
-			// Legacy / unpinned: skip if present (any version) — do not upgrade.
 			new Notice(`Plugin "${normalizedId}" already installed.`);
 			return true;
 		}
@@ -150,14 +163,7 @@ export class PluginInstaller {
 		const mainPath = this.fileManager.pluginsPath(normalizedId, "main.js");
 
 		try {
-			const pluginRegistry =
-				await this.networkManager.fetchJson<PluginRegistryEntry[]>(
-					PLUGIN_REGISTRY_URL,
-				);
-
-			if (!Array.isArray(pluginRegistry)) {
-				throw new Error("Plugin registry is not an array");
-			}
+			const pluginRegistry = await this.getPluginRegistry();
 
 			const pluginMeta = pluginRegistry.find(
 				(p) => p.id.trim().toLowerCase() === normalizedId.toLowerCase(),
@@ -259,10 +265,9 @@ export class PluginInstaller {
 			);
 			return true;
 		} catch (err: unknown) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+			const errorMessage = NetworkManager.describeError(err);
 			new Notice(
-				`[Installer] Failed to install plugin "${normalizedId}": ${errorMessage}. See console for details.`,
+				`[Installer] Failed to install plugin "${normalizedId}": ${errorMessage}`,
 			);
 			logger.error(`Installation error for ${normalizedId}:`, err);
 			if (

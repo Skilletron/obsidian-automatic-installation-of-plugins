@@ -1,10 +1,8 @@
 import { App, Notice } from "obsidian";
 import { FileManager } from "../utils/FileManager";
+import { isSafePluginId } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
-/**
- * Internal Obsidian plugins API interface (not officially documented).
- */
 interface PluginsAPI {
 	manifests?: Record<string, { id?: string }>;
 	enabledPlugins?: Set<string>;
@@ -20,9 +18,6 @@ interface PluginsAPI {
 	updatePluginList?: () => void;
 }
 
-/**
- * Internal Obsidian settings API interface (not officially documented).
- */
 interface SettingsAPI {
 	pluginTabs?: Array<{
 		id?: string;
@@ -36,9 +31,6 @@ interface SettingsAPI {
 	};
 }
 
-/**
- * Manages enabling of installed plugins.
- */
 export class PluginEnabler {
 	constructor(
 		private app: App,
@@ -49,9 +41,6 @@ export class PluginEnabler {
 		return (this.app as App & { plugins?: PluginsAPI }).plugins;
 	}
 
-	/**
-	 * Updates the plugin list and enables all plugins from the provided list.
-	 */
 	async enableInstalledPlugins(
 		pluginIds: string[],
 		onProgress?: (current: number, total: number, pluginId: string) => void,
@@ -73,7 +62,11 @@ export class PluginEnabler {
 
 			const installedPluginIds: string[] = [];
 			for (const pluginId of pluginIds) {
-				if (typeof pluginId !== "string" || pluginId.trim() === "") {
+				if (
+					typeof pluginId !== "string" ||
+					pluginId.trim() === "" ||
+					!isSafePluginId(pluginId.trim())
+				) {
 					continue;
 				}
 				const normalizedId = pluginId.trim();
@@ -138,7 +131,6 @@ export class PluginEnabler {
 							if (failIndex > -1) {
 								failedPlugins.splice(failIndex, 1);
 							}
-							// Let plugins that open side leaves settle before the next enable.
 							await new Promise((resolve) =>
 								window.setTimeout(resolve, 350),
 							);
@@ -209,10 +201,6 @@ export class PluginEnabler {
 		}
 	}
 
-	/**
-	 * Workspace must be ready before enabling plugins that open side leaves
-	 * (e.g. Recent Files calls ensureSideLeaf in onUserEnable).
-	 */
 	private waitForLayoutReady(): Promise<void> {
 		return new Promise((resolve) => {
 			const workspace = this.app.workspace;
@@ -224,9 +212,6 @@ export class PluginEnabler {
 		});
 	}
 
-	/**
-	 * Reloads plugin manifests so newly installed folders are recognized.
-	 */
 	private async reloadPlugins(pluginsApi: PluginsAPI): Promise<void> {
 		try {
 			if (typeof pluginsApi.loadManifests === "function") {
@@ -248,9 +233,6 @@ export class PluginEnabler {
 		}
 	}
 
-	/**
-	 * Candidate IDs for a plugin folder: folder name + id from local manifest.json.
-	 */
 	private async getCandidateIds(pluginId: string): Promise<string[]> {
 		const candidates = [pluginId];
 		try {
@@ -280,9 +262,6 @@ export class PluginEnabler {
 		return candidates;
 	}
 
-	/**
-	 * Resolves the registry/manifest ID for a folder plugin ID.
-	 */
 	private async resolvePluginId(
 		pluginId: string,
 		pluginsApi: PluginsAPI,
@@ -323,9 +302,6 @@ export class PluginEnabler {
 		return false;
 	}
 
-	/**
-	 * Enables a single plugin using Obsidian's internal API.
-	 */
 	private async enableSinglePlugin(
 		pluginId: string,
 		pluginsApi: PluginsAPI,
@@ -349,7 +325,6 @@ export class PluginEnabler {
 			actualPluginId = await this.resolvePluginId(pluginId, pluginsApi);
 		}
 
-		// Folder exists with a valid manifest — try enabling even if manifests map lags.
 		if (!actualPluginId) {
 			const candidates = await this.getCandidateIds(pluginId);
 			if (candidates.length > 0) {
@@ -404,7 +379,6 @@ export class PluginEnabler {
 					return { enabled: true, failed: false, actualId: enableId };
 				}
 
-				// API call did not throw — treat as success even if Set lags.
 				return { enabled: true, failed: false, actualId: enableId };
 			} catch (err: unknown) {
 				lastError = err instanceof Error ? err.message : String(err);
@@ -420,9 +394,6 @@ export class PluginEnabler {
 		};
 	}
 
-	/**
-	 * Refreshes the Community plugins settings UI to show updated plugin list and status.
-	 */
 	async refreshPluginsUI(): Promise<void> {
 		try {
 			await new Promise((resolve) => window.setTimeout(resolve, 300));

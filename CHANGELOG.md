@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-15
+
+### Added
+- Export current vault plugin list (with versions) and settings to JSON
+- Preview import (dry-run) before changing the vault
+- Optional version pins in `community-plugins-list.json` (`{ "id", "version" }`)
+- Merge plugin settings into existing `data.json` (toggle; on for new installs)
+
+### Changed
+- Safer review defaults: auto-install, auto-enable, and settings sync remain off by default
+- Cache the community plugins registry for a single import run
+- Clearer Notices for GitHub rate limits (HTTP 403/429)
+- Use `normalizePath()` and reject unsafe plugin IDs / path segments
+- After applying settings, notify that plugins need a reload for in-memory settings
+- Remove duplicate Command palette entry for import
+- Desktop adapter error message no longer mentions “base path”
+
 ## [1.1.9] - 2026-08-08
 
 ### Fixed

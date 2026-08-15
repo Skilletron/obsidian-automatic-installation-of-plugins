@@ -1,12 +1,9 @@
 import { Notice } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { PLUGINS_SETTINGS_FILE } from "../types";
+import { isSafePluginId } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
-/**
- * Deep-merge source onto target. Plain objects recurse; arrays and scalars
- * from source replace. Does not mutate inputs.
- */
 export function mergeSettingsObjects(
 	target: unknown,
 	source: unknown,
@@ -38,9 +35,6 @@ export function mergeSettingsObjects(
 	return result;
 }
 
-/**
- * Manages plugin settings synchronization.
- */
 export class SettingsManager {
 	constructor(
 		private fileManager: FileManager,
@@ -76,22 +70,19 @@ export class SettingsManager {
 		}
 	}
 
-	/**
-	 * Applies settings from community-plugins-settings.json to installed plugins.
-	 */
-	async applySettingsToInstalledPlugins(): Promise<void> {
+	async applySettingsToInstalledPlugins(): Promise<number> {
 		const settingsFile = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
 		if (!(await this.fileManager.exists(settingsFile))) {
 			new Notice(
 				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings on startup`,
 			);
-			return;
+			return 0;
 		}
 
 		const rawSettings = await this.fileManager.readFile(settingsFile);
 		if (!rawSettings) {
-			return;
+			return 0;
 		}
 
 		const allSettings = this.fileManager.parseJsonWithValidation<
@@ -99,10 +90,19 @@ export class SettingsManager {
 		>(rawSettings, PLUGINS_SETTINGS_FILE);
 
 		if (!allSettings) {
-			return;
+			return 0;
 		}
 
+		let applied = 0;
+
 		for (const pluginId of Object.keys(allSettings)) {
+			if (!isSafePluginId(pluginId)) {
+				logger.warn(
+					`Skipping settings for unsafe plugin id: ${pluginId}`,
+				);
+				continue;
+			}
+
 			const manifestPath = this.fileManager.pluginsPath(
 				pluginId,
 				"manifest.json",
@@ -129,6 +129,8 @@ export class SettingsManager {
 						new Notice(
 							`[Installer] Cannot write settings for plugin ${pluginId}. Check file permissions.`,
 						);
+					} else {
+						applied++;
 					}
 				} catch (err: unknown) {
 					const errorMessage =
@@ -143,15 +145,21 @@ export class SettingsManager {
 				}
 			}
 		}
+
+		return applied;
 	}
 
-	/**
-	 * Applies settings for a specific plugin after installation.
-	 */
 	async applySettingsForPlugin(
 		pluginId: string,
 		pluginFolderId: string,
 	): Promise<void> {
+		if (!isSafePluginId(pluginId) || !isSafePluginId(pluginFolderId)) {
+			logger.warn(
+				`Skipping settings apply for unsafe id: ${pluginId} / ${pluginFolderId}`,
+			);
+			return;
+		}
+
 		const settingsFile = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
 		if (!(await this.fileManager.exists(settingsFile))) {

@@ -1,62 +1,52 @@
-import { App, FileSystemAdapter, Notice } from "obsidian";
+import { App, FileSystemAdapter, Notice, normalizePath } from "obsidian";
 import { logger } from "./Logger";
+import { isSafePathSegment } from "./parsePluginList";
 
-/**
- * Vault-relative file helpers via Obsidian's DataAdapter (no Node fs).
- */
 export class FileManager {
 	constructor(private app: App) {}
 
-	/**
-	 * Ensures desktop FileSystemAdapter is available.
-	 */
 	assertDesktopAdapter(): void {
 		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
 			throw new Error(
-				"Base path is only available on desktop. This plugin requires desktop version of Obsidian.",
+				"This plugin requires the desktop version of Obsidian (FileSystemAdapter).",
 			);
 		}
 	}
 
-	/**
-	 * Joins vault-relative path segments (Obsidian uses `/`).
-	 */
 	joinPath(...parts: string[]): string {
-		return parts
-			.filter((part) => part.length > 0)
-			.join("/")
-			.replace(/\\/g, "/")
-			.replace(/\/+/g, "/");
+		const joined = parts.filter((part) => part.length > 0).join("/");
+		return normalizePath(joined);
 	}
 
-	/**
-	 * Path under the vault config dir (usually `.obsidian/...`).
-	 */
 	configPath(...parts: string[]): string {
+		for (const part of parts) {
+			if (!isSafePathSegment(part)) {
+				throw new Error(`Invalid config path segment: ${part}`);
+			}
+		}
 		return this.joinPath(this.app.vault.configDir, ...parts);
 	}
 
-	/**
-	 * Path under `.obsidian/plugins/...`.
-	 */
 	pluginsPath(...parts: string[]): string {
+		for (const part of parts) {
+			if (!isSafePathSegment(part)) {
+				throw new Error(`Invalid plugin path segment: ${part}`);
+			}
+		}
 		return this.configPath("plugins", ...parts);
 	}
 
 	async exists(vaultPath: string): Promise<boolean> {
 		try {
-			return await this.app.vault.adapter.exists(vaultPath);
+			return await this.app.vault.adapter.exists(normalizePath(vaultPath));
 		} catch (err: unknown) {
 			logger.error(`exists() failed for ${vaultPath}:`, err);
 			return false;
 		}
 	}
 
-	/**
-	 * Ensures parent directories exist so a file can be written.
-	 */
 	async ensureParentDir(vaultFilePath: string): Promise<boolean> {
-		const normalized = vaultFilePath.replace(/\\/g, "/");
+		const normalized = normalizePath(vaultFilePath);
 		const lastSlash = normalized.lastIndexOf("/");
 		if (lastSlash <= 0) {
 			return true;
@@ -66,18 +56,20 @@ export class FileManager {
 
 	async ensureDirectory(vaultPath: string): Promise<boolean> {
 		try {
-			if (await this.exists(vaultPath)) {
+			const normalized = normalizePath(vaultPath);
+			if (await this.exists(normalized)) {
 				return true;
 			}
-			const parts = vaultPath
-				.replace(/\\/g, "/")
-				.split("/")
-				.filter(Boolean);
+			const parts = normalized.split("/").filter(Boolean);
 			let current = "";
 			for (const part of parts) {
+				if (!isSafePathSegment(part)) {
+					throw new Error(`Invalid directory segment: ${part}`);
+				}
 				current = current ? `${current}/${part}` : part;
-				if (!(await this.exists(current))) {
-					await this.app.vault.adapter.mkdir(current);
+				const currentPath = normalizePath(current);
+				if (!(await this.exists(currentPath))) {
+					await this.app.vault.adapter.mkdir(currentPath);
 				}
 			}
 			return true;
@@ -89,7 +81,7 @@ export class FileManager {
 
 	async readFile(vaultPath: string): Promise<string | null> {
 		try {
-			return await this.app.vault.adapter.read(vaultPath);
+			return await this.app.vault.adapter.read(normalizePath(vaultPath));
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
@@ -101,10 +93,11 @@ export class FileManager {
 
 	async writeFile(vaultPath: string, content: string): Promise<boolean> {
 		try {
-			if (!(await this.ensureParentDir(vaultPath))) {
+			const normalized = normalizePath(vaultPath);
+			if (!(await this.ensureParentDir(normalized))) {
 				return false;
 			}
-			await this.app.vault.adapter.write(vaultPath, content);
+			await this.app.vault.adapter.write(normalized, content);
 			return true;
 		} catch (err: unknown) {
 			const errorMessage =
@@ -117,26 +110,26 @@ export class FileManager {
 
 	async removeRecursive(vaultPath: string): Promise<void> {
 		try {
-			if (await this.exists(vaultPath)) {
-				await this.app.vault.adapter.rmdir(vaultPath, true);
+			const normalized = normalizePath(vaultPath);
+			if (await this.exists(normalized)) {
+				await this.app.vault.adapter.rmdir(normalized, true);
 			}
 		} catch (err: unknown) {
 			logger.debug(`removeRecursive failed for ${vaultPath}:`, err);
 		}
 	}
 
-	/**
-	 * Lists immediate subdirectory names under a vault-relative path.
-	 */
 	async listDirs(vaultPath: string): Promise<string[]> {
 		try {
-			if (!(await this.exists(vaultPath))) {
+			const normalized = normalizePath(vaultPath);
+			if (!(await this.exists(normalized))) {
 				return [];
 			}
-			const listed = await this.app.vault.adapter.list(vaultPath);
+			const listed = await this.app.vault.adapter.list(normalized);
 			return listed.folders.map((folderPath) => {
-				const normalized = folderPath.replace(/\\/g, "/");
-				const parts = normalized.split("/").filter(Boolean);
+				const parts = normalizePath(folderPath)
+					.split("/")
+					.filter(Boolean);
 				return parts[parts.length - 1] ?? folderPath;
 			});
 		} catch (err: unknown) {
@@ -145,9 +138,6 @@ export class FileManager {
 		}
 	}
 
-	/**
-	 * Validates and parses JSON content with detailed error messages.
-	 */
 	parseJsonWithValidation<T>(content: string, fileName: string): T | null {
 		if (!content || content.trim() === "") {
 			new Notice(

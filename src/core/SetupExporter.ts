@@ -6,7 +6,7 @@ import {
 	PLUGINS_SETTINGS_FILE,
 	PluginListEntry,
 } from "../types";
-import { normalizeVersion } from "../utils/parsePluginList";
+import { normalizeVersion, isSafePathSegment } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
 interface InstalledPlugin {
@@ -25,7 +25,7 @@ export class SetupExporter {
 		const seenIds = new Set<string>();
 
 		for (const folderName of folderNames) {
-			if (folderName === PLUGIN_ID) {
+			if (folderName === PLUGIN_ID || !isSafePathSegment(folderName)) {
 				continue;
 			}
 

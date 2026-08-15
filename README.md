@@ -158,6 +158,7 @@ Use the ID from the plugin’s Community plugins page or its `manifest.json` (fo
 - Confirm IDs in `community-plugins-settings.json` match the installed plugins
 - With **Merge** on, only listed keys are updated; with it off, the whole settings file for that plugin is replaced
 - Turn on **Apply settings on installation** and/or **Sync settings on every startup**, or run **Apply settings from JSON**
+- After Apply, disable/re-enable the affected plugins or restart Obsidian so they reload `data.json`
 
 ## Links
 

@@ -6,6 +6,24 @@ export function normalizeVersion(version: string): string {
 	return version.trim().replace(/^v/i, "");
 }
 
+export function isSafePathSegment(segment: string): boolean {
+	if (!segment || segment === "." || segment === "..") {
+		return false;
+	}
+	if (
+		segment.includes("/") ||
+		segment.includes("\\") ||
+		segment.includes("\0")
+	) {
+		return false;
+	}
+	return true;
+}
+
+export function isSafePluginId(id: string): boolean {
+	return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(id);
+}
+
 export function parsePluginList(raw: unknown): PluginListEntry[] | null {
 	if (!Array.isArray(raw)) {
 		new Notice(
@@ -26,10 +44,10 @@ export function parsePluginList(raw: unknown): PluginListEntry[] | null {
 
 		if (typeof item === "string") {
 			const id = item.trim();
-			if (!id) {
+			if (!id || !isSafePluginId(id)) {
 				skipped++;
 				logger.warn(
-					`Skipping empty string entry at index ${i} in ${PLUGINS_LIST_FILE}`,
+					`Skipping invalid plugin id at index ${i} in ${PLUGINS_LIST_FILE}`,
 				);
 				continue;
 			}
@@ -47,7 +65,16 @@ export function parsePluginList(raw: unknown): PluginListEntry[] | null {
 				continue;
 			}
 
-			const entry: PluginListEntry = { id: obj.id.trim() };
+			const id = obj.id.trim();
+			if (!isSafePluginId(id)) {
+				skipped++;
+				logger.warn(
+					`Skipping unsafe plugin id at index ${i} in ${PLUGINS_LIST_FILE}: ${id}`,
+				);
+				continue;
+			}
+
+			const entry: PluginListEntry = { id };
 			if (typeof obj.version === "string" && obj.version.trim()) {
 				entry.version = normalizeVersion(obj.version);
 			}

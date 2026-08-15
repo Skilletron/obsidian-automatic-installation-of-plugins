@@ -43,4 +43,4 @@ export const PLUGIN_REGISTRY_URL =
 export const PLUGIN_ID = "automatic-installation-of-plugins";
 export const PLUGINS_LIST_FILE = "community-plugins-list.json";
 export const PLUGINS_SETTINGS_FILE = "community-plugins-settings.json";
-export const USER_AGENT = "obsidian-plugin-installer";
+export const USER_AGENT = "obsidian-community-install-manager";

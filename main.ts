@@ -14,10 +14,6 @@ import {
 import { parsePluginList } from "./src/utils/parsePluginList";
 import { logger, LogLevel } from "./src/utils/Logger";
 
-/**
- * Plugin that automatically installs and configures community plugins
- * based on configuration files in the vault.
- */
 export default class InstallCommunityPlugins extends Plugin {
 	settings!: InstallCommunityPluginsSettings;
 	fileManager!: FileManager;
@@ -31,7 +27,6 @@ export default class InstallCommunityPlugins extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// Initialize managers
 		this.fileManager = new FileManager(this.app);
 		this.networkManager = new NetworkManager();
 		this.settingsManager = new SettingsManager(
@@ -75,24 +70,12 @@ export default class InstallCommunityPlugins extends Plugin {
 			},
 		});
 
-		// Kept for existing hotkeys / muscle memory
-		this.addCommand({
-			id: "install-plugins",
-			name: "Import plugin setup from JSON",
-			callback: async () => {
-				new Notice("Starting plugin setup import...");
-				await this.runImportPipeline();
-				new Notice("Plugin setup import finished.");
-			},
-		});
-
 		this.addCommand({
 			id: "apply-plugin-settings",
 			name: "Apply settings from JSON",
 			callback: async () => {
 				new Notice("Applying plugin settings...");
 				await this.applySettingsToInstalledPlugins();
-				new Notice("Finished applying plugin settings.");
 			},
 		});
 
@@ -100,15 +83,11 @@ export default class InstallCommunityPlugins extends Plugin {
 			new InstallCommunityPluginsSettingTab(this.app, this),
 		);
 
-		// Wait for workspace layout — enabling plugins like Recent Files needs side leaves.
 		this.app.workspace.onLayoutReady(() => {
 			void this.onWorkspaceReady();
 		});
 	}
 
-	/**
-	 * Startup work that touches other plugins / the workspace.
-	 */
 	private async onWorkspaceReady(): Promise<void> {
 		try {
 			if (this.settings.loadSettingsOnStartup) {
@@ -128,9 +107,6 @@ export default class InstallCommunityPlugins extends Plugin {
 		}
 	}
 
-	/**
-	 * Install from list, then enable (shared by startup + import command).
-	 */
 	async runImportPipeline(): Promise<void> {
 		await this.installPluginsFromFile();
 	}
@@ -177,8 +153,6 @@ export default class InstallCommunityPlugins extends Plugin {
 			| undefined;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
 
-		// Existing installs (pre-merge toggle): keep replace behavior.
-		// New installs have no data.json yet → merge stays on from DEFAULT_SETTINGS.
 		if (data && data.mergePluginSettings === undefined) {
 			this.settings.mergePluginSettings = false;
 		}
@@ -201,13 +175,16 @@ export default class InstallCommunityPlugins extends Plugin {
 		logger.setLevel(logLevelMap[level || "error"] || LogLevel.ERROR);
 	}
 
-	/**
-	 * Applies settings from community-plugins-settings.json to installed plugins.
-	 */
 	async applySettingsToInstalledPlugins(): Promise<void> {
 		try {
 			this.fileManager.assertDesktopAdapter();
-			await this.settingsManager.applySettingsToInstalledPlugins();
+			const applied =
+				await this.settingsManager.applySettingsToInstalledPlugins();
+			if (applied > 0) {
+				new Notice(
+					`[Installer] Wrote settings for ${applied} plugin${applied === 1 ? "" : "s"}. Disable and re-enable those plugins (or restart Obsidian) for changes to take effect.`,
+				);
+			}
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
@@ -218,12 +195,10 @@ export default class InstallCommunityPlugins extends Plugin {
 		}
 	}
 
-	/**
-	 * Installs plugins listed in community-plugins-list.json.
-	 */
 	async installPluginsFromFile() {
 		try {
 			this.fileManager.assertDesktopAdapter();
+			this.pluginInstaller.clearCaches();
 			const pluginsJsonPath =
 				this.fileManager.configPath(PLUGINS_LIST_FILE);
 
@@ -304,7 +279,6 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			const pluginIds = entries.map((e) => e.id);
 
-			// Auto-enable plugins if setting is enabled
 			if (this.settings.autoEnablePlugins) {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
 					pluginIds,
@@ -319,11 +293,9 @@ export default class InstallCommunityPlugins extends Plugin {
 					await this.pluginEnabler.refreshPluginsUI();
 				}
 			} else {
-				// Even if auto-enable is off, refresh UI after installation
 				await this.pluginEnabler.refreshPluginsUI();
 			}
 
-			// Show final summary
 			if (installedCount === totalPlugins) {
 				new Notice(
 					`[Installer] Successfully installed ${installedCount} plugin${installedCount > 1 ? "s" : ""}.`,
@@ -340,13 +312,12 @@ export default class InstallCommunityPlugins extends Plugin {
 				`[Installer] Error during installation: ${errorMessage}. See console for details.`,
 			);
 			logger.error("Installation error:", err);
+		} finally {
+			this.pluginInstaller.clearCaches();
 		}
 	}
 }
 
-/**
- * Settings tab for Community Install Manager.
- */
 class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 	plugin: InstallCommunityPlugins;
 
@@ -419,7 +390,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					try {
 						new Notice("Applying plugin settings...");
 						await this.plugin.applySettingsToInstalledPlugins();
-						new Notice("Finished applying plugin settings.");
 					} finally {
 						button.setDisabled(false);
 					}
@@ -427,9 +397,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 	}
 
-	/**
-	 * Obsidian 1.13.0+: declarative settings (searchable). Skips display().
-	 */
 	getSettingDefinitions() {
 		return [
 			{
@@ -463,9 +430,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							.onClick(async () => {
 								new Notice("Applying plugin settings...");
 								await this.plugin.applySettingsToInstalledPlugins();
-								new Notice(
-									"Finished applying plugin settings.",
-								);
 							}),
 					);
 				},
@@ -542,9 +506,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		];
 	}
 
-	/**
-	 * Pre-1.13.0: imperative settings UI.
-	 */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
