@@ -1,6 +1,6 @@
 {
 	"name": "automatic-plugin-manager",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"main": "main.js",
 	"description": "Install, enable, and configure Obsidian community plugins from JSON files for syncing vault setups across devices.",
 	"scripts": {
