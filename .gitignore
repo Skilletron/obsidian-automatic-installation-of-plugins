@@ -22,5 +22,8 @@ data.json
 e2e/
 test-vault/
 
+# Local test helpers
+scripts/
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
