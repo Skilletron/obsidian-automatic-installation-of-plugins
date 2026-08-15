@@ -20,6 +20,7 @@ Typical uses:
 - Keep the same plugins on several computers
 - Share a team vault starter setup
 - Bootstrap a new vault from a known list
+- Reinstall community plugins after `git clone` when `.obsidian/plugins/` is gitignored (keep a list JSON in the repo, then Import)
 
 ## Security warning
 
@@ -36,7 +37,8 @@ This plugin can download and install other community plugins.
 - Install plugins from the Obsidian Community Plugins registry (via Obsidian’s own installer)
 - Optional version pins so setups stay reproducible
 - Export / import / preview of your plugin list and settings
-- Optional auto-install, auto-enable, and settings sync (all **off** by default)
+- Optional auto-install on startup and settings sync on startup (**off** by default)
+- Auto-enable after install and apply settings on install (**on** by default for new installs)
 - Merge plugin settings into existing ones (on by default for new installs)
 
 ## Network use
@@ -44,15 +46,16 @@ This plugin can download and install other community plugins.
 | Remote service | Purpose |
 |---|---|
 | Community plugins registry on GitHub | Look up plugin IDs and repositories |
-| GitHub Releases API and release assets | Resolve versions and manifests |
+| GitHub release assets (`releases/download/...`) | Resolve pinned/latest manifests |
 | Obsidian’s built-in installer | Download and install plugin files (same path as Community plugins) |
 
-No telemetry. Network use happens only when you import/install (or when auto-install is enabled).
+No telemetry. Network use happens only when you import/install (or when auto-install is enabled). The installer avoids calling `api.github.com` so anonymous rate limits are less likely.
 
 ## Installation
 
-1. Install from Community plugins when available, **or** download the latest [GitHub release](https://github.com/Skilletron/obsidian-automatic-installation-of-plugins/releases) (`main.js`, `manifest.json`, `styles.css`) into `.obsidian/plugins/automatic-installation-of-plugins/`
-2. Settings → Community plugins → turn Restricted mode off
+1. In Obsidian: **Settings → Community plugins → Browse** → search **Community Install Manager** → Install → Enable  
+   Or download the latest [GitHub release](https://github.com/Skilletron/obsidian-automatic-installation-of-plugins/releases) (`main.js`, `manifest.json`, `styles.css`) into `.obsidian/plugins/automatic-installation-of-plugins/`
+2. Settings → Community plugins → turn Restricted mode off (if needed)
 3. Enable **Community Install Manager**
 
 ## Configuration files
@@ -123,17 +126,17 @@ Maps plugin IDs to settings objects applied to each plugin:
 
 ## Settings
 
-Automatic options are **off** by default so nothing runs until you choose it.
+| Setting | Default (new install) | Description |
+|---|---|---|
+| Preview / Export / Import / Apply | — | Buttons for the actions above |
+| Auto-install plugins on startup | Off | When Obsidian starts, install any missing plugins from the list |
+| Auto-enable plugins after installation | On | Turn plugins on after they are installed via Import |
+| Apply settings on installation | On | After each install, apply that plugin’s settings from the settings file |
+| Merge settings instead of replace | On | Combine settings with what the plugin already has; when off, replace entirely |
+| Sync settings on every startup | Off | Re-apply the settings file every time Obsidian starts |
+| Logging level | Error | How much detail to write to the console if something goes wrong |
 
-| Setting | Description |
-|---|---|
-| Preview / Export / Import / Apply | Buttons for the actions above |
-| Auto-install plugins on startup | When Obsidian starts, install any missing plugins from the list |
-| Auto-enable plugins after installation | Turn installed plugins on after import |
-| Apply settings on installation | After each install, apply that plugin’s settings from the settings file |
-| Merge settings instead of replace | Combine settings with what the plugin already has, instead of replacing them entirely |
-| Sync settings on every startup | Re-apply the settings file every time Obsidian starts |
-| Logging level | How much detail to write to the console if something goes wrong (default: Error) |
+Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
 
 ## Finding plugin IDs
 
@@ -150,8 +153,9 @@ Use the ID from the plugin’s Community plugins page or its `manifest.json` (fo
 
 **Plugins stay disabled**
 
-- Turn on **Auto-enable plugins after installation**, or enable them under Community plugins
-- Reload Obsidian if the list looks stale
+- Confirm **Auto-enable plugins after installation** is on (check `data.json` if the toggle looks wrong in Obsidian 1.13 settings search)
+- Or enable them under Community plugins
+- After Import, the Community plugins tab should refresh; if toggles look stale, close and reopen Settings
 
 **Settings look wrong**
 
