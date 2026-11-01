@@ -3,6 +3,11 @@ import { FileManager } from "../utils/FileManager";
 import { PLUGINS_SETTINGS_FILE } from "../types";
 import { isSafePluginId } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
+import { findPluginFolder, scanInstalledPlugins } from "./InstalledPlugins";
+
+// Assigning "__proto__" would replace the result's prototype instead of
+// copying the value.
+const UNSAFE_MERGE_KEYS = new Set(["__proto__"]);
 
 export function mergeSettingsObjects(
 	target: unknown,
@@ -30,9 +35,20 @@ export function mergeSettingsObjects(
 	for (const [key, value] of Object.entries(
 		source as Record<string, unknown>,
 	)) {
+		if (UNSAFE_MERGE_KEYS.has(key)) {
+			continue;
+		}
 		result[key] = mergeSettingsObjects(result[key], value);
 	}
 	return result;
+}
+
+export interface SettingsTarget {
+	// Key in the settings file (the plugin id)
+	pluginId: string;
+	// Folder under .obsidian/plugins that holds the plugin
+	folderName: string;
+	settings: unknown;
 }
 
 export class SettingsManager {
@@ -70,12 +86,14 @@ export class SettingsManager {
 		}
 	}
 
-	async applySettingsToInstalledPlugins(): Promise<string[]> {
+	// Reads the settings file and pairs each entry with an installed plugin
+	// folder. Entries for plugins that are not installed are skipped.
+	async collectSettingsTargets(): Promise<SettingsTarget[]> {
 		const settingsFile = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
 		if (!(await this.fileManager.exists(settingsFile))) {
 			new Notice(
-				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings on startup`,
+				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings.`,
 			);
 			return [];
 		}
@@ -93,7 +111,8 @@ export class SettingsManager {
 			return [];
 		}
 
-		const applied: string[] = [];
+		const installed = await scanInstalledPlugins(this.fileManager);
+		const targets: SettingsTarget[] = [];
 
 		for (const pluginId of Object.keys(allSettings)) {
 			if (!isSafePluginId(pluginId)) {
@@ -102,51 +121,71 @@ export class SettingsManager {
 				);
 				continue;
 			}
-
-			const manifestPath = this.fileManager.pluginsPath(
-				pluginId,
-				"manifest.json",
-			);
-			const dataJsonPath = this.fileManager.pluginsPath(
-				pluginId,
-				"data.json",
-			);
-
-			if (
-				(await this.fileManager.exists(manifestPath)) &&
-				allSettings[pluginId]
-			) {
-				try {
-					const payload = await this.resolvePayload(
-						dataJsonPath,
-						allSettings[pluginId],
-					);
-					const written = await this.fileManager.writeFile(
-						dataJsonPath,
-						JSON.stringify(payload, null, 2),
-					);
-					if (!written) {
-						new Notice(
-							`[Installer] Cannot write settings for plugin ${pluginId}. Check file permissions.`,
-						);
-					} else {
-						applied.push(pluginId);
-					}
-				} catch (err: unknown) {
-					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
-					new Notice(
-						`[Installer] Failed to write data.json for plugin ${pluginId}: ${errorMessage}`,
-					);
-					logger.error(
-						`Failed to write settings for ${pluginId}:`,
-						err,
-					);
-				}
+			if (!allSettings[pluginId]) {
+				continue;
 			}
+
+			const folder = findPluginFolder(installed, pluginId);
+			if (!folder) {
+				logger.debug(
+					`Skipping settings for "${pluginId}": plugin is not installed.`,
+				);
+				continue;
+			}
+
+			targets.push({
+				pluginId,
+				folderName: folder.folderName,
+				settings: allSettings[pluginId],
+			});
 		}
 
+		return targets;
+	}
+
+	async writeSettings(target: SettingsTarget): Promise<boolean> {
+		try {
+			const dataJsonPath = this.fileManager.pluginsPath(
+				target.folderName,
+				"data.json",
+			);
+			const payload = await this.resolvePayload(
+				dataJsonPath,
+				target.settings,
+			);
+			const written = await this.fileManager.writeFile(
+				dataJsonPath,
+				JSON.stringify(payload, null, 2),
+			);
+			if (!written) {
+				new Notice(
+					`[Installer] Cannot write settings for plugin ${target.pluginId}. Check file permissions.`,
+				);
+			}
+			return written;
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			new Notice(
+				`[Installer] Failed to write data.json for plugin ${target.pluginId}: ${errorMessage}`,
+			);
+			logger.error(`Failed to write settings for ${target.pluginId}:`, err);
+			return false;
+		}
+	}
+
+	async writeAllSettings(targets: SettingsTarget[]): Promise<string[]> {
+		const applied: string[] = [];
+		for (const target of targets) {
+			if (await this.writeSettings(target)) {
+				applied.push(target.pluginId);
+			}
+		}
 		return applied;
+	}
+
+	async applySettingsToInstalledPlugins(): Promise<string[]> {
+		return this.writeAllSettings(await this.collectSettingsTargets());
 	}
 
 	async applySettingsForPlugin(
@@ -166,48 +205,34 @@ export class SettingsManager {
 			return;
 		}
 
-		try {
-			const rawSettings = await this.fileManager.readFile(settingsFile);
-			if (!rawSettings) {
-				return;
-			}
-
-			const allSettings = this.fileManager.parseJsonWithValidation<
-				Record<string, unknown>
-			>(rawSettings, PLUGINS_SETTINGS_FILE);
-
-			if (allSettings && allSettings[pluginId]) {
-				const manifestPath = this.fileManager.pluginsPath(
-					pluginFolderId,
-					"manifest.json",
-				);
-				if (!(await this.fileManager.exists(manifestPath))) {
-					logger.warn(
-						`Skipping settings for "${pluginId}": plugin is not fully installed.`,
-					);
-					return;
-				}
-
-				const dataJsonPath = this.fileManager.pluginsPath(
-					pluginFolderId,
-					"data.json",
-				);
-				const payload = await this.resolvePayload(
-					dataJsonPath,
-					allSettings[pluginId],
-				);
-				await this.fileManager.writeFile(
-					dataJsonPath,
-					JSON.stringify(payload, null, 2),
-				);
-			}
-		} catch (err: unknown) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
-			new Notice(
-				`[Installer] Failed to apply settings for plugin ${pluginId}: ${errorMessage}`,
-			);
-			logger.error(`Settings apply error for ${pluginId}:`, err);
+		const rawSettings = await this.fileManager.readFile(settingsFile);
+		if (!rawSettings) {
+			return;
 		}
+
+		const allSettings = this.fileManager.parseJsonWithValidation<
+			Record<string, unknown>
+		>(rawSettings, PLUGINS_SETTINGS_FILE);
+
+		if (!allSettings || !allSettings[pluginId]) {
+			return;
+		}
+
+		const manifestPath = this.fileManager.pluginsPath(
+			pluginFolderId,
+			"manifest.json",
+		);
+		if (!(await this.fileManager.exists(manifestPath))) {
+			logger.warn(
+				`Skipping settings for "${pluginId}": plugin is not fully installed.`,
+			);
+			return;
+		}
+
+		await this.writeSettings({
+			pluginId,
+			folderName: pluginFolderId,
+			settings: allSettings[pluginId],
+		});
 	}
 }

@@ -15,8 +15,11 @@ export class NetworkError extends Error {
 
 export class NetworkManager {
 	async fetchJson<T>(url: string): Promise<T> {
+		// throw: false so 4xx/5xx reach the status checks below instead of
+		// rejecting with a generic error.
 		const response = await requestUrl({
 			url,
+			throw: false,
 			headers: {
 				"User-Agent": USER_AGENT,
 				Accept: "application/json, */*",
