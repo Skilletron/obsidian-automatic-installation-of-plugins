@@ -27,3 +27,6 @@ scripts/
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# WebdriverIO / Obsidian e2e
+.obsidian-cache
