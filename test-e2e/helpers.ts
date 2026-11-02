@@ -33,7 +33,8 @@ export async function runPluginMethod(
 	method:
 		| "runImportPipeline"
 		| "applySettingsToInstalledPlugins"
-		| "exportPluginSetup",
+		| "exportPluginSetup"
+		| "undoLastChange",
 ): Promise<void> {
 	await browser.executeObsidian(
 		async ({ app }, id, method) => {

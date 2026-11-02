@@ -4,6 +4,8 @@ import { PLUGINS_SETTINGS_FILE } from "../types";
 import { isSafePluginId } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 import { findPluginFolder, scanInstalledPlugins } from "./InstalledPlugins";
+import { SettingsBackup } from "./SettingsBackup";
+import { restoreSecrets } from "../utils/secrets";
 
 // Assigning "__proto__" would replace the result's prototype instead of
 // copying the value.
@@ -55,34 +57,27 @@ export class SettingsManager {
 	constructor(
 		private fileManager: FileManager,
 		private shouldMergeSettings: () => boolean = () => false,
+		private backup?: SettingsBackup,
 	) {}
 
-	private async resolvePayload(
-		dataJsonPath: string,
-		incoming: unknown,
-	): Promise<unknown> {
-		if (!this.shouldMergeSettings()) {
-			return incoming;
-		}
-
+	// The plugin's current settings, or undefined if there are none or the
+	// file is not valid JSON.
+	private async readExisting(dataJsonPath: string): Promise<unknown> {
 		if (!(await this.fileManager.exists(dataJsonPath))) {
-			return incoming;
+			return undefined;
 		}
-
-		const rawExisting = await this.fileManager.readFile(dataJsonPath);
-		if (!rawExisting) {
-			return incoming;
+		const raw = await this.fileManager.readFile(dataJsonPath);
+		if (!raw) {
+			return undefined;
 		}
-
 		try {
-			const existing: unknown = JSON.parse(rawExisting);
-			return mergeSettingsObjects(existing, incoming);
+			return JSON.parse(raw) as unknown;
 		} catch (err: unknown) {
 			logger.warn(
-				`Merge skipped for ${dataJsonPath}: invalid existing data.json, replacing.`,
+				`Ignoring invalid existing ${dataJsonPath}; it will be replaced.`,
 				err,
 			);
-			return incoming;
+			return undefined;
 		}
 	}
 
@@ -149,10 +144,17 @@ export class SettingsManager {
 				target.folderName,
 				"data.json",
 			);
-			const payload = await this.resolvePayload(
-				dataJsonPath,
-				target.settings,
-			);
+			const existing = await this.readExisting(dataJsonPath);
+			// Values removed on export keep what the plugin has now.
+			const incoming = restoreSecrets(target.settings, existing);
+			const payload =
+				this.shouldMergeSettings() && existing !== undefined
+					? mergeSettingsObjects(existing, incoming)
+					: incoming;
+			if (payload === undefined) {
+				return false;
+			}
+			await this.backup?.capture(dataJsonPath, target.pluginId);
 			const written = await this.fileManager.writeFile(
 				dataJsonPath,
 				JSON.stringify(payload, null, 2),

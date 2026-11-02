@@ -13,6 +13,8 @@ import { PluginInstaller } from "./src/core/PluginInstaller";
 import { PluginEnabler } from "./src/core/PluginEnabler";
 import { SetupExporter } from "./src/core/SetupExporter";
 import { SetupPreview, SetupPreviewModal } from "./src/core/SetupPreview";
+import { SettingsBackup } from "./src/core/SettingsBackup";
+import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
 	DEFAULT_SETTINGS,
@@ -30,6 +32,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	pluginEnabler!: PluginEnabler;
 	setupExporter!: SetupExporter;
 	setupPreview!: SetupPreview;
+	settingsBackup!: SettingsBackup;
 	private busy = false;
 
 	async onload() {
@@ -37,9 +40,11 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.fileManager = new FileManager(this.app);
 		this.networkManager = new NetworkManager();
+		this.settingsBackup = new SettingsBackup(this.fileManager);
 		this.settingsManager = new SettingsManager(
 			this.fileManager,
 			() => this.settings.mergePluginSettings,
+			this.settingsBackup,
 		);
 		this.pluginInstaller = new PluginInstaller(
 			this.app,
@@ -49,7 +54,15 @@ export default class InstallCommunityPlugins extends Plugin {
 			() => this.settings.loadSettingsOnInstall,
 		);
 		this.pluginEnabler = new PluginEnabler(this.app, this.fileManager);
-		this.setupExporter = new SetupExporter(this.fileManager);
+		this.setupExporter = new SetupExporter(
+			this.fileManager,
+			undefined,
+			() => ({
+				redact: this.settings.redactSecretsOnExport,
+				extraKeys: parseSecretKeys(this.settings.extraSecretKeys),
+			}),
+			this.settingsBackup,
+		);
 		this.setupPreview = new SetupPreview(this.fileManager);
 
 		this.addCommand({
@@ -81,6 +94,14 @@ export default class InstallCommunityPlugins extends Plugin {
 			name: "Apply settings from JSON",
 			callback: async () => {
 				await this.applySettingsToInstalledPlugins();
+			},
+		});
+
+		this.addCommand({
+			id: "undo-last-change",
+			name: "Undo last import, export or settings change",
+			callback: async () => {
+				await this.undoLastChange();
 			},
 		});
 
@@ -128,18 +149,91 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async runImportPipeline(): Promise<void> {
-		await this.runExclusive(() => this.installPluginsFromFile());
+		await this.runExclusive(() =>
+			this.withBackup("Import", () => this.installPluginsFromFile()),
+		);
 	}
 
 	async exportPluginSetup(): Promise<void> {
+		await this.runExclusive(() =>
+			this.withBackup("Export", async () => {
+				try {
+					await this.setupExporter.exportSetup();
+				} catch (err: unknown) {
+					const errorMessage =
+						err instanceof Error ? err.message : "Unknown error";
+					new Notice(`[Installer] Export failed: ${errorMessage}`);
+					logger.error("Export failed:", err);
+				}
+			}),
+		);
+	}
+
+	// Everything the task overwrites goes into one backup snapshot, which
+	// "Undo last change" restores.
+	private async withBackup(
+		reason: string,
+		task: () => Promise<void>,
+	): Promise<void> {
+		this.settingsBackup.begin(reason);
 		try {
-			await this.setupExporter.exportSetup();
-		} catch (err: unknown) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
-			new Notice(`[Installer] Export failed: ${errorMessage}`);
-			logger.error("Export failed:", err);
+			await task();
+		} finally {
+			await this.settingsBackup.end();
 		}
+	}
+
+	async undoLastChange(): Promise<void> {
+		await this.runExclusive(async () => {
+			try {
+				const latest = await this.settingsBackup.latest();
+				if (!latest) {
+					new Notice("[Installer] Nothing to undo.");
+					return;
+				}
+				const { name, snapshot } = latest;
+				const pluginIds = [
+					...new Set(
+						snapshot.entries
+							.map((entry) => entry.pluginId)
+							.filter((id): id is string => Boolean(id)),
+					),
+				];
+
+				let restored: string[] = [];
+				const { deferred } =
+					await this.pluginEnabler.runWithPluginsStopped(
+						pluginIds,
+						async () => {
+							restored =
+								await this.settingsBackup.restore(snapshot);
+						},
+					);
+				await this.pluginEnabler.refreshPluginsUI();
+
+				if (restored.length < snapshot.entries.length) {
+					new Notice(
+						`[Installer] Undo restored ${restored.length} of ${snapshot.entries.length} files. The backup is kept; see console for details.`,
+					);
+					return;
+				}
+				await this.settingsBackup.remove(name);
+
+				const files = `${restored.length} file${restored.length === 1 ? "" : "s"}`;
+				const reload =
+					deferred > 0
+						? " Plugins will reload when you close Settings."
+						: "";
+				new Notice(
+					`[Installer] Undid ${snapshot.reason.toLowerCase()} from ${new Date(snapshot.createdAt).toLocaleString()}: restored ${files}.${reload}`,
+				);
+			} catch (err: unknown) {
+				const errorMessage =
+					err instanceof Error ? err.message : "Unknown error";
+				new Notice(`[Installer] Undo failed: ${errorMessage}`);
+				logger.error("Undo failed:", err);
+			}
+		});
 	}
 
 	async previewPluginSetup(): Promise<void> {
@@ -175,6 +269,11 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		if (data && data.mergePluginSettings === undefined) {
 			this.settings.mergePluginSettings = false;
+		}
+		// Existing installs keep exporting settings as before until the
+		// user turns this on; new installs leave secrets out.
+		if (data && data.redactSecretsOnExport === undefined) {
+			this.settings.redactSecretsOnExport = false;
 		}
 
 		this.applyLogLevel(this.settings.logLevel || "error");
@@ -213,7 +312,9 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async applySettingsToInstalledPlugins(): Promise<void> {
-		await this.runExclusive(() => this.applySettings());
+		await this.runExclusive(() =>
+			this.withBackup("Apply settings", () => this.applySettings()),
+		);
 	}
 
 	private async applySettings(): Promise<void> {
@@ -459,6 +560,22 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(target)
+			.setName("Undo last change")
+			.setDesc(
+				"Put back the settings and setup files as they were before the last Import, Apply settings or Export. Installed plugins stay installed.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Undo").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await this.plugin.undoLastChange();
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(target)
 			.setName("Apply settings")
 			.setDesc(
 				"Update installed plugins from the settings file without reinstalling them.",
@@ -506,6 +623,11 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							.onClick(async () => {
 								await this.plugin.applySettingsToInstalledPlugins();
 							}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Undo").onClick(async () => {
+							await this.plugin.undoLastChange();
+						}),
 					);
 				},
 			},
@@ -588,6 +710,35 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							.setValue(this.plugin.settings.allowAutoActionsOnMobile)
 							.onChange(async (value) => {
 								this.plugin.settings.allowAutoActionsOnMobile = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+				},
+			},
+			{
+				name: "Leave out secrets on export",
+				desc: "Replace tokens, passwords and API keys with a placeholder in the exported settings file. Import never writes the placeholder over a real value.",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.redactSecretsOnExport)
+							.onChange(async (value) => {
+								this.plugin.settings.redactSecretsOnExport = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+				},
+			},
+			{
+				name: "Extra secret setting names",
+				desc: "Comma-separated setting names to leave out as well, for example: licenseCode, endpoint",
+				render: (setting: Setting) => {
+					setting.addText((text) =>
+						text
+							.setPlaceholder("licenseCode, endpoint")
+							.setValue(this.plugin.settings.extraSecretKeys)
+							.onChange(async (value) => {
+								this.plugin.settings.extraSecretKeys = value;
 								await this.plugin.saveSettings();
 							}),
 					);
@@ -719,6 +870,35 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.allowAutoActionsOnMobile)
 					.onChange(async (value) => {
 						this.plugin.settings.allowAutoActionsOnMobile = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Leave out secrets on export")
+			.setDesc(
+				"Replace tokens, passwords and API keys with a placeholder in the exported settings file. Import never writes the placeholder over a real value.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.redactSecretsOnExport)
+					.onChange(async (value) => {
+						this.plugin.settings.redactSecretsOnExport = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Extra secret setting names")
+			.setDesc(
+				"Comma-separated setting names to leave out as well, for example: licenseCode, endpoint",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("licenseCode, endpoint")
+					.setValue(this.plugin.settings.extraSecretKeys)
+					.onChange(async (value) => {
+						this.plugin.settings.extraSecretKeys = value;
 						await this.plugin.saveSettings();
 					}),
 			);

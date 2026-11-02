@@ -111,6 +111,38 @@ export class FileManager {
 		}
 	}
 
+	// Deletes a file; true if it is gone afterwards.
+	async removeFile(vaultPath: string): Promise<boolean> {
+		try {
+			const normalized = normalizePath(vaultPath);
+			if (await this.exists(normalized)) {
+				await this.app.vault.adapter.remove(normalized);
+			}
+			return true;
+		} catch (err: unknown) {
+			logger.error(`removeFile() failed for ${vaultPath}:`, err);
+			return false;
+		}
+	}
+
+	// File names directly inside a folder.
+	async listFiles(vaultPath: string): Promise<string[]> {
+		try {
+			const normalized = normalizePath(vaultPath);
+			if (!(await this.exists(normalized))) {
+				return [];
+			}
+			const listed = await this.app.vault.adapter.list(normalized);
+			return listed.files.map((filePath) => {
+				const parts = normalizePath(filePath).split("/").filter(Boolean);
+				return parts[parts.length - 1] ?? filePath;
+			});
+		} catch (err: unknown) {
+			logger.error(`listFiles() failed for ${vaultPath}:`, err);
+			return [];
+		}
+	}
+
 	async listDirs(vaultPath: string): Promise<string[]> {
 		try {
 			const normalized = normalizePath(vaultPath);

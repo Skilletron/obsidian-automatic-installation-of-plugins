@@ -5,6 +5,8 @@ import {
 	mergeSettingsObjects,
 } from "../src/core/SettingsManager";
 import { PLUGINS_SETTINGS_FILE } from "../src/types";
+import { SettingsBackup } from "../src/core/SettingsBackup";
+import { SECRET_PLACEHOLDER } from "../src/utils/secrets";
 import { createTestVault, installedPlugin } from "./helpers";
 
 const SETTINGS_PATH = `.obsidian/${PLUGINS_SETTINGS_FILE}`;
@@ -204,6 +206,75 @@ describe("SettingsManager.applySettingsToInstalledPlugins", () => {
 		await manager.applySettingsToInstalledPlugins();
 		expect(vault.read(dataPath("dataview"))).toBeDefined();
 		expect(vault.read(dataPath("other"))).toBeUndefined();
+	});
+});
+
+describe("SettingsManager with secrets removed on export", () => {
+	const files = (data: unknown) => ({
+		...installedPlugin("ai", { id: "ai" }, data),
+		[SETTINGS_PATH]: JSON.stringify({
+			ai: { apiKey: SECRET_PLACEHOLDER, model: "gpt-x" },
+		}),
+	});
+
+	it("keeps the current secret when merging", async () => {
+		const vault = createTestVault(files({ apiKey: "real", model: "old" }));
+		await new SettingsManager(
+			vault.fileManager,
+			() => true,
+		).applySettingsToInstalledPlugins();
+		expect(vault.readJson(dataPath("ai"))).toEqual({
+			apiKey: "real",
+			model: "gpt-x",
+		});
+	});
+
+	it("keeps the current secret when replacing", async () => {
+		const vault = createTestVault(
+			files({ apiKey: "real", model: "old", extra: 1 }),
+		);
+		await new SettingsManager(
+			vault.fileManager,
+			() => false,
+		).applySettingsToInstalledPlugins();
+		expect(vault.readJson(dataPath("ai"))).toEqual({
+			apiKey: "real",
+			model: "gpt-x",
+		});
+	});
+
+	it("never writes the placeholder when there is no current value", async () => {
+		const vault = createTestVault(files(undefined));
+		await new SettingsManager(
+			vault.fileManager,
+			() => true,
+		).applySettingsToInstalledPlugins();
+		expect(vault.readJson(dataPath("ai"))).toEqual({ model: "gpt-x" });
+	});
+});
+
+describe("SettingsManager backups", () => {
+	it("captures data.json before writing it", async () => {
+		const vault = createTestVault({
+			...installedPlugin("dataview", { id: "dataview" }, { a: 1 }),
+			[SETTINGS_PATH]: JSON.stringify({ dataview: { a: 2 } }),
+		});
+		const backup = new SettingsBackup(vault.fileManager);
+		const manager = new SettingsManager(vault.fileManager, () => true, backup);
+
+		backup.begin("Apply settings");
+		await manager.applySettingsToInstalledPlugins();
+		await backup.end();
+
+		const latest = await backup.latest();
+		expect(latest?.snapshot.entries).toEqual([
+			{
+				path: dataPath("dataview"),
+				pluginId: "dataview",
+				content: JSON.stringify({ a: 1 }),
+			},
+		]);
+		expect(vault.readJson(dataPath("dataview"))).toEqual({ a: 2 });
 	});
 });
 

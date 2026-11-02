@@ -7,7 +7,15 @@ import {
 	PluginListEntry,
 } from "../types";
 import { scanInstalledPlugins } from "./InstalledPlugins";
+import { SettingsBackup } from "./SettingsBackup";
+import { redactSecrets } from "../utils/secrets";
 import { logger } from "../utils/Logger";
+
+export interface SecretOptions {
+	redact: boolean;
+	// Extra key names to treat as secrets (normalized, see parseSecretKeys).
+	extraKeys: string[];
+}
 
 interface ExportedPlugin {
 	folderName: string;
@@ -19,6 +27,11 @@ export class SetupExporter {
 	constructor(
 		private fileManager: FileManager,
 		private isMobile: () => boolean = () => Platform.isMobile,
+		private secretOptions: () => SecretOptions = () => ({
+			redact: false,
+			extraKeys: [],
+		}),
+		private backup?: SettingsBackup,
 	) {}
 
 	async listInstalledPlugins(): Promise<ExportedPlugin[]> {
@@ -47,6 +60,7 @@ export class SetupExporter {
 	async exportSetup(): Promise<{
 		pluginCount: number;
 		settingsCount: number;
+		redactedCount: number;
 	}> {
 		const installed = await this.listInstalledPlugins();
 		const listEntries: unknown[] = installed.map((p) => {
@@ -57,6 +71,8 @@ export class SetupExporter {
 			return entry;
 		});
 		const settings: Record<string, unknown> = {};
+		const { redact, extraKeys } = this.secretOptions();
+		let redactedCount = 0;
 
 		for (const { folderName, pluginId } of installed) {
 			const dataPath = this.fileManager.pluginsPath(
@@ -79,7 +95,13 @@ export class SetupExporter {
 					typeof parsed === "object" &&
 					!Array.isArray(parsed)
 				) {
-					settings[pluginId] = parsed;
+					if (redact) {
+						const result = redactSecrets(parsed, extraKeys);
+						settings[pluginId] = result.value;
+						redactedCount += result.redacted;
+					} else {
+						settings[pluginId] = parsed;
+					}
 				} else {
 					logger.warn(
 						`Skipping settings for "${pluginId}": data.json is not an object.`,
@@ -117,6 +139,9 @@ export class SetupExporter {
 			keptCount = kept.listEntries.length;
 		}
 
+		await this.backup?.capture(listPath);
+		await this.backup?.capture(settingsPath);
+
 		const listWritten = await this.fileManager.writeFile(
 			listPath,
 			`${JSON.stringify(listEntries, null, 2)}\n`,
@@ -130,7 +155,7 @@ export class SetupExporter {
 			new Notice(
 				"[Installer] Export failed: could not write setup JSON files.",
 			);
-			return { pluginCount: 0, settingsCount: 0 };
+			return { pluginCount: 0, settingsCount: 0, redactedCount: 0 };
 		}
 
 		const settingsCount = Object.keys(settings).length;
@@ -139,8 +164,12 @@ export class SetupExporter {
 			keptCount > 0
 				? ` Kept ${keptCount} entr${keptCount === 1 ? "y" : "ies"} for plugins not installed on this device.`
 				: "";
+		const redactedNote =
+			redactedCount > 0
+				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
+				: "";
 		new Notice(
-			`[Installer] Exported ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}`,
+			`[Installer] Exported ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}`,
 		);
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
@@ -149,6 +178,7 @@ export class SetupExporter {
 		return {
 			pluginCount: listEntries.length,
 			settingsCount,
+			redactedCount,
 		};
 	}
 
