@@ -122,7 +122,7 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Preview plugin setup import | Shows what would be installed, skipped, re-pinned, or updated in settings — without changing anything |
 | Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
 | Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
-| Apply settings from JSON | Applies settings from the settings file without reinstalling plugins |
+| Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |
 
 ## Settings
 
@@ -154,6 +154,7 @@ Use the ID from the plugin’s Community plugins page or its `manifest.json` (fo
 **Plugins stay disabled**
 
 - Confirm **Auto-enable plugins after installation** is on (check `data.json` if the toggle looks wrong in Obsidian 1.13 settings search)
+- Import only turns on plugins it installed or changed in that run; plugins that were already installed keep their on/off state
 - Or enable them under Community plugins
 - After Import, the Community plugins tab should refresh; if toggles look stale, close and reopen Settings
 

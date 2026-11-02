@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Network requests no longer reject on HTTP 4xx/5xx before the plugin can handle them: a missing release tag now falls back to the `v`-prefixed tag, and GitHub rate limits show the rate-limit hint
+- Plugins that fail to enable are no longer marked as enabled or counted as enabled
+- Import enables only plugins it installed or changed in that run, not every plugin in the list (failed installs and plugins you turned off stay off)
+- Apply settings unloads running plugins before writing `data.json` and loads them afterwards, so a plugin cannot overwrite the new settings with its in-memory ones on unload
+- Settings are applied to plugins whose folder name differs from their manifest id
+- Import and Apply settings can no longer run at the same time
+- `normalizeVersion` strips a leading `v` only before a digit
+- Settings merge ignores `__proto__` keys
+
+### Added
+- Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
+
+### Changed
+- Release workflow runs tests and uses Node 22
+- Updated esbuild to 0.27 and `@types/node` to 22
+
 ## [1.2.0] - 2026-08-15
 
 ### Added

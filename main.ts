@@ -23,6 +23,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	pluginEnabler!: PluginEnabler;
 	setupExporter!: SetupExporter;
 	setupPreview!: SetupPreview;
+	private busy = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -64,9 +65,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			id: "import-plugin-setup",
 			name: "Import plugin setup from JSON",
 			callback: async () => {
-				new Notice("Starting plugin setup import...");
 				await this.runImportPipeline();
-				new Notice("Plugin setup import finished.");
 			},
 		});
 
@@ -74,7 +73,6 @@ export default class InstallCommunityPlugins extends Plugin {
 			id: "apply-plugin-settings",
 			name: "Apply settings from JSON",
 			callback: async () => {
-				new Notice("Applying plugin settings...");
 				await this.applySettingsToInstalledPlugins();
 			},
 		});
@@ -95,9 +93,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (this.settings.autoInstallPlugins) {
-				new Notice("Starting community plugins installation...");
 				await this.runImportPipeline();
-				new Notice("Installation process finished.");
 			}
 		} catch (err: unknown) {
 			logger.error("Startup install pipeline failed:", err);
@@ -108,7 +104,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async runImportPipeline(): Promise<void> {
-		await this.installPluginsFromFile();
+		await this.runExclusive(() => this.installPluginsFromFile());
 	}
 
 	async exportPluginSetup(): Promise<void> {
@@ -175,24 +171,62 @@ export default class InstallCommunityPlugins extends Plugin {
 		logger.setLevel(logLevelMap[level || "error"] || LogLevel.ERROR);
 	}
 
+	// Runs one import/apply operation at a time; a second request while one
+	// is in progress is dropped with a notice.
+	private async runExclusive(task: () => Promise<void>): Promise<void> {
+		if (this.busy) {
+			new Notice(
+				"[Installer] Another import or settings update is already running.",
+			);
+			return;
+		}
+		this.busy = true;
+		try {
+			await task();
+		} finally {
+			this.busy = false;
+		}
+	}
+
 	async applySettingsToInstalledPlugins(): Promise<void> {
+		await this.runExclusive(() => this.applySettings());
+	}
+
+	private async applySettings(): Promise<void> {
+		new Notice("Applying plugin settings...");
 		try {
 			this.fileManager.assertDesktopAdapter();
-			const applied =
-				await this.settingsManager.applySettingsToInstalledPlugins();
-			if (applied.length === 0) {
+			const targets = await this.settingsManager.collectSettingsTargets();
+			if (targets.length === 0) {
 				return;
 			}
 
-			const reloaded =
-				await this.pluginEnabler.reloadEnabledPlugins(applied);
+			let applied: string[] = [];
+			const { restarted, deferred } =
+				await this.pluginEnabler.runWithPluginsStopped(
+					targets.map((t) => t.pluginId),
+					async () => {
+						applied =
+							await this.settingsManager.writeAllSettings(targets);
+					},
+				);
+			if (applied.length === 0) {
+				return;
+			}
 			await this.pluginEnabler.refreshPluginsUI();
 
-			new Notice(
-				reloaded > 0
-					? `[Installer] Applied settings to ${applied.length} plugin${applied.length === 1 ? "" : "s"} (${reloaded} reloaded).`
-					: `[Installer] Applied settings to ${applied.length} plugin${applied.length === 1 ? "" : "s"}.`,
-			);
+			const count = `${applied.length} plugin${applied.length === 1 ? "" : "s"}`;
+			if (deferred > 0) {
+				new Notice(
+					`[Installer] Applied settings to ${count}. ${deferred} running plugin${deferred === 1 ? "" : "s"} will reload when you close Settings.`,
+				);
+			} else if (restarted > 0) {
+				new Notice(
+					`[Installer] Applied settings to ${count} (${restarted} reloaded).`,
+				);
+			} else {
+				new Notice(`[Installer] Applied settings to ${count}.`);
+			}
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
@@ -204,6 +238,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async installPluginsFromFile() {
+		new Notice("Starting plugin setup import...");
 		try {
 			this.fileManager.assertDesktopAdapter();
 			this.pluginInstaller.clearCaches();
@@ -266,6 +301,8 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			const totalPlugins = entries.length;
 			let installedCount = 0;
+			// Plugins whose files changed in this run; only these get enabled.
+			const newlyInstalled: string[] = [];
 
 			for (let i = 0; i < entries.length; i++) {
 				const entry = entries[i];
@@ -278,16 +315,19 @@ export default class InstallCommunityPlugins extends Plugin {
 					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${label}...`,
 				);
 
-				const success = await this.pluginInstaller.installPlugin(entry);
+				const result = await this.pluginInstaller.installPlugin(entry);
 
-				if (success) {
+				if (result !== "failed") {
 					installedCount++;
+				}
+				if (result === "installed") {
+					newlyInstalled.push(entry.id);
 				}
 			}
 
-			if (this.settings.autoEnablePlugins) {
+			if (newlyInstalled.length > 0 && this.settings.autoEnablePlugins) {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
-					entries.map((e) => e.id),
+					newlyInstalled,
 					(current, total, pluginId) => {
 						new Notice(
 							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`,
@@ -300,7 +340,7 @@ export default class InstallCommunityPlugins extends Plugin {
 						result.failedPlugins,
 					);
 				}
-			} else {
+			} else if (newlyInstalled.length > 0) {
 				new Notice(
 					"[Installer] Auto-enable is off; plugins were installed but not turned on.",
 				);
@@ -382,9 +422,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				button.setButtonText("Import").onClick(async () => {
 					button.setDisabled(true);
 					try {
-						new Notice("Starting plugin setup import...");
 						await this.plugin.runImportPipeline();
-						new Notice("Plugin setup import finished.");
 					} finally {
 						button.setDisabled(false);
 					}
@@ -400,7 +438,6 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				button.setButtonText("Apply").onClick(async () => {
 					button.setDisabled(true);
 					try {
-						new Notice("Applying plugin settings...");
 						await this.plugin.applySettingsToInstalledPlugins();
 					} finally {
 						button.setDisabled(false);
@@ -431,16 +468,13 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					);
 					setting.addButton((button) =>
 						button.setButtonText("Import").onClick(async () => {
-							new Notice("Starting plugin setup import...");
 							await this.plugin.runImportPipeline();
-							new Notice("Plugin setup import finished.");
 						}),
 					);
 					setting.addButton((button) =>
 						button
 							.setButtonText("Apply settings")
 							.onClick(async () => {
-								new Notice("Applying plugin settings...");
 								await this.plugin.applySettingsToInstalledPlugins();
 							}),
 					);

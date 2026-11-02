@@ -3,7 +3,7 @@ import { PluginListEntry, PLUGINS_LIST_FILE } from "../types";
 import { logger } from "./Logger";
 
 export function normalizeVersion(version: string): string {
-	return version.trim().replace(/^v/i, "");
+	return version.trim().replace(/^v(?=\d)/i, "");
 }
 
 export function isSafePathSegment(segment: string): boolean {

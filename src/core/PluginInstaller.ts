@@ -23,6 +23,10 @@ interface PluginsAPI {
 	getPluginFolder?: () => string;
 }
 
+// "installed": files were written (fresh install or version change)
+// "unchanged": already installed at the wanted version
+export type InstallResult = "installed" | "unchanged" | "failed";
+
 export class PluginInstaller {
 	private registryCache: PluginRegistryEntry[] | null = null;
 
@@ -105,20 +109,20 @@ export class PluginInstaller {
 		);
 	}
 
-	async installPlugin(entry: PluginListEntry): Promise<boolean> {
+	async installPlugin(entry: PluginListEntry): Promise<InstallResult> {
 		if (
 			!entry?.id ||
 			typeof entry.id !== "string" ||
 			entry.id.trim() === ""
 		) {
 			new Notice("Invalid plugin ID provided.");
-			return false;
+			return "failed";
 		}
 
 		const normalizedId = entry.id.trim();
 		if (!isSafePluginId(normalizedId)) {
 			new Notice(`Invalid plugin ID: "${normalizedId}".`);
-			return false;
+			return "failed";
 		}
 
 		const pinnedVersion = entry.version
@@ -130,7 +134,7 @@ export class PluginInstaller {
 
 		if (fullyInstalled && !pinnedVersion) {
 			new Notice(`Plugin "${normalizedId}" already installed.`);
-			return true;
+			return "unchanged";
 		}
 
 		if (fullyInstalled && pinnedVersion) {
@@ -140,7 +144,7 @@ export class PluginInstaller {
 				new Notice(
 					`Plugin "${normalizedId}" already at pinned version ${pinnedVersion}.`,
 				);
-				return true;
+				return "unchanged";
 			}
 			logger.info(
 				`Plugin "${normalizedId}" installed at ${localVersion ?? "unknown"}; pinning to ${pinnedVersion}.`,
@@ -151,7 +155,7 @@ export class PluginInstaller {
 			new Notice(
 				"[Installer] Obsidian installPlugin API is unavailable. Update Obsidian and try again.",
 			);
-			return false;
+			return "failed";
 		}
 
 		const pluginFolder = this.fileManager.pluginsPath(normalizedId);
@@ -168,14 +172,14 @@ export class PluginInstaller {
 				new Notice(
 					`Plugin "${normalizedId}" not found in Obsidian Community Plugins registry.`,
 				);
-				return false;
+				return "failed";
 			}
 
 			if (!pluginMeta.repo || typeof pluginMeta.repo !== "string") {
 				new Notice(
 					`Plugin "${normalizedId}" has invalid repository information in registry.`,
 				);
-				return false;
+				return "failed";
 			}
 
 			const repoParts = pluginMeta.repo.split("/");
@@ -183,7 +187,7 @@ export class PluginInstaller {
 				new Notice(
 					`Plugin "${normalizedId}" has invalid repository format: ${pluginMeta.repo}`,
 				);
-				return false;
+				return "failed";
 			}
 
 			const [owner, repo] = repoParts;
@@ -203,7 +207,7 @@ export class PluginInstaller {
 						`No suitable release found for plugin "${normalizedId}".`,
 					);
 				}
-				return false;
+				return "failed";
 			}
 
 			const { manifest, version } = resolved;
@@ -211,7 +215,7 @@ export class PluginInstaller {
 				new Notice(
 					`[Installer] Invalid manifest.json for "${normalizedId}".`,
 				);
-				return false;
+				return "failed";
 			}
 
 			logger.debug(
@@ -267,7 +271,7 @@ export class PluginInstaller {
 					? `Plugin "${normalizedId}" installed at ${version}.`
 					: `Plugin "${normalizedId}" installed successfully.`,
 			);
-			return true;
+			return "installed";
 		} catch (err: unknown) {
 			const errorMessage = NetworkManager.describeError(err);
 			new Notice(
@@ -280,7 +284,7 @@ export class PluginInstaller {
 			) {
 				await this.fileManager.removeRecursive(pluginFolder);
 			}
-			return false;
+			return "failed";
 		}
 	}
 

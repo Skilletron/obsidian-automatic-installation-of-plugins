@@ -37,7 +37,7 @@ interface SettingsAPI {
 }
 
 export class PluginEnabler {
-	private pendingLoadIds: string[] = [];
+	private pendingAfterSettings: Array<() => Promise<unknown>> = [];
 	private waitingForSettingsClose = false;
 
 	constructor(
@@ -102,14 +102,16 @@ export class PluginEnabler {
 					await pluginsApi.enablePluginAndSave(actualId);
 				} else if (typeof pluginsApi.enablePlugin === "function") {
 					await pluginsApi.enablePlugin(actualId);
+				} else {
+					throw new Error("No enablePlugin API available");
 				}
+				this.markEnabled(pluginsApi, actualId);
+				enabledIds.push(actualId);
 			} catch (err: unknown) {
 				logger.warn(`enablePlugin("${actualId}") failed:`, err);
+				this.unmarkEnabled(pluginsApi, actualId);
 				failedPlugins.push(pluginId);
 			}
-
-			this.markEnabled(pluginsApi, actualId);
-			enabledIds.push(actualId);
 
 			await new Promise((resolve) => window.setTimeout(resolve, 200));
 		}
@@ -118,7 +120,9 @@ export class PluginEnabler {
 		await this.showCommunityPluginsTab();
 
 		new Notice(
-			`[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length > 1 ? "s" : ""}.`,
+			failedPlugins.length > 0
+				? `[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length === 1 ? "" : "s"}; failed: ${failedPlugins.join(", ")}.`
+				: `[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length === 1 ? "" : "s"}.`,
 		);
 
 		return {
@@ -163,10 +167,109 @@ export class PluginEnabler {
 		}
 	}
 
-	private queuePluginStart(pluginIds: string[]): void {
-		this.pendingLoadIds = [
-			...new Set([...this.pendingLoadIds, ...pluginIds]),
-		];
+	private unmarkEnabled(pluginsApi: PluginsAPI, pluginId: string): void {
+		if (pluginsApi.enabledPlugins instanceof Set) {
+			pluginsApi.enabledPlugins.delete(pluginId);
+			return;
+		}
+		if (Array.isArray(pluginsApi.enabledPlugins)) {
+			const index = pluginsApi.enabledPlugins.indexOf(pluginId);
+			if (index !== -1) {
+				pluginsApi.enabledPlugins.splice(index, 1);
+			}
+		}
+	}
+
+	private isLoaded(pluginsApi: PluginsAPI, pluginId: string): boolean {
+		return Object.prototype.hasOwnProperty.call(
+			pluginsApi.plugins ?? {},
+			pluginId,
+		);
+	}
+
+	// Runs `task` (which writes plugin files such as data.json) while the
+	// affected plugins are unloaded, then loads them again. Unloading first
+	// keeps a plugin from saving its in-memory settings over the new file.
+	//
+	// While the Settings window is open, plugins are not unloaded (that would
+	// pull their tabs out from under the user): `task` runs right away and the
+	// stop, task, start cycle is repeated once Settings closes.
+	async runWithPluginsStopped(
+		pluginIds: string[],
+		task: () => Promise<void>,
+	): Promise<{ restarted: number; deferred: number }> {
+		const pluginsApi = this.getPluginsApi();
+		const loadedIds: string[] = [];
+		if (pluginsApi) {
+			for (const pluginId of pluginIds) {
+				if (!isSafePluginId(pluginId) || pluginId === PLUGIN_ID) {
+					continue;
+				}
+				const actualId =
+					(await this.resolvePluginId(pluginId, pluginsApi)) ||
+					pluginId;
+				if (
+					actualId !== PLUGIN_ID &&
+					this.isLoaded(pluginsApi, actualId) &&
+					!loadedIds.includes(actualId)
+				) {
+					loadedIds.push(actualId);
+				}
+			}
+		}
+
+		if (!pluginsApi || loadedIds.length === 0) {
+			await task();
+			return { restarted: 0, deferred: 0 };
+		}
+
+		if (this.isSettingsOpen()) {
+			await task();
+			this.whenSettingsClosed(() =>
+				this.stopRunStart(pluginsApi, loadedIds, task),
+			);
+			return { restarted: 0, deferred: loadedIds.length };
+		}
+
+		const restarted = await this.stopRunStart(pluginsApi, loadedIds, task);
+		return { restarted, deferred: 0 };
+	}
+
+	private async stopRunStart(
+		pluginsApi: PluginsAPI,
+		pluginIds: string[],
+		task: () => Promise<void>,
+	): Promise<number> {
+		const stopped: string[] = [];
+		for (const pluginId of pluginIds) {
+			try {
+				if (typeof pluginsApi.disablePlugin === "function") {
+					await pluginsApi.disablePlugin(pluginId);
+					stopped.push(pluginId);
+				}
+			} catch (err: unknown) {
+				logger.warn(`Failed to unload plugin "${pluginId}":`, err);
+			}
+		}
+
+		try {
+			await task();
+		} finally {
+			for (const pluginId of stopped) {
+				try {
+					if (typeof pluginsApi.enablePlugin === "function") {
+						await pluginsApi.enablePlugin(pluginId);
+					}
+				} catch (err: unknown) {
+					logger.warn(`Failed to load plugin "${pluginId}":`, err);
+				}
+			}
+		}
+		return stopped.length;
+	}
+
+	private whenSettingsClosed(callback: () => Promise<unknown>): void {
+		this.pendingAfterSettings.push(callback);
 		if (this.waitingForSettingsClose) {
 			return;
 		}
@@ -177,64 +280,19 @@ export class PluginEnabler {
 				return;
 			}
 			this.waitingForSettingsClose = false;
-			const ids = this.pendingLoadIds;
-			this.pendingLoadIds = [];
-			void this.startPlugins(ids);
+			const callbacks = this.pendingAfterSettings;
+			this.pendingAfterSettings = [];
+			void (async () => {
+				for (const cb of callbacks) {
+					try {
+						await cb();
+					} catch (err: unknown) {
+						logger.warn("Deferred plugin restart failed:", err);
+					}
+				}
+			})();
 		};
 		window.setTimeout(poll, 400);
-	}
-
-	private async startPlugins(pluginIds: string[]): Promise<void> {
-		const pluginsApi = this.getPluginsApi();
-		if (!pluginsApi || typeof pluginsApi.enablePlugin !== "function") {
-			return;
-		}
-		await this.waitForLayoutReady();
-		for (const pluginId of pluginIds) {
-			if (pluginId === PLUGIN_ID) {
-				continue;
-			}
-			try {
-				await pluginsApi.enablePlugin(pluginId);
-			} catch (err: unknown) {
-				logger.debug(`enablePlugin("${pluginId}") failed:`, err);
-			}
-			await new Promise((resolve) => window.setTimeout(resolve, 350));
-		}
-	}
-
-	async reloadEnabledPlugins(pluginIds: string[]): Promise<number> {
-		const pluginsApi = this.getPluginsApi();
-		if (!pluginsApi || pluginIds.length === 0) {
-			return 0;
-		}
-
-		if (this.isSettingsOpen()) {
-			this.queuePluginStart(pluginIds.filter((id) => id !== PLUGIN_ID));
-			return 0;
-		}
-
-		let reloaded = 0;
-		for (const pluginId of pluginIds) {
-			if (!isSafePluginId(pluginId) || pluginId === PLUGIN_ID) {
-				continue;
-			}
-			const actualId =
-				(await this.resolvePluginId(pluginId, pluginsApi)) || pluginId;
-			try {
-				if (typeof pluginsApi.disablePlugin === "function") {
-					await pluginsApi.disablePlugin(actualId);
-				}
-				await new Promise((resolve) => window.setTimeout(resolve, 50));
-				if (typeof pluginsApi.enablePlugin === "function") {
-					await pluginsApi.enablePlugin(actualId);
-				}
-				reloaded++;
-			} catch (err: unknown) {
-				logger.warn(`Failed to reload plugin "${pluginId}":`, err);
-			}
-		}
-		return reloaded;
 	}
 
 	private waitForLayoutReady(): Promise<void> {
