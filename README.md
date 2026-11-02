@@ -4,7 +4,7 @@ Install, enable, and configure Obsidian community plugins from JSON files in you
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Desktop only.**
+Works on desktop and mobile. Tested automatically on Windows, Linux and Android; iOS is not covered by the automated tests.
 
 ## What it does
 
@@ -17,7 +17,7 @@ You can **export** your current vault setup into those files, **preview** what a
 
 Typical uses:
 
-- Keep the same plugins on several computers
+- Keep the same plugins on several computers and your phone or tablet
 - Share a team vault starter setup
 - Bootstrap a new vault from a known list
 - Reinstall community plugins after `git clone` when `.obsidian/plugins/` is gitignored (keep a list JSON in the repo, then Import)
@@ -150,6 +150,7 @@ Use the ID from the plugin’s Community plugins page or its `manifest.json` (fo
 - Use **Preview** to see planned actions
 - Confirm network access to GitHub
 - Open the console (Ctrl/Cmd+Shift+I) if import fails
+- On mobile, keep Obsidian open until the import finishes; it downloads every plugin
 
 **Plugins stay disabled**
 
@@ -163,6 +164,16 @@ Use the ID from the plugin’s Community plugins page or its `manifest.json` (fo
 - Confirm IDs in `community-plugins-settings.json` match the installed plugins
 - With **Merge** on, only listed keys are updated; with it off, the whole settings file for that plugin is replaced
 - Turn on **Apply settings on installation** and/or **Sync settings on every startup**, or run **Apply settings from JSON**
+
+## Development
+
+```bash
+npm test             # unit tests
+npm run test:e2e     # Obsidian desktop (minimum and latest version, plus mobile UI emulation)
+npm run test:android # Obsidian for Android in an Android Virtual Device named obsidian_test
+```
+
+The end-to-end tests download Obsidian into `.obsidian-cache` and install real plugins from GitHub. Android tests need the Android SDK (`ANDROID_HOME`) and Java 17.
 
 ## Links
 

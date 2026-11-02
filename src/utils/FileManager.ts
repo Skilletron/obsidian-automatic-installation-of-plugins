@@ -1,17 +1,9 @@
-import { App, FileSystemAdapter, Notice, normalizePath } from "obsidian";
+import { App, Notice, normalizePath } from "obsidian";
 import { logger } from "./Logger";
 import { isSafePathSegment } from "./parsePluginList";
 
 export class FileManager {
 	constructor(private app: App) {}
-
-	assertDesktopAdapter(): void {
-		if (!(this.app.vault.adapter instanceof FileSystemAdapter)) {
-			throw new Error(
-				"This plugin requires the desktop version of Obsidian (FileSystemAdapter).",
-			);
-		}
-	}
 
 	joinPath(...parts: string[]): string {
 		const joined = parts.filter((part) => part.length > 0).join("/");

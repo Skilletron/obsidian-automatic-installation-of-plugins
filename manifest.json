@@ -6,5 +6,5 @@
 	"description": "Install, enable, and configure community plugins from a JSON file for syncing vault setups across devices.",
 	"author": "Konstantin Volobuev",
 	"authorUrl": "https://github.com/Skilletron",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 }

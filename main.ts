@@ -195,7 +195,6 @@ export default class InstallCommunityPlugins extends Plugin {
 	private async applySettings(): Promise<void> {
 		new Notice("Applying plugin settings...");
 		try {
-			this.fileManager.assertDesktopAdapter();
 			const targets = await this.settingsManager.collectSettingsTargets();
 			if (targets.length === 0) {
 				return;
@@ -240,7 +239,6 @@ export default class InstallCommunityPlugins extends Plugin {
 	async installPluginsFromFile() {
 		new Notice("Starting plugin setup import...");
 		try {
-			this.fileManager.assertDesktopAdapter();
 			this.pluginInstaller.clearCaches();
 			const pluginsJsonPath =
 				this.fileManager.configPath(PLUGINS_LIST_FILE);

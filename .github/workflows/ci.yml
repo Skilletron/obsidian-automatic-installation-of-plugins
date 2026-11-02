@@ -67,3 +67,62 @@ jobs:
           # obsidian-launcher uses it for GitHub API calls when resolving
           # Obsidian versions (avoids the anonymous rate limit).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest Obsidian release with an Android build, and the latest one.
+        obsidian-version: ["1.5.8/1.5.8", "latest/latest"]
+    name: android (${{ matrix.obsidian-version }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Get Obsidian cache key
+        run: |
+          npx tsx wdio.mobile.conf.mts | grep 'obsidian-cache-key:' > obsidian-versions-lock.txt
+          rm -rf .obsidian-cache
+        env:
+          CI: "true"
+          OBSIDIAN_VERSIONS: ${{ matrix.obsidian-version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache Obsidian
+        uses: actions/cache@v4
+        with:
+          path: .obsidian-cache
+          key: obsidian-cache-android-${{ hashFiles('obsidian-versions-lock.txt') }}
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: AVD cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-36-pixel
+      - name: Android tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          avd-name: obsidian_test
+          force-avd-creation: false
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel
+          disk-size: 4096M
+          heap-size: 512M
+          emulator-options: -no-snapshot -no-metrics -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: npm run test:android
+        env:
+          OBSIDIAN_VERSIONS: ${{ matrix.obsidian-version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

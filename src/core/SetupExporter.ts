@@ -45,8 +45,6 @@ export class SetupExporter {
 		pluginCount: number;
 		settingsCount: number;
 	}> {
-		this.fileManager.assertDesktopAdapter();
-
 		const installed = await this.listInstalledPlugins();
 		const listEntries: PluginListEntry[] = installed.map((p) => {
 			const entry: PluginListEntry = { id: p.pluginId };
