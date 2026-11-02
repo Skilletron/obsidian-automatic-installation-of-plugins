@@ -79,5 +79,10 @@ export const config: WebdriverIO.Config = {
 
 	cacheDir,
 
+	// Obsidian runs on the device, so no display is needed on the host. On
+	// Linux without DISPLAY, wdio would otherwise wrap the worker in xvfb-run,
+	// which breaks the worker IPC channel ("write EINVAL").
+	autoXvfb: false,
+
 	injectGlobals: false,
 };
