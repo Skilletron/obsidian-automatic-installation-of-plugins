@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Mobile support: the plugin is no longer desktop-only (`isDesktopOnly: false`); Import, Preview, Export and Apply settings work in Obsidian for Android (tested on 1.5.8 and 1.15.0)
+- **Run automatic actions on mobile** setting (off by default): auto-install and settings sync on startup do not run on phones and tablets unless it is on, so a synced desktop setup does not start downloads on mobile
+- Import skips desktop-only plugins on mobile with a notice instead of failing
+- Export on mobile keeps list and settings entries for plugins not installed on that device
 - Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
 - End-to-end tests in a real Obsidian (wdio-obsidian-service) on the minimum supported version and the latest one: import, re-import, version change, apply settings, export (`npm run test:e2e`, also run in CI)
 

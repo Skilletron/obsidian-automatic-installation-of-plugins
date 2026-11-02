@@ -96,6 +96,68 @@ describe("SetupExporter", () => {
 		expect(vault.read(LIST_PATH)?.endsWith("\n")).toBe(true);
 	});
 
+	describe("existing entries for plugins that are not installed", () => {
+		const files = () => ({
+			...installedPlugin(
+				"calendar",
+				{ id: "calendar", version: "1.5.10" },
+				{ weekStart: "monday" },
+			),
+			[LIST_PATH]: JSON.stringify([
+				"obsidian-git",
+				{ id: "templater-obsidian", version: "2.0.0", note: "kept" },
+				{ id: "calendar", version: "1.0.0" },
+				"obsidian-git",
+				PLUGIN_ID,
+				{ broken: true },
+			]),
+			[SETTINGS_PATH]: JSON.stringify({
+				"obsidian-git": { autoPullInterval: 10 },
+				calendar: { weekStart: "sunday" },
+				[PLUGIN_ID]: { x: 1 },
+			}),
+		});
+
+		it("keeps them when exporting on mobile", async () => {
+			const vault = createTestVault(files());
+			await new SetupExporter(vault.fileManager, () => true).exportSetup();
+
+			expect(vault.readJson(LIST_PATH)).toEqual([
+				{ id: "calendar", version: "1.5.10" },
+				"obsidian-git",
+				{ id: "templater-obsidian", version: "2.0.0", note: "kept" },
+			]);
+			expect(vault.readJson(SETTINGS_PATH)).toEqual({
+				calendar: { weekStart: "monday" },
+				"obsidian-git": { autoPullInterval: 10 },
+			});
+		});
+
+		it("drops them when exporting on desktop", async () => {
+			const vault = createTestVault(files());
+			await new SetupExporter(vault.fileManager, () => false).exportSetup();
+
+			expect(vault.readJson(LIST_PATH)).toEqual([
+				{ id: "calendar", version: "1.5.10" },
+			]);
+			expect(vault.readJson(SETTINGS_PATH)).toEqual({
+				calendar: { weekStart: "monday" },
+			});
+		});
+
+		it("ignores invalid existing files on mobile", async () => {
+			const vault = createTestVault({
+				...installedPlugin("calendar", { id: "calendar" }),
+				[LIST_PATH]: "{oops",
+				[SETTINGS_PATH]: "[]",
+			});
+			await new SetupExporter(vault.fileManager, () => true).exportSetup();
+
+			expect(vault.readJson(LIST_PATH)).toEqual([{ id: "calendar" }]);
+			expect(vault.readJson(SETTINGS_PATH)).toEqual({});
+		});
+	});
+
 	it("writes empty files for a vault without plugins", async () => {
 		const vault = createTestVault();
 		const result = await new SetupExporter(vault.fileManager).exportSetup();

@@ -1,4 +1,11 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from "obsidian";
+import {
+	App,
+	Platform,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	Notice,
+} from "obsidian";
 import { FileManager } from "./src/utils/FileManager";
 import { NetworkManager } from "./src/utils/NetworkManager";
 import { SettingsManager } from "./src/core/SettingsManager";
@@ -87,6 +94,23 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	private async onWorkspaceReady(): Promise<void> {
+		const wantsAutoActions =
+			this.settings.loadSettingsOnStartup ||
+			this.settings.autoInstallPlugins;
+		// These settings often reach phones through a synced config folder;
+		// do not install plugins or rewrite their settings there unless the
+		// user allowed it on mobile.
+		if (
+			wantsAutoActions &&
+			Platform.isMobile &&
+			!this.settings.allowAutoActionsOnMobile
+		) {
+			logger.info(
+				"Skipping startup auto-install and settings sync on mobile (not allowed in settings).",
+			);
+			return;
+		}
+
 		try {
 			if (this.settings.loadSettingsOnStartup) {
 				await this.applySettingsToInstalledPlugins();
@@ -299,6 +323,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			const totalPlugins = entries.length;
 			let installedCount = 0;
+			let skippedCount = 0;
 			// Plugins whose files changed in this run; only these get enabled.
 			const newlyInstalled: string[] = [];
 
@@ -315,7 +340,9 @@ export default class InstallCommunityPlugins extends Plugin {
 
 				const result = await this.pluginInstaller.installPlugin(entry);
 
-				if (result !== "failed") {
+				if (result === "skipped") {
+					skippedCount++;
+				} else if (result !== "failed") {
 					installedCount++;
 				}
 				if (result === "installed") {
@@ -346,13 +373,17 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			await this.pluginEnabler.refreshPluginsUI();
 
-			if (installedCount === totalPlugins) {
+			const skippedNote =
+				skippedCount > 0
+					? ` Skipped ${skippedCount} desktop-only plugin${skippedCount > 1 ? "s" : ""} on this device.`
+					: "";
+			if (installedCount + skippedCount === totalPlugins) {
 				new Notice(
-					`[Installer] Successfully installed ${installedCount} plugin${installedCount > 1 ? "s" : ""}.`,
+					`[Installer] Successfully installed ${installedCount} plugin${installedCount === 1 ? "" : "s"}.${skippedNote}`,
 				);
 			} else {
 				new Notice(
-					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.`,
+					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.${skippedNote}`,
 				);
 			}
 		} catch (err: unknown) {
@@ -549,6 +580,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				},
 			},
 			{
+				name: "Run automatic actions on mobile",
+				desc: "Let auto-install and settings sync on startup run on phones and tablets. Off by default, so a synced desktop setup does not start downloads on mobile data.",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.allowAutoActionsOnMobile)
+							.onChange(async (value) => {
+								this.plugin.settings.allowAutoActionsOnMobile = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+				},
+			},
+			{
 				name: "Logging level",
 				desc: "How much detail to show in the console if something goes wrong. Leave on Error unless you are troubleshooting.",
 				render: (setting: Setting) => {
@@ -660,6 +705,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.loadSettingsOnStartup)
 					.onChange(async (value) => {
 						this.plugin.settings.loadSettingsOnStartup = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Run automatic actions on mobile")
+			.setDesc(
+				"Let auto-install and settings sync on startup run on phones and tablets. Off by default, so a synced desktop setup does not start downloads on mobile data.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.allowAutoActionsOnMobile)
+					.onChange(async (value) => {
+						this.plugin.settings.allowAutoActionsOnMobile = value;
 						await this.plugin.saveSettings();
 					}),
 			);

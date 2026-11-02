@@ -47,6 +47,7 @@ function setup(
 		files?: Record<string, string>;
 		loadSettingsOnInstall?: boolean;
 		withInstallApi?: boolean;
+		isMobile?: boolean;
 	} = {},
 ): Setup {
 	let vault!: TestVault;
@@ -71,6 +72,7 @@ function setup(
 		new NetworkManager(),
 		new SettingsManager(vault.fileManager, () => true),
 		() => options.loadSettingsOnInstall ?? false,
+		() => options.isMobile ?? false,
 	);
 	return { vault, installer, installPlugin };
 }
@@ -134,6 +136,51 @@ describe("PluginInstaller.installPlugin", () => {
 			"1.2.0",
 			manifest("1.2.0"),
 		);
+	});
+
+	describe("desktop-only plugins", () => {
+		const desktopOnly = { ...manifest("1.2.0"), isDesktopOnly: true };
+
+		it("skips them on mobile without installing", async () => {
+			serve({
+				[PLUGIN_REGISTRY_URL]: registry,
+				[RAW_HEAD]: desktopOnly,
+				[release("1.2.0")]: desktopOnly,
+			});
+			const { installer, installPlugin } = setup({ isMobile: true });
+
+			expect(await installer.installPlugin({ id: "dataview" })).toBe(
+				"skipped",
+			);
+			expect(installPlugin).not.toHaveBeenCalled();
+			expect(Notice.messages.at(-1)).toContain("desktop-only");
+		});
+
+		it("installs them on desktop", async () => {
+			serve({
+				[PLUGIN_REGISTRY_URL]: registry,
+				[RAW_HEAD]: desktopOnly,
+				[release("1.2.0")]: desktopOnly,
+			});
+			const { installer } = setup({ isMobile: false });
+
+			expect(await installer.installPlugin({ id: "dataview" })).toBe(
+				"installed",
+			);
+		});
+
+		it("installs other plugins on mobile", async () => {
+			serve({
+				[PLUGIN_REGISTRY_URL]: registry,
+				[RAW_HEAD]: manifest("1.2.0"),
+				[release("1.2.0")]: manifest("1.2.0"),
+			});
+			const { installer } = setup({ isMobile: true });
+
+			expect(await installer.installPlugin({ id: "dataview" })).toBe(
+				"installed",
+			);
+		});
 	});
 
 	it("installs a pinned version from its release manifest", async () => {

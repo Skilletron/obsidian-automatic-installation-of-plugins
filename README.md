@@ -134,9 +134,18 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Apply settings on installation | On | After each install, apply that plugin’s settings from the settings file |
 | Merge settings instead of replace | On | Combine settings with what the plugin already has; when off, replace entirely |
 | Sync settings on every startup | Off | Re-apply the settings file every time Obsidian starts |
+| Run automatic actions on mobile | Off | Let auto-install and sync on startup run on phones and tablets too |
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
+
+### On phones and tablets
+
+If you sync your `.obsidian` folder (Obsidian Sync, iCloud, git), these settings reach your phone too. To avoid surprise downloads on mobile data:
+
+- Auto-install and sync on startup do not run on mobile until you turn on **Run automatic actions on mobile** there. The commands and buttons work as usual.
+- Import skips desktop-only plugins on mobile and says so in a notice.
+- Export on mobile keeps list and settings entries for plugins that are not installed on that device, so exporting from a phone does not drop your desktop-only plugins.
 
 ## Finding plugin IDs
 
