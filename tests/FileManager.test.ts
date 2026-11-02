@@ -1,25 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { App, Notice } from "obsidian";
+import { Notice } from "obsidian";
 import { FileManager } from "../src/utils/FileManager";
 import { createTestVault } from "./helpers";
 
 describe("FileManager", () => {
-	describe("assertDesktopAdapter", () => {
-		it("passes with a FileSystemAdapter", () => {
-			const { fileManager } = createTestVault();
-			expect(() => fileManager.assertDesktopAdapter()).not.toThrow();
-		});
-
-		it("throws for any other adapter", () => {
-			const app = {
-				vault: { adapter: {}, configDir: ".obsidian" },
-			} as unknown as App;
-			expect(() => new FileManager(app).assertDesktopAdapter()).toThrow(
-				/desktop version/,
-			);
-		});
-	});
-
 	describe("paths", () => {
 		it("builds paths inside the config directory", () => {
 			const { fileManager } = createTestVault();

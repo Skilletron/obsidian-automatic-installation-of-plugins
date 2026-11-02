@@ -34,10 +34,9 @@ export const config: WebdriverIO.Config = {
 				},
 			}),
 		),
-		// The plugin is desktop-only (isDesktopOnly), but the mobile UI can
-		// still be emulated on desktop: it catches code that only works with
-		// the desktop layout. This is not the real mobile app (no Capacitor
-		// file system).
+		// Mobile UI emulated on desktop: a quick check for code that only
+		// works with the desktop layout. It is not the real mobile app (no
+		// Capacitor file system); wdio.mobile.conf.mts runs Android.
 		{
 			browserName: "obsidian",
 			"wdio:obsidianOptions": {

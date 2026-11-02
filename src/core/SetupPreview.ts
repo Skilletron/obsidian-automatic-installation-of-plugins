@@ -88,8 +88,6 @@ export class SetupPreview {
 	async buildReport(
 		loadSettingsOnInstall: boolean
 	): Promise<SetupPreviewReport | null> {
-		this.fileManager.assertDesktopAdapter();
-
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
 		const settingsPath = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 

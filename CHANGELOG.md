@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Apply settings detects an open Settings window in newer Obsidian, where Settings opens in a separate window, and no longer mistakes the mobile drawer settings button for an open Settings window
 
 ### Added
+- Mobile support: the plugin is no longer desktop-only (`isDesktopOnly: false`); Import, Preview, Export and Apply settings work in Obsidian for Android (tested on 1.5.8 and 1.15.0)
 - Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
 - End-to-end tests in a real Obsidian (wdio-obsidian-service) on the minimum supported version and the latest one: import, re-import, version change, apply settings, export (`npm run test:e2e`, also run in CI)
 
