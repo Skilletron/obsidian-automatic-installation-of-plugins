@@ -1,24 +1,30 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Modal, Notice, Platform, Setting } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import {
 	PLUGINS_LIST_FILE,
 	PLUGINS_SETTINGS_FILE,
 	PluginListEntry,
 } from "../types";
-import { normalizeVersion, parsePluginList } from "../utils/parsePluginList";
+import {
+	isForThisDevice,
+	normalizeVersion,
+	parsePluginList,
+} from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
 export type InstallPreviewAction =
 	| "install"
 	| "skip"
 	| "repin"
-	| "ok-pinned";
+	| "ok-pinned"
+	| "other-device";
 
 export type SettingsPreviewAction =
 	| "would-apply"
 	| "no-settings-entry"
 	| "plugin-not-installed"
-	| "settings-file-missing";
+	| "settings-file-missing"
+	| "other-device";
 
 export interface PluginPreviewRow {
 	id: string;
@@ -39,13 +45,17 @@ export interface SetupPreviewReport {
 		repin: number;
 		okPinned: number;
 		wouldApplySettings: number;
+		otherDevice: number;
 	};
 	listMissing: boolean;
 	settingsMissing: boolean;
 }
 
 export class SetupPreview {
-	constructor(private fileManager: FileManager) {}
+	constructor(
+		private fileManager: FileManager,
+		private isMobile: () => boolean = () => Platform.isMobile,
+	) {}
 
 	private async isFullyInstalled(pluginId: string): Promise<boolean> {
 		const manifestPath = this.fileManager
@@ -106,6 +116,7 @@ export class SetupPreview {
 					repin: 0,
 					okPinned: 0,
 					wouldApplySettings: 0,
+					otherDevice: 0,
 				},
 				listMissing: true,
 				settingsMissing,
@@ -157,6 +168,7 @@ export class SetupPreview {
 			repin: 0,
 			okPinned: 0,
 			wouldApplySettings: 0,
+			otherDevice: 0,
 		};
 
 		for (const entry of entries) {
@@ -188,6 +200,21 @@ export class SetupPreview {
 		const id = entry.id;
 		const pinnedVersion = entry.version;
 		const installed = await this.isFullyInstalled(id);
+
+		if (!isForThisDevice(entry, this.isMobile())) {
+			summary.otherDevice++;
+			const devices = (entry.devices ?? []).join(" and ");
+			return {
+				id,
+				pinnedVersion,
+				localVersion: installed ? await this.getLocalVersion(id) : null,
+				installed,
+				installAction: "other-device",
+				installNote: `Listed for ${devices} only; skipped on this device`,
+				settingsAction: "other-device",
+				settingsNote: "Not applied on this device",
+			};
+		}
 		const localVersion = installed ? await this.getLocalVersion(id) : null;
 
 		let installAction: InstallPreviewAction;
@@ -198,6 +225,9 @@ export class SetupPreview {
 			installNote = pinnedVersion
 				? `Would install @${pinnedVersion}`
 				: "Would install (latest stable)";
+			if (entry.enabled === false) {
+				installNote += ", left turned off";
+			}
 			summary.install++;
 		} 
 		else if (pinnedVersion) {
@@ -264,7 +294,7 @@ export class SetupPreview {
 	formatReportText(report: SetupPreviewReport): string {
 		const lines: string[] = [];
 		lines.push(
-			`Summary: install ${report.summary.install}, skip ${report.summary.skip}, re-pin ${report.summary.repin}, ok pinned ${report.summary.okPinned}, settings touch ${report.summary.wouldApplySettings}`
+			`Summary: install ${report.summary.install}, skip ${report.summary.skip}, re-pin ${report.summary.repin}, ok pinned ${report.summary.okPinned}, settings touch ${report.summary.wouldApplySettings}, other devices ${report.summary.otherDevice}`
 		);
 
 		if (report.settingsMissing) {
@@ -296,6 +326,8 @@ function installBadgeLabel(action: InstallPreviewAction): string {
 			return "Re-pin";
 		case "ok-pinned":
 			return "Pinned OK";
+		case "other-device":
+			return "Other device";
 		case "skip":
 		default:
 			return "Skip";
@@ -312,6 +344,8 @@ function settingsBadgeLabel(action: SettingsPreviewAction): string {
 			return "Settings blocked";
 		case "settings-file-missing":
 			return "No settings file";
+		case "other-device":
+			return "Not here";
 		default:
 			return "Settings";
 	}
@@ -351,6 +385,14 @@ export class SetupPreviewModal extends Modal {
 			this.report.summary.wouldApplySettings,
 			"settings"
 		);
+		if (this.report.summary.otherDevice > 0) {
+			this.addStat(
+				summary,
+				"Other devices",
+				this.report.summary.otherDevice,
+				"skip"
+			);
+		}
 
 		if (this.report.settingsMissing) {
 			contentEl.createDiv({

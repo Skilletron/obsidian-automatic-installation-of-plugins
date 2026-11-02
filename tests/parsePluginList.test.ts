@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Notice } from "obsidian";
 import {
+	isForThisDevice,
 	isSafePathSegment,
 	isSafePluginId,
 	normalizeVersion,
+	parseDevices,
 	parsePluginList,
 } from "../src/utils/parsePluginList";
 
@@ -136,5 +138,57 @@ describe("parsePluginList", () => {
 
 	it("keeps duplicate IDs as listed", () => {
 		expect(parsePluginList(["a", "a"])).toEqual([{ id: "a" }, { id: "a" }]);
+	});
+});
+
+describe("devices and enabled", () => {
+	it("reads devices as a string or a list", () => {
+		expect(
+			parsePluginList([
+				{ id: "a", devices: "desktop" },
+				{ id: "b", devices: ["Mobile", "desktop", "mobile"] },
+			]),
+		).toEqual([
+			{ id: "a", devices: ["desktop"] },
+			{ id: "b", devices: ["mobile", "desktop"] },
+		]);
+	});
+
+	it("ignores invalid devices and keeps the entry", () => {
+		expect(
+			parsePluginList([
+				{ id: "a", devices: "tablet" },
+				{ id: "b", devices: [] },
+				{ id: "c", devices: 1 },
+			]),
+		).toEqual([{ id: "a" }, { id: "b" }, { id: "c" }]);
+		expect(parseDevices(["desktop", 5])).toBeNull();
+	});
+
+	it("reads enabled only when it is a boolean", () => {
+		expect(
+			parsePluginList([
+				{ id: "a", enabled: false },
+				{ id: "b", enabled: true },
+				{ id: "c", enabled: "no" },
+			]),
+		).toEqual([
+			{ id: "a", enabled: false },
+			{ id: "b", enabled: true },
+			{ id: "c" },
+		]);
+	});
+
+	it("matches entries to the current device", () => {
+		expect(isForThisDevice({ id: "a" }, true)).toBe(true);
+		expect(isForThisDevice({ id: "a", devices: ["desktop"] }, true)).toBe(
+			false,
+		);
+		expect(isForThisDevice({ id: "a", devices: ["desktop"] }, false)).toBe(
+			true,
+		);
+		expect(
+			isForThisDevice({ id: "a", devices: ["desktop", "mobile"] }, true),
+		).toBe(true);
 	});
 });

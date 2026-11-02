@@ -13,9 +13,15 @@ export interface InstallCommunityPluginsSettings {
 	logLevel?: "debug" | "info" | "warn" | "error" | "none";
 }
 
+export type DeviceKind = "desktop" | "mobile";
+
 export interface PluginListEntry {
 	id: string;
 	version?: string;
+	// Only install on these kinds of device; all devices when unset.
+	devices?: DeviceKind[];
+	// false: Import installs the plugin but leaves it turned off.
+	enabled?: boolean;
 }
 
 export interface PluginRegistryEntry {

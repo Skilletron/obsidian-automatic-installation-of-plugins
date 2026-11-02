@@ -8,6 +8,8 @@ export interface InstalledPlugin {
 	version?: string;
 	// true when main.js is present next to manifest.json
 	complete: boolean;
+	// Set only when the manifest says so.
+	isDesktopOnly?: true;
 }
 
 // Scans .obsidian/plugins/* for folders with a manifest.json. The plugin id
@@ -30,13 +32,18 @@ export async function scanInstalledPlugins(
 
 		let pluginId = folderName;
 		let version: string | undefined;
+		let isDesktopOnly: true | undefined;
 		const raw = await fileManager.readFile(manifestPath);
 		if (raw) {
 			try {
 				const manifest = JSON.parse(raw) as {
 					id?: unknown;
 					version?: unknown;
+					isDesktopOnly?: unknown;
 				};
+				if (manifest.isDesktopOnly === true) {
+					isDesktopOnly = true;
+				}
 				if (typeof manifest.id === "string" && manifest.id.trim()) {
 					pluginId = manifest.id.trim();
 				}
@@ -58,6 +65,9 @@ export async function scanInstalledPlugins(
 			fileManager.pluginsPath(folderName, "main.js"),
 		);
 		installed.push({ folderName, pluginId, version, complete });
+		if (isDesktopOnly) {
+			installed[installed.length - 1].isDesktopOnly = true;
+		}
 	}
 
 	return installed;

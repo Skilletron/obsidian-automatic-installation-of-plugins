@@ -107,7 +107,8 @@
   border-left-color: var(--text-success, var(--color-green));
 }
 
-.community-install-manager-preview-row.is-skip {
+.community-install-manager-preview-row.is-skip,
+.community-install-manager-preview-row.is-other-device {
   border-left-color: var(--text-faint);
 }
 
@@ -179,7 +180,8 @@
   box-shadow: inset 0 0 0 1px var(--text-success, var(--color-green));
 }
 
-.community-install-manager-preview-badge.is-skip {
+.community-install-manager-preview-badge.is-skip,
+.community-install-manager-preview-badge.is-other-device {
   background: var(--background-modifier-border);
   color: var(--text-muted);
 }

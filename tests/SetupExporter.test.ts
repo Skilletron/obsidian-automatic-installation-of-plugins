@@ -204,6 +204,63 @@ describe("SetupExporter", () => {
 		});
 	});
 
+	describe("enabled and devices", () => {
+		const ENABLED_PATH = ".obsidian/community-plugins.json";
+
+		it("marks turned-off and desktop-only plugins", async () => {
+			const vault = createTestVault({
+				...installedPlugin("calendar", { id: "calendar" }),
+				...installedPlugin("git", { id: "git", isDesktopOnly: true }),
+				...installedPlugin("tasks", { id: "tasks" }),
+				[ENABLED_PATH]: JSON.stringify(["git", "tasks", PLUGIN_ID]),
+			});
+			await new SetupExporter(vault.fileManager, () => false).exportSetup();
+
+			expect(vault.readJson(LIST_PATH)).toEqual([
+				{ id: "calendar", enabled: false },
+				{ id: "git", devices: ["desktop"] },
+				{ id: "tasks" },
+			]);
+		});
+
+		it("does not write enabled when the enabled list is missing", async () => {
+			const vault = createTestVault(
+				installedPlugin("calendar", { id: "calendar" }),
+			);
+			await new SetupExporter(vault.fileManager, () => false).exportSetup();
+			expect(vault.readJson(LIST_PATH)).toEqual([{ id: "calendar" }]);
+		});
+
+		it("keeps devices and custom fields written by hand", async () => {
+			const vault = createTestVault({
+				...installedPlugin("calendar", { id: "calendar", version: "2.0.0" }),
+				...installedPlugin("git", { id: "git", isDesktopOnly: true }),
+				[ENABLED_PATH]: JSON.stringify(["calendar", "git"]),
+				[LIST_PATH]: JSON.stringify([
+					{
+						id: "calendar",
+						version: "1.0.0",
+						enabled: false,
+						devices: "mobile",
+						note: "for my phone",
+					},
+					{ id: "git", devices: ["desktop", "mobile"] },
+				]),
+			});
+			await new SetupExporter(vault.fileManager, () => false).exportSetup();
+
+			expect(vault.readJson(LIST_PATH)).toEqual([
+				{
+					id: "calendar",
+					version: "2.0.0",
+					devices: ["mobile"],
+					note: "for my phone",
+				},
+				{ id: "git", devices: ["desktop", "mobile"] },
+			]);
+		});
+	});
+
 	it("backs up both files before overwriting them", async () => {
 		const vault = createTestVault({
 			...installedPlugin("calendar", { id: "calendar" }),

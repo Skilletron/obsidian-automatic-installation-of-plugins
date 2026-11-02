@@ -20,7 +20,10 @@ import {
 	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
 } from "./src/types";
-import { parsePluginList } from "./src/utils/parsePluginList";
+import {
+	isForThisDevice,
+	parsePluginList,
+} from "./src/utils/parsePluginList";
 import { logger, LogLevel } from "./src/utils/Logger";
 
 export default class InstallCommunityPlugins extends Plugin {
@@ -422,14 +425,28 @@ export default class InstallCommunityPlugins extends Plugin {
 				return;
 			}
 
-			const totalPlugins = entries.length;
+			const isMobile = Platform.isMobile;
+			const forThisDevice = entries.filter((entry) =>
+				isForThisDevice(entry, isMobile),
+			);
+			const otherDeviceCount = entries.length - forThisDevice.length;
+			if (forThisDevice.length === 0) {
+				new Notice(
+					`[Installer] No plugins in the list are meant for this ${isMobile ? "mobile" : "desktop"} device.`,
+				);
+				return;
+			}
+
+			const totalPlugins = forThisDevice.length;
 			let installedCount = 0;
 			let skippedCount = 0;
 			// Plugins whose files changed in this run; only these get enabled.
 			const newlyInstalled: string[] = [];
+			// Installed in this run but marked "enabled": false in the list.
+			const keptOff: string[] = [];
 
-			for (let i = 0; i < entries.length; i++) {
-				const entry = entries[i];
+			for (let i = 0; i < forThisDevice.length; i++) {
+				const entry = forThisDevice[i];
 				const current = i + 1;
 				const label = entry.version
 					? `${entry.id}@${entry.version}`
@@ -447,7 +464,11 @@ export default class InstallCommunityPlugins extends Plugin {
 					installedCount++;
 				}
 				if (result === "installed") {
-					newlyInstalled.push(entry.id);
+					if (entry.enabled === false) {
+						keptOff.push(entry.id);
+					} else {
+						newlyInstalled.push(entry.id);
+					}
 				}
 			}
 
@@ -474,10 +495,23 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			await this.pluginEnabler.refreshPluginsUI();
 
-			const skippedNote =
-				skippedCount > 0
-					? ` Skipped ${skippedCount} desktop-only plugin${skippedCount > 1 ? "s" : ""} on this device.`
-					: "";
+			const notes: string[] = [];
+			if (skippedCount > 0) {
+				notes.push(
+					`Skipped ${skippedCount} desktop-only plugin${skippedCount > 1 ? "s" : ""} on this device.`,
+				);
+			}
+			if (otherDeviceCount > 0) {
+				notes.push(
+					`${otherDeviceCount} plugin${otherDeviceCount > 1 ? "s are" : " is"} listed for other devices only.`,
+				);
+			}
+			if (keptOff.length > 0) {
+				notes.push(
+					`Left ${keptOff.length} turned off as set in the list.`,
+				);
+			}
+			const skippedNote = notes.length > 0 ? ` ${notes.join(" ")}` : "";
 			if (installedCount + skippedCount === totalPlugins) {
 				new Notice(
 					`[Installer] Successfully installed ${installedCount} plugin${installedCount === 1 ? "" : "s"}.${skippedNote}`,
