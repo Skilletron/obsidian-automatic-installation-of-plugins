@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
+- End-to-end tests in a real Obsidian (wdio-obsidian-service) on the minimum supported version and the latest one: import, re-import, version change, apply settings, export (`npm run test:e2e`, also run in CI)
 
 ### Changed
 - Release workflow runs tests and uses Node 22

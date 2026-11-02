@@ -24,3 +24,46 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # wdio.conf.mts prints the resolved Obsidian versions; use them as the
+      # cache key so new Obsidian releases are downloaded once.
+      - name: Get Obsidian cache key
+        run: |
+          npx tsx wdio.conf.mts | grep 'obsidian-cache-key:' > obsidian-versions-lock.txt
+          rm -rf .obsidian-cache
+        env:
+          CI: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache Obsidian
+        uses: actions/cache@v4
+        with:
+          path: .obsidian-cache
+          key: obsidian-cache-${{ runner.os }}-${{ hashFiles('obsidian-versions-lock.txt') }}
+      # Obsidian needs a display: run it under Xvfb with a window manager.
+      - name: Setup virtual display
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -q -y herbstluftwm
+          export DISPLAY=:99
+          echo "DISPLAY=$DISPLAY" >> "$GITHUB_ENV"
+          Xvfb $DISPLAY -screen 0 1280x1024x24 +extension GLX -noreset &
+          sleep 1
+          herbstluftwm &
+          sleep 1
+      - name: E2E tests
+        run: npm run test:e2e
+        env:
+          # obsidian-launcher uses it for GitHub API calls when resolving
+          # Obsidian versions (avoids the anonymous rate limit).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
