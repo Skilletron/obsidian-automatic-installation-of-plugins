@@ -1,80 +1,18 @@
 import { browser, expect } from "@wdio/globals";
 import { before, describe, it } from "mocha";
+import {
+	HIDER,
+	PLUGIN_ID,
+	URL_INTO_SELECTION,
+	pluginState,
+	readConfigJson,
+	runPluginMethod,
+	writeConfigJson,
+} from "../helpers";
 
 // These tests run against a real Obsidian and download real plugins from
 // GitHub. They share one vault and run in order: each step builds on the
 // state the previous one left behind.
-
-const PLUGIN_ID = "automatic-installation-of-plugins";
-const HIDER = "obsidian-hider";
-const URL_INTO_SELECTION = "url-into-selection";
-
-async function writeConfigJson(name: string, data: unknown): Promise<void> {
-	await browser.executeObsidian(
-		async ({ app }, name, text) => {
-			await app.vault.adapter.write(`${app.vault.configDir}/${name}`, text);
-		},
-		name,
-		JSON.stringify(data, null, 2),
-	);
-}
-
-async function readConfigJson<T>(name: string): Promise<T | null> {
-	const text = await browser.executeObsidian(async ({ app }, name) => {
-		const path = `${app.vault.configDir}/${name}`;
-		return (await app.vault.adapter.exists(path))
-			? await app.vault.adapter.read(path)
-			: null;
-	}, name);
-	return text === null ? null : (JSON.parse(text) as T);
-}
-
-// Calls a plugin method and waits for it, unlike executeObsidianCommand,
-// which does not wait for async command callbacks.
-async function runPluginMethod(
-	method:
-		| "runImportPipeline"
-		| "applySettingsToInstalledPlugins"
-		| "exportPluginSetup",
-): Promise<void> {
-	await browser.executeObsidian(
-		async ({ app }, id, method) => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const plugin = (app as any).plugins.plugins[id];
-			await plugin[method]();
-		},
-		PLUGIN_ID,
-		method,
-	);
-}
-
-interface PluginState {
-	installedVersion: string | null;
-	enabled: boolean;
-	loaded: boolean;
-	settings: Record<string, unknown> | null;
-}
-
-async function pluginState(id: string): Promise<PluginState> {
-	return browser.executeObsidian(async ({ app }, id) => {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const plugins = (app as any).plugins;
-		const dir = `${app.vault.configDir}/plugins/${id}`;
-		const manifestPath = `${dir}/manifest.json`;
-		const installedVersion = (await app.vault.adapter.exists(manifestPath))
-			? JSON.parse(await app.vault.adapter.read(manifestPath)).version
-			: null;
-		const loaded = plugins.plugins[id];
-		return {
-			installedVersion,
-			enabled: plugins.enabledPlugins.has(id),
-			loaded: Boolean(loaded),
-			settings: loaded?.settings
-				? JSON.parse(JSON.stringify(loaded.settings))
-				: null,
-		};
-	}, id);
-}
 
 describe("Community Install Manager in Obsidian", () => {
 	before(async () => {

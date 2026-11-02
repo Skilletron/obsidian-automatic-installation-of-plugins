@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, Platform } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import {
 	PLUGIN_ID,
@@ -16,7 +16,10 @@ interface ExportedPlugin {
 }
 
 export class SetupExporter {
-	constructor(private fileManager: FileManager) {}
+	constructor(
+		private fileManager: FileManager,
+		private isMobile: () => boolean = () => Platform.isMobile,
+	) {}
 
 	async listInstalledPlugins(): Promise<ExportedPlugin[]> {
 		const scanned = await scanInstalledPlugins(this.fileManager);
@@ -46,7 +49,7 @@ export class SetupExporter {
 		settingsCount: number;
 	}> {
 		const installed = await this.listInstalledPlugins();
-		const listEntries: PluginListEntry[] = installed.map((p) => {
+		const listEntries: unknown[] = installed.map((p) => {
 			const entry: PluginListEntry = { id: p.pluginId };
 			if (p.version) {
 				entry.version = p.version;
@@ -93,6 +96,27 @@ export class SetupExporter {
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
 		const settingsPath = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
+		// A phone usually has fewer plugins than the desktop it syncs with
+		// (desktop-only ones cannot be installed there). Exporting on mobile
+		// keeps list and settings entries for plugins missing on this device
+		// instead of dropping them for every synced device.
+		let keptCount = 0;
+		if (this.isMobile()) {
+			const installedIds = new Set(installed.map((p) => p.pluginId));
+			const kept = await this.readEntriesNotInstalled(
+				listPath,
+				settingsPath,
+				installedIds,
+			);
+			listEntries.push(...kept.listEntries);
+			for (const [id, value] of Object.entries(kept.settings)) {
+				if (!(id in settings)) {
+					settings[id] = value;
+				}
+			}
+			keptCount = kept.listEntries.length;
+		}
+
 		const listWritten = await this.fileManager.writeFile(
 			listPath,
 			`${JSON.stringify(listEntries, null, 2)}\n`,
@@ -110,9 +134,13 @@ export class SetupExporter {
 		}
 
 		const settingsCount = Object.keys(settings).length;
-		const pinnedCount = listEntries.filter((e) => e.version).length;
+		const pinnedCount = installed.filter((p) => p.version).length;
+		const keptNote =
+			keptCount > 0
+				? ` Kept ${keptCount} entr${keptCount === 1 ? "y" : "ies"} for plugins not installed on this device.`
+				: "";
 		new Notice(
-			`[Installer] Exported ${listEntries.length} plugin${listEntries.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.`,
+			`[Installer] Exported ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}`,
 		);
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
@@ -123,4 +151,79 @@ export class SetupExporter {
 			settingsCount,
 		};
 	}
+
+	// Entries from the current files whose plugin is not installed here.
+	// List items are kept as written, including fields this version does
+	// not know about.
+	private async readEntriesNotInstalled(
+		listPath: string,
+		settingsPath: string,
+		installedIds: Set<string>,
+	): Promise<{
+		listEntries: unknown[];
+		settings: Record<string, unknown>;
+	}> {
+		const listEntries: unknown[] = [];
+		const settings: Record<string, unknown> = {};
+
+		const rawList = await this.readJson(listPath);
+		if (Array.isArray(rawList)) {
+			const seen = new Set<string>();
+			for (const item of rawList) {
+				const id = listItemId(item);
+				if (
+					!id ||
+					installedIds.has(id) ||
+					id === PLUGIN_ID ||
+					seen.has(id)
+				) {
+					continue;
+				}
+				seen.add(id);
+				listEntries.push(item);
+			}
+		}
+
+		const rawSettings = await this.readJson(settingsPath);
+		if (
+			rawSettings !== null &&
+			typeof rawSettings === "object" &&
+			!Array.isArray(rawSettings)
+		) {
+			for (const [id, value] of Object.entries(rawSettings)) {
+				if (!installedIds.has(id) && id !== PLUGIN_ID) {
+					settings[id] = value;
+				}
+			}
+		}
+
+		return { listEntries, settings };
+	}
+
+	private async readJson(path: string): Promise<unknown> {
+		if (!(await this.fileManager.exists(path))) {
+			return null;
+		}
+		const raw = await this.fileManager.readFile(path);
+		if (!raw) {
+			return null;
+		}
+		try {
+			return JSON.parse(raw) as unknown;
+		} catch {
+			logger.warn(`Ignoring invalid JSON in ${path} while exporting.`);
+			return null;
+		}
+	}
+}
+
+function listItemId(item: unknown): string | null {
+	if (typeof item === "string") {
+		return item.trim() || null;
+	}
+	if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+		const id = (item as { id?: unknown }).id;
+		return typeof id === "string" && id.trim() ? id.trim() : null;
+	}
+	return null;
 }

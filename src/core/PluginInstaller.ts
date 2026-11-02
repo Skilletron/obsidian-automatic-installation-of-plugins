@@ -1,4 +1,4 @@
-import { App, Notice, PluginManifest } from "obsidian";
+import { App, Notice, Platform, PluginManifest } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { NetworkManager } from "../utils/NetworkManager";
 import { SettingsManager } from "./SettingsManager";
@@ -25,7 +25,8 @@ interface PluginsAPI {
 
 // "installed": files were written (fresh install or version change)
 // "unchanged": already installed at the wanted version
-export type InstallResult = "installed" | "unchanged" | "failed";
+// "skipped": desktop-only plugin on a mobile device
+export type InstallResult = "installed" | "unchanged" | "skipped" | "failed";
 
 export class PluginInstaller {
 	private registryCache: PluginRegistryEntry[] | null = null;
@@ -36,6 +37,7 @@ export class PluginInstaller {
 		private networkManager: NetworkManager,
 		private settingsManager: SettingsManager,
 		private shouldLoadSettingsOnInstall: () => boolean,
+		private isMobile: () => boolean = () => Platform.isMobile,
 	) {}
 
 	private getPluginsApi(): PluginsAPI | undefined {
@@ -216,6 +218,13 @@ export class PluginInstaller {
 					`[Installer] Invalid manifest.json for "${normalizedId}".`,
 				);
 				return "failed";
+			}
+
+			if (manifest.isDesktopOnly && this.isMobile()) {
+				new Notice(
+					`Plugin "${normalizedId}" is desktop-only; skipped on this device.`,
+				);
+				return "skipped";
 			}
 
 			logger.debug(

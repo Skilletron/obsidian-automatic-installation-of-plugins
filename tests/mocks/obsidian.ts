@@ -138,6 +138,8 @@ export async function requestUrl(
 	return response;
 }
 
+export const Platform = { isMobile: false, isDesktop: true };
+
 export class App {}
 
 export class Modal {
@@ -162,4 +164,5 @@ export type PluginManifest = {
 	minAppVersion: string;
 	author?: string;
 	description?: string;
+	isDesktopOnly?: boolean;
 };

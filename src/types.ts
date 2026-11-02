@@ -4,6 +4,8 @@ export interface InstallCommunityPluginsSettings {
 	autoInstallPlugins: boolean;
 	autoEnablePlugins: boolean;
 	mergePluginSettings: boolean;
+	// Lets auto-install and settings sync on startup run on phones and tablets.
+	allowAutoActionsOnMobile: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error" | "none";
 }
 
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
 	autoInstallPlugins: false,
 	autoEnablePlugins: true,
 	mergePluginSettings: true,
+	allowAutoActionsOnMobile: false,
 	logLevel: "error",
 };
 
