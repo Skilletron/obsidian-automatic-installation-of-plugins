@@ -6,6 +6,10 @@ export interface InstallCommunityPluginsSettings {
 	mergePluginSettings: boolean;
 	// Lets auto-install and settings sync on startup run on phones and tablets.
 	allowAutoActionsOnMobile: boolean;
+	// Replace tokens, passwords and similar values on export.
+	redactSecretsOnExport: boolean;
+	// Comma-separated extra setting names to treat as secrets.
+	extraSecretKeys: string;
 	logLevel?: "debug" | "info" | "warn" | "error" | "none";
 }
 
@@ -38,6 +42,8 @@ export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
 	autoEnablePlugins: true,
 	mergePluginSettings: true,
 	allowAutoActionsOnMobile: false,
+	redactSecretsOnExport: true,
+	extraSecretKeys: "",
 	logLevel: "error",
 };
 

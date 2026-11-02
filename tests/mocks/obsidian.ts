@@ -68,6 +68,12 @@ export class FileSystemAdapter {
 		this.files.set(path, content);
 	}
 
+	async remove(path: string): Promise<void> {
+		if (!this.files.delete(path)) {
+			throw new Error(`ENOENT: ${path}`);
+		}
+	}
+
 	async mkdir(path: string): Promise<void> {
 		this.folders.add(path);
 		this.addParents(path);

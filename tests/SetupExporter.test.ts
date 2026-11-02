@@ -6,6 +6,8 @@ import {
 	PLUGINS_SETTINGS_FILE,
 } from "../src/types";
 import { createTestVault, installedPlugin } from "./helpers";
+import { SettingsBackup } from "../src/core/SettingsBackup";
+import { SECRET_PLACEHOLDER } from "../src/utils/secrets";
 
 const LIST_PATH = `.obsidian/${PLUGINS_LIST_FILE}`;
 const SETTINGS_PATH = `.obsidian/${PLUGINS_SETTINGS_FILE}`;
@@ -83,7 +85,11 @@ describe("SetupExporter", () => {
 
 		const result = await new SetupExporter(vault.fileManager).exportSetup();
 
-		expect(result).toEqual({ pluginCount: 4, settingsCount: 1 });
+		expect(result).toEqual({
+			pluginCount: 4,
+			settingsCount: 1,
+			redactedCount: 0,
+		});
 		expect(vault.readJson(LIST_PATH)).toEqual([
 			{ id: "array-data" },
 			{ id: "bad-data" },
@@ -158,11 +164,76 @@ describe("SetupExporter", () => {
 		});
 	});
 
+	describe("secrets", () => {
+		const files = () =>
+			installedPlugin(
+				"ai",
+				{ id: "ai" },
+				{ apiKey: "sk-1", licenseCode: "L-1", model: "gpt-x" },
+			);
+
+		it("leaves them out when asked, including extra names", async () => {
+			const vault = createTestVault(files());
+			const result = await new SetupExporter(
+				vault.fileManager,
+				() => false,
+				() => ({ redact: true, extraKeys: ["licensecode"] }),
+			).exportSetup();
+
+			expect(result.redactedCount).toBe(2);
+			expect(vault.readJson(SETTINGS_PATH)).toEqual({
+				ai: {
+					apiKey: SECRET_PLACEHOLDER,
+					licenseCode: SECRET_PLACEHOLDER,
+					model: "gpt-x",
+				},
+			});
+		});
+
+		it("exports them as they are when redaction is off", async () => {
+			const vault = createTestVault(files());
+			await new SetupExporter(
+				vault.fileManager,
+				() => false,
+				() => ({ redact: false, extraKeys: [] }),
+			).exportSetup();
+
+			expect(vault.readJson(SETTINGS_PATH)).toEqual({
+				ai: { apiKey: "sk-1", licenseCode: "L-1", model: "gpt-x" },
+			});
+		});
+	});
+
+	it("backs up both files before overwriting them", async () => {
+		const vault = createTestVault({
+			...installedPlugin("calendar", { id: "calendar" }),
+			[LIST_PATH]: '["old"]',
+		});
+		const backup = new SettingsBackup(vault.fileManager);
+		backup.begin("Export");
+		await new SetupExporter(
+			vault.fileManager,
+			() => false,
+			undefined,
+			backup,
+		).exportSetup();
+		await backup.end();
+
+		expect((await backup.latest())?.snapshot.entries).toEqual([
+			{ path: LIST_PATH, content: '["old"]' },
+			{ path: SETTINGS_PATH, content: null },
+		]);
+	});
+
 	it("writes empty files for a vault without plugins", async () => {
 		const vault = createTestVault();
 		const result = await new SetupExporter(vault.fileManager).exportSetup();
 
-		expect(result).toEqual({ pluginCount: 0, settingsCount: 0 });
+		expect(result).toEqual({
+			pluginCount: 0,
+			settingsCount: 0,
+			redactedCount: 0,
+		});
 		expect(vault.readJson(LIST_PATH)).toEqual([]);
 		expect(vault.readJson(SETTINGS_PATH)).toEqual({});
 	});

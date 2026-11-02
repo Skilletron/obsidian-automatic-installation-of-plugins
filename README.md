@@ -123,6 +123,7 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
 | Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
 | Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |
+| Undo last import, export or settings change | Puts the files the last Import, Apply settings or Export changed back the way they were |
 
 ## Settings
 
@@ -135,9 +136,17 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Merge settings instead of replace | On | Combine settings with what the plugin already has; when off, replace entirely |
 | Sync settings on every startup | Off | Re-apply the settings file every time Obsidian starts |
 | Run automatic actions on mobile | Off | Let auto-install and sync on startup run on phones and tablets too |
+| Leave out secrets on export | On (off if you used the plugin before 1.3.0) | Replace tokens, passwords and API keys with a placeholder in the exported settings |
+| Extra secret setting names | — | More setting names to leave out, comma-separated |
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
+
+### Secrets and undo
+
+Plugin settings often hold API keys and tokens, and the settings file tends to end up in git or a shared folder. With **Leave out secrets on export** on, Export writes `<secret removed on export>` instead of any text value whose setting name looks like a secret (token, password, API key, webhook and similar), and tells you how many it left out. Add your own names under **Extra secret setting names**. Import and Apply settings never write that placeholder into a plugin: the plugin keeps the value it already has.
+
+Before Import, Apply settings or Export overwrites anything, the plugin saves a copy of those files. **Undo last change** (a button in settings and a command) puts them back and reloads the affected plugins. You can undo several times in a row; the last 10 changes are kept in `.obsidian/community-install-manager-backups`. Undo restores settings and setup files only. Plugins that Import installed stay installed.
 
 ### On phones and tablets
 
