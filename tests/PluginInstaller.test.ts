@@ -105,21 +105,22 @@ describe("PluginInstaller.installPlugin", () => {
 	it("fails when Obsidian's installPlugin API is unavailable", async () => {
 		const { installer } = setup({ withInstallApi: false });
 		expect(await installer.installPlugin({ id: "dataview" })).toBe("failed");
-		expect(Notice.messages.at(-1)).toContain("installPlugin API");
+		expect(installer.lastFailure).toContain("installPlugin API");
+		expect(Notice.messages).toEqual([]);
 	});
 
 	it("fails for plugins missing from the registry", async () => {
 		serve({ [PLUGIN_REGISTRY_URL]: registry });
 		const { installer } = setup();
 		expect(await installer.installPlugin({ id: "unknown" })).toBe("failed");
-		expect(Notice.messages.at(-1)).toContain("not found");
+		expect(installer.lastFailure).toContain("not found");
 	});
 
 	it("fails for a malformed registry repo", async () => {
 		serve({ [PLUGIN_REGISTRY_URL]: registry });
 		const { installer } = setup();
 		expect(await installer.installPlugin({ id: "bad-repo" })).toBe("failed");
-		expect(Notice.messages.at(-1)).toContain("invalid repository format");
+		expect(installer.lastFailure).toContain("invalid repository format");
 	});
 
 	it("installs the latest version from the repo manifest", async () => {
@@ -153,7 +154,7 @@ describe("PluginInstaller.installPlugin", () => {
 				"skipped",
 			);
 			expect(installPlugin).not.toHaveBeenCalled();
-			expect(Notice.messages.at(-1)).toContain("desktop-only");
+			expect(Notice.messages).toEqual([]);
 		});
 
 		it("installs them on desktop", async () => {

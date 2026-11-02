@@ -45,6 +45,18 @@ describe("Community Install Manager in Obsidian", () => {
 
 		await runPluginMethod("runImportPipeline");
 
+		// One notice that updated in place, not one per plugin. Obsidian may
+		// add its own warnings about the installed plugins (in mobile
+		// emulation, about Node.js modules); those are not ours to hide.
+		const notices = await browser.executeObsidian(() =>
+			[...document.querySelectorAll(".notice")]
+				.map((n) => n.textContent ?? "")
+				.filter((text) => !text.includes("attempted to load")),
+		);
+		expect(notices).toHaveLength(1);
+		expect(notices[0]).toContain("Import finished");
+		expect(notices[0]).toContain("Installed or updated 2 plugins");
+
 		const hider = await pluginState(HIDER);
 		expect(hider.installedVersion).toBe("1.7.0");
 		expect(hider.enabled).toBe(true);
