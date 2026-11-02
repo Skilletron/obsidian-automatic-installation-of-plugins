@@ -173,6 +173,35 @@ describe("Community Install Manager in Obsidian", () => {
 		expect(hider.settings?.hideTabs).toBe(true);
 	});
 
+	it("waits for the Settings window to close before restarting plugins", async () => {
+		await writeConfigJson("community-plugins-settings.json", {
+			[HIDER]: { hideStatus: false },
+		});
+		await browser.executeObsidian(({ app }) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(app as any).setting.open();
+		});
+
+		await runPluginMethod("applySettingsToInstalledPlugins");
+
+		const data = await readConfigJson<Record<string, unknown>>(
+			`plugins/${HIDER}/data.json`,
+		);
+		expect(data).toMatchObject({ hideStatus: false });
+		// Still running with the settings it had before.
+		expect((await pluginState(HIDER)).settings?.hideStatus).toBe(true);
+
+		await browser.executeObsidian(({ app }) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(app as any).setting.close();
+		});
+		await browser.waitUntil(
+			async () => (await pluginState(HIDER)).settings?.hideStatus === false,
+			{ timeoutMsg: "plugin was not restarted after Settings closed" },
+		);
+		expect((await pluginState(HIDER)).loaded).toBe(true);
+	});
+
 	it("exports the installed plugins and their settings", async () => {
 		await runPluginMethod("exportPluginSetup");
 
@@ -194,7 +223,7 @@ describe("Community Install Manager in Obsidian", () => {
 			"community-plugins-settings.json",
 		);
 		expect(settings?.[HIDER]).toMatchObject({
-			hideStatus: true,
+			hideStatus: false,
 			hideTabs: true,
 		});
 	});

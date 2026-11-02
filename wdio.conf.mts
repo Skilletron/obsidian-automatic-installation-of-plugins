@@ -16,23 +16,44 @@ if (env.CI) {
 	console.log("obsidian-cache-key:", JSON.stringify(versions));
 }
 
-// The plugin is desktop-only (isDesktopOnly in manifest.json), so there is
-// no emulateMobile or Android configuration.
 export const config: WebdriverIO.Config = {
 	runner: "local",
 	framework: "mocha",
 	specs: ["./test-e2e/specs/**/*.e2e.ts"],
 	maxInstances: Number(env.WDIO_MAX_INSTANCES || 2),
 
-	capabilities: versions.map(([appVersion, installerVersion]) => ({
-		browserName: "obsidian",
-		"wdio:obsidianOptions": {
-			appVersion,
-			installerVersion,
-			plugins: ["."],
-			vault: "test-e2e/vaults/empty",
+	capabilities: [
+		...versions.map<WebdriverIO.Capabilities>(
+			([appVersion, installerVersion]) => ({
+				browserName: "obsidian",
+				"wdio:obsidianOptions": {
+					appVersion,
+					installerVersion,
+					plugins: ["."],
+					vault: "test-e2e/vaults/empty",
+				},
+			}),
+		),
+		// The plugin is desktop-only (isDesktopOnly), but the mobile UI can
+		// still be emulated on desktop: it catches code that only works with
+		// the desktop layout. This is not the real mobile app (no Capacitor
+		// file system).
+		{
+			browserName: "obsidian",
+			"wdio:obsidianOptions": {
+				appVersion: "latest",
+				installerVersion: "latest",
+				emulateMobile: true,
+				plugins: ["."],
+				vault: "test-e2e/vaults/empty",
+			},
+			"goog:chromeOptions": {
+				mobileEmulation: {
+					deviceMetrics: { width: 390, height: 844 },
+				},
+			},
 		},
-	})),
+	],
 
 	services: ["obsidian"],
 	reporters: ["obsidian"],

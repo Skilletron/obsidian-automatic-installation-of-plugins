@@ -10,6 +10,8 @@ function setup(
 		// Plugins currently loaded (app.plugins.plugins)
 		loaded?: string[];
 		withSaveConfig?: boolean;
+		// app.setting
+		setting?: { isOpen?: boolean };
 	} = {},
 ) {
 	const calls: string[] = [];
@@ -35,7 +37,10 @@ function setup(
 		saveConfig:
 			options.withSaveConfig === false ? undefined : vi.fn(async () => {}),
 	};
-	const vault = createTestVault(options.files ?? {}, { plugins });
+	const vault = createTestVault(options.files ?? {}, {
+		plugins,
+		...(options.setting ? { setting: options.setting } : {}),
+	});
 	return {
 		vault,
 		plugins,
@@ -179,6 +184,40 @@ describe("PluginEnabler.runWithPluginsStopped", () => {
 			}),
 		).rejects.toThrow("write failed");
 		expect(calls).toEqual(["disable:dataview", "enable:dataview"]);
+	});
+
+	it("asks app.setting whether Settings is open", async () => {
+		const setting = { isOpen: true };
+		const { enabler, calls } = setup({
+			manifests: ["dataview"],
+			loaded: ["dataview"],
+			setting,
+		});
+		const result = await enabler.runWithPluginsStopped(
+			["dataview"],
+			async () => {
+				calls.push("task");
+			},
+		);
+		// The DOM has no Settings modal (popout window), isOpen still wins.
+		expect(result).toEqual({ restarted: 0, deferred: 1 });
+		expect(calls).toEqual(["task"]);
+	});
+
+	it("ignores the mobile drawer settings button", async () => {
+		(document as unknown as {
+			querySelector: (selector: string) => unknown;
+		}).querySelector = (selector) =>
+			selector === ".mod-settings" ? {} : null;
+		const { enabler } = setup({
+			manifests: ["dataview"],
+			loaded: ["dataview"],
+		});
+		const result = await enabler.runWithPluginsStopped(
+			["dataview"],
+			async () => {},
+		);
+		expect(result).toEqual({ restarted: 1, deferred: 0 });
 	});
 
 	it("defers the restart until the Settings window closes", async () => {

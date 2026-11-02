@@ -34,6 +34,7 @@ interface SettingsAPI {
 		name?: string;
 		display?: () => void;
 	};
+	isOpen?: boolean;
 }
 
 export class PluginEnabler {
@@ -50,7 +51,16 @@ export class PluginEnabler {
 	}
 
 	private isSettingsOpen(): boolean {
-		return !!document.querySelector(".mod-settings");
+		// Newer Obsidian can show Settings in a popout window, outside this
+		// document, so ask the Settings modal first.
+		const isOpen = (this.app as App & { setting?: SettingsAPI }).setting
+			?.isOpen;
+		if (typeof isOpen === "boolean") {
+			return isOpen;
+		}
+		// Match the modal itself: on mobile the drawer header also has a
+		// settings button with the mod-settings class.
+		return !!document.querySelector(".modal.mod-settings");
 	}
 
 	async enableInstalledPlugins(

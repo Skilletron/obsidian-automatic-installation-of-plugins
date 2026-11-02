@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import and Apply settings can no longer run at the same time
 - `normalizeVersion` strips a leading `v` only before a digit
 - Settings merge ignores `__proto__` keys
+- Apply settings detects an open Settings window in newer Obsidian, where Settings opens in a separate window, and no longer mistakes the mobile drawer settings button for an open Settings window
 
 ### Added
 - Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
