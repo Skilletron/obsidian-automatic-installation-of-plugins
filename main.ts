@@ -5,6 +5,7 @@ import {
 	PluginSettingTab,
 	Setting,
 	Notice,
+	normalizePath,
 } from "obsidian";
 import { FileManager } from "./src/utils/FileManager";
 import { NetworkManager } from "./src/utils/NetworkManager";
@@ -23,9 +24,20 @@ import {
 import { UpdatesModal } from "./src/core/UpdatesModal";
 import {
 	VaultSetupApplier,
+	describeVaultSetupChanges,
 	liveVaultState,
 	parseVaultSetup,
+	readVaultSetup,
 } from "./src/core/VaultSetup";
+import {
+	PACK_FILE,
+	ParsedPack,
+	buildSetupPack,
+	mergePackIntoSetup,
+	packUrl,
+	parseSetupPack,
+} from "./src/core/SetupPack";
+import { PackConfirmModal, PackLinkModal } from "./src/core/SetupPackModals";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
@@ -133,6 +145,32 @@ export default class InstallCommunityPlugins extends Plugin {
 		});
 
 		this.addCommand({
+			id: "export-setup-pack",
+			name: "Export shareable setup pack",
+			callback: async () => {
+				await this.exportSetupPack();
+			},
+		});
+
+		this.addCommand({
+			id: "import-setup-pack",
+			name: "Import setup pack from a link",
+			callback: () => {
+				new PackLinkModal(this.app, (input) => {
+					void this.loadSetupPack(input);
+				}).open();
+			},
+		});
+
+		// obsidian://install-setup-pack?url=<link> opens the same
+		// confirmation; nothing is installed without it.
+		this.registerObsidianProtocolHandler("install-setup-pack", (params) => {
+			if (params.url) {
+				void this.loadSetupPack(params.url);
+			}
+		});
+
+		this.addCommand({
 			id: "check-plugin-updates",
 			name: "Check for plugin updates",
 			callback: async () => {
@@ -197,13 +235,135 @@ export default class InstallCommunityPlugins extends Plugin {
 		);
 	}
 
+	// Writes setup-pack.json to the vault root: everything installed, with
+	// secrets always left out, ready to share.
+	async exportSetupPack(): Promise<void> {
+		try {
+			const { listEntries, settings, redactedCount } =
+				await this.setupExporter.collect(true);
+			const vaultSetup = this.settings.syncVaultSetup
+				? await readVaultSetup(this.fileManager, liveVaultState(this.app))
+				: null;
+			const pack = buildSetupPack(
+				listEntries,
+				settings,
+				vaultSetup,
+				`${this.app.vault.getName()} setup`,
+			);
+			const path = normalizePath(PACK_FILE);
+			if (
+				!(await this.fileManager.writeFile(
+					path,
+					`${JSON.stringify(pack, null, 2)}\n`,
+				))
+			) {
+				throw new Error(`could not write ${PACK_FILE}`);
+			}
+			const secrets =
+				redactedCount > 0
+					? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"}.`
+					: "";
+			ProgressNotice.show(
+				"Setup pack saved",
+				`${PACK_FILE} in your vault has ${listEntries.length} plugin${listEntries.length === 1 ? "" : "s"}.${secrets} Share it (for example as a GitHub gist) and others can use Import setup pack from a link.`,
+				10000,
+			);
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			logger.error("Setup pack export failed:", err);
+			ProgressNotice.show("Setup pack not saved", errorMessage, 12000);
+		}
+	}
+
+	// Loads a pack from a link or a vault path and asks before using it.
+	async loadSetupPack(input: string): Promise<void> {
+		let raw: unknown;
+		let source = input;
+		try {
+			const url = packUrl(input);
+			if (url) {
+				source = url;
+				raw = await this.networkManager.fetchJson<unknown>(url);
+			} else if (/^[a-z]+:/i.test(input)) {
+				throw new Error("only https links can be loaded");
+			} else {
+				const path = normalizePath(input);
+				const text = (await this.fileManager.exists(path))
+					? await this.fileManager.readFile(path)
+					: null;
+				if (text === null) {
+					throw new Error(`${path} was not found in this vault`);
+				}
+				raw = JSON.parse(text) as unknown;
+			}
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			ProgressNotice.show(
+				"Could not load the setup pack",
+				NetworkManager.describeError(err) || errorMessage,
+				12000,
+			);
+			return;
+		}
+
+		const pack = parseSetupPack(raw);
+		if (!pack) {
+			ProgressNotice.show(
+				"Not a setup pack",
+				"The file is not a setup pack made with Export shareable setup pack.",
+				12000,
+			);
+			return;
+		}
+
+		const vaultSetupSummary = pack.vaultSetup
+			? describeVaultSetupChanges(
+					pack.vaultSetup,
+					await readVaultSetup(this.fileManager, liveVaultState(this.app)),
+				)
+			: "";
+		new PackConfirmModal(this.app, pack, source, vaultSetupSummary, () =>
+			this.useSetupPack(pack),
+		).open();
+	}
+
+	private async useSetupPack(pack: ParsedPack): Promise<void> {
+		await this.runExclusive(() =>
+			this.withBackup("Import setup pack", async () => {
+				try {
+					await mergePackIntoSetup(
+						this.fileManager,
+						pack,
+						this.settingsBackup,
+					);
+				} catch (err: unknown) {
+					const errorMessage =
+						err instanceof Error ? err.message : "Unknown error";
+					logger.error("Merging the setup pack failed:", err);
+					ProgressNotice.show("Setup pack not added", errorMessage, 12000);
+					return;
+				}
+				// The user saw and confirmed the pack, theme and snippets included.
+				await this.installPluginsFromFile({
+					forceVaultSetup: pack.vaultSetup !== undefined,
+				});
+			}),
+		);
+	}
+
 	// Applies vault-setup.json if syncing it is on. Returns notes
 	// for the import summary.
 	private async applyVaultSetupFile(
 		progress: ProgressNotice,
+		force = false,
 	): Promise<string[]> {
 		const path = this.fileManager.configPath(VAULT_SETUP_FILE);
-		if (!this.settings.syncVaultSetup || !(await this.fileManager.exists(path))) {
+		if (
+			(!this.settings.syncVaultSetup && !force) ||
+			!(await this.fileManager.exists(path))
+		) {
 			return [];
 		}
 		let setup = null;
@@ -582,7 +742,8 @@ export default class InstallCommunityPlugins extends Plugin {
 		}
 	}
 
-	async installPluginsFromFile() {
+	// forceVaultSetup applies vault-setup.json even when syncing it is off.
+	async installPluginsFromFile(options: { forceVaultSetup?: boolean } = {}) {
 		// One notice for the whole run, updated in place. Problems with a
 		// single plugin still get a notice of their own.
 		const progress = new ProgressNotice("Importing plugin setup");
@@ -632,7 +793,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (entries.length === 0) {
-				const setupNotes = await this.applyVaultSetupFile(progress);
+				const setupNotes = await this.applyVaultSetupFile(progress, options.forceVaultSetup);
 				progress.setTitle("Import finished");
 				progress.finish(["No plugins to install.", ...setupNotes].join(" "));
 				return;
@@ -723,7 +884,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				);
 			}
 			notes.push(...failed);
-			notes.push(...(await this.applyVaultSetupFile(progress)));
+			notes.push(...(await this.applyVaultSetupFile(progress, options.forceVaultSetup)));
 
 			const changed = newlyInstalled.length + keptOff.length;
 			const summary =
@@ -811,6 +972,30 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(target)
+			.setName("Share your setup")
+			.setDesc(
+				"Save everything you have installed as setup-pack.json in your vault, with secrets left out, to share with others.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Export pack").onClick(async () => {
+					await this.plugin.exportSetupPack();
+				}),
+			);
+
+		new Setting(target)
+			.setName("Import a setup pack")
+			.setDesc(
+				"Add someone else's setup pack to yours from a link. You see what it contains before anything is installed.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Import from link").onClick(() => {
+					new PackLinkModal(this.app, (input) => {
+						void this.plugin.loadSetupPack(input);
+					}).open();
+				}),
+			);
+
+		new Setting(target)
 			.setName("Check for updates")
 			.setDesc(
 				"See which installed community plugins have newer versions, and update them. Pins in your plugin list move along.",
@@ -894,6 +1079,18 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					setting.addButton((button) =>
 						button.setButtonText("Check for updates").onClick(async () => {
 							await this.plugin.checkForUpdates();
+						}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Export pack").onClick(async () => {
+							await this.plugin.exportSetupPack();
+						}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Import pack").onClick(() => {
+							new PackLinkModal(this.app, (input) => {
+								void this.plugin.loadSetupPack(input);
+							}).open();
 						}),
 					);
 					setting.addButton((button) =>

@@ -83,56 +83,8 @@ export class SetupExporter {
 		redactedCount: number;
 		message: string;
 	}> {
-		const installed = await this.listInstalledPlugins();
-		const enabledIds = await this.readEnabledIds();
-		const existingEntries = await this.readExistingEntries();
-		const listEntries: unknown[] = installed.map((p) =>
-			this.buildEntry(p, enabledIds, existingEntries.get(p.pluginId)),
-		);
-		const settings: Record<string, unknown> = {};
-		const { redact, extraKeys } = this.secretOptions();
-		let redactedCount = 0;
-
-		for (const { folderName, pluginId } of installed) {
-			const dataPath = this.fileManager.pluginsPath(
-				folderName,
-				"data.json",
-			);
-			if (!(await this.fileManager.exists(dataPath))) {
-				continue;
-			}
-
-			const raw = await this.fileManager.readFile(dataPath);
-			if (!raw) {
-				continue;
-			}
-
-			try {
-				const parsed: unknown = JSON.parse(raw);
-				if (
-					parsed !== null &&
-					typeof parsed === "object" &&
-					!Array.isArray(parsed)
-				) {
-					if (redact) {
-						const result = redactSecrets(parsed, extraKeys);
-						settings[pluginId] = result.value;
-						redactedCount += result.redacted;
-					} else {
-						settings[pluginId] = parsed;
-					}
-				} else {
-					logger.warn(
-						`Skipping settings for "${pluginId}": data.json is not an object.`,
-					);
-				}
-			} catch (err: unknown) {
-				logger.warn(
-					`Skipping settings for "${pluginId}": invalid data.json.`,
-					err,
-				);
-			}
-		}
+		const { installed, listEntries, settings, redactedCount } =
+			await this.collect();
 
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
 		const settingsPath = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
@@ -216,6 +168,71 @@ export class SetupExporter {
 			redactedCount,
 			message,
 		};
+	}
+
+	// The plugin list entries and settings for what is installed now.
+	// forceRedact leaves secrets out whatever the setting says (for packs
+	// meant to be shared).
+	async collect(forceRedact = false): Promise<{
+		installed: ExportedPlugin[];
+		listEntries: unknown[];
+		settings: Record<string, unknown>;
+		redactedCount: number;
+	}> {
+		const installed = await this.listInstalledPlugins();
+		const enabledIds = await this.readEnabledIds();
+		const existingEntries = await this.readExistingEntries();
+		const listEntries: unknown[] = installed.map((p) =>
+			this.buildEntry(p, enabledIds, existingEntries.get(p.pluginId)),
+		);
+		const settings: Record<string, unknown> = {};
+		const { redact, extraKeys } = forceRedact
+			? { redact: true, extraKeys: this.secretOptions().extraKeys }
+			: this.secretOptions();
+		let redactedCount = 0;
+
+		for (const { folderName, pluginId } of installed) {
+			const dataPath = this.fileManager.pluginsPath(
+				folderName,
+				"data.json",
+			);
+			if (!(await this.fileManager.exists(dataPath))) {
+				continue;
+			}
+
+			const raw = await this.fileManager.readFile(dataPath);
+			if (!raw) {
+				continue;
+			}
+
+			try {
+				const parsed: unknown = JSON.parse(raw);
+				if (
+					parsed !== null &&
+					typeof parsed === "object" &&
+					!Array.isArray(parsed)
+				) {
+					if (redact) {
+						const result = redactSecrets(parsed, extraKeys);
+						settings[pluginId] = result.value;
+						redactedCount += result.redacted;
+					} else {
+						settings[pluginId] = parsed;
+					}
+				} else {
+					logger.warn(
+						`Skipping settings for "${pluginId}": data.json is not an object.`,
+					);
+				}
+			} catch (err: unknown) {
+				logger.warn(
+					`Skipping settings for "${pluginId}": invalid data.json.`,
+					err,
+				);
+			}
+		}
+
+		return { installed, listEntries, settings, redactedCount };
 	}
 
 	private buildEntry(
