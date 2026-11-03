@@ -17,14 +17,28 @@ export async function writeConfigJson(
 	);
 }
 
+// A plugin may be saving the file at the moment we read it (seen on slow
+// Android emulators), so retry briefly while it is not valid JSON yet.
 export async function readConfigJson<T>(name: string): Promise<T | null> {
-	const text = await browser.executeObsidian(async ({ app }, name) => {
-		const path = `${app.vault.configDir}/${name}`;
-		return (await app.vault.adapter.exists(path))
-			? await app.vault.adapter.read(path)
-			: null;
-	}, name);
-	return text === null ? null : (JSON.parse(text) as T);
+	for (let attempt = 1; ; attempt++) {
+		const text = await browser.executeObsidian(async ({ app }, name) => {
+			const path = `${app.vault.configDir}/${name}`;
+			return (await app.vault.adapter.exists(path))
+				? await app.vault.adapter.read(path)
+				: null;
+		}, name);
+		if (text === null) {
+			return null;
+		}
+		try {
+			return JSON.parse(text) as T;
+		} catch (err) {
+			if (attempt >= 20) {
+				throw err;
+			}
+			await browser.pause(250);
+		}
+	}
 }
 
 // Calls a plugin method and waits for it, unlike executeObsidianCommand,
