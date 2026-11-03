@@ -90,6 +90,7 @@ export class FileManager {
 				return false;
 			}
 			await this.app.vault.adapter.write(normalized, content);
+			await this.waitUntilReadable(normalized, content);
 			return true;
 		} catch (err: unknown) {
 			const errorMessage =
@@ -109,6 +110,24 @@ export class FileManager {
 		} catch (err: unknown) {
 			logger.debug(`removeRecursive failed for ${vaultPath}:`, err);
 		}
+	}
+
+	// On slow Android devices a read right after a write can still return
+	// the old content. Callers often hand the file to something that reads
+	// it straight away (a plugin loading its settings), so wait briefly
+	// until the new content reads back.
+	private async waitUntilReadable(path: string, content: string): Promise<void> {
+		for (let attempt = 0; attempt < 20; attempt++) {
+			try {
+				if ((await this.app.vault.adapter.read(path)) === content) {
+					return;
+				}
+			} catch {
+				// Not readable yet.
+			}
+			await new Promise((resolve) => window.setTimeout(resolve, 100));
+		}
+		logger.warn(`${path} did not read back as written.`);
 	}
 
 	// Deletes a file; true if it is gone afterwards.
