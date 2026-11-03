@@ -61,6 +61,13 @@ export class ProgressNotice {
 		this.detailEl.textContent = `${current} of ${total} · ${detail}`;
 	}
 
+	// A step without a count, e.g. a final step after the per-plugin ones.
+	setDetail(detail: string): void {
+		if (!this.done) {
+			this.detailEl.textContent = detail;
+		}
+	}
+
 	// Shows the result in the same notice and closes it after a while.
 	finish(message: string, timeoutMs = 6000): void {
 		if (this.done) {

@@ -11,6 +11,13 @@ import {
 	parsePluginList,
 } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
+import {
+	LiveAppearance,
+	describeAppearanceChanges,
+	parseAppearance,
+	readAppearance,
+} from "./Appearance";
+import { APPEARANCE_FILE } from "../types";
 
 export type InstallPreviewAction =
 	| "install"
@@ -49,12 +56,15 @@ export interface SetupPreviewReport {
 	};
 	listMissing: boolean;
 	settingsMissing: boolean;
+	// Theme and snippet changes, when community-appearance.json is used.
+	appearance?: string;
 }
 
 export class SetupPreview {
 	constructor(
 		private fileManager: FileManager,
 		private isMobile: () => boolean = () => Platform.isMobile,
+		private liveAppearance: () => LiveAppearance | null = () => null,
 	) {}
 
 	private async isFullyInstalled(pluginId: string): Promise<boolean> {
@@ -96,6 +106,41 @@ export class SetupPreview {
 	}
 
 	async buildReport(
+		loadSettingsOnInstall: boolean,
+		includeAppearance = false
+	): Promise<SetupPreviewReport | null> {
+		const report = await this.buildPluginReport(loadSettingsOnInstall);
+		if (report && includeAppearance) {
+			const appearance = await this.describeAppearance();
+			if (appearance) {
+				report.appearance = appearance;
+			}
+		}
+		return report;
+	}
+
+	private async describeAppearance(): Promise<string | null> {
+		const path = this.fileManager.configPath(APPEARANCE_FILE);
+		if (!(await this.fileManager.exists(path))) {
+			return null;
+		}
+		try {
+			const wanted = parseAppearance(
+				JSON.parse((await this.fileManager.readFile(path)) ?? "")
+			);
+			if (!wanted) {
+				return `${APPEARANCE_FILE} is not valid`;
+			}
+			return describeAppearanceChanges(
+				wanted,
+				await readAppearance(this.fileManager, this.liveAppearance())
+			);
+		} catch {
+			return `${APPEARANCE_FILE} is not valid JSON`;
+		}
+	}
+
+	private async buildPluginReport(
 		loadSettingsOnInstall: boolean
 	): Promise<SetupPreviewReport | null> {
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
@@ -300,6 +345,9 @@ export class SetupPreview {
 		if (report.settingsMissing) {
 			lines.push(`Note: ${PLUGINS_SETTINGS_FILE} not found.`);
 		}
+		if (report.appearance) {
+			lines.push(report.appearance);
+		}
 
 		lines.push("");
 
@@ -398,6 +446,12 @@ export class SetupPreviewModal extends Modal {
 			contentEl.createDiv({
 				cls: "community-install-manager-preview-note",
 				text: `${PLUGINS_SETTINGS_FILE} was not found.`,
+			});
+		}
+		if (this.report.appearance) {
+			contentEl.createDiv({
+				cls: "community-install-manager-preview-note",
+				text: this.report.appearance,
 			});
 		}
 

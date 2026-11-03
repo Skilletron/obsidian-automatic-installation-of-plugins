@@ -21,11 +21,17 @@ import {
 	updatePinsInList,
 } from "./src/core/UpdateChecker";
 import { UpdatesModal } from "./src/core/UpdatesModal";
+import {
+	AppearanceApplier,
+	liveAppearance,
+	parseAppearance,
+} from "./src/core/Appearance";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
 	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
+	APPEARANCE_FILE,
 } from "./src/types";
 import {
 	isForThisDevice,
@@ -44,6 +50,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	setupPreview!: SetupPreview;
 	settingsBackup!: SettingsBackup;
 	updateChecker!: UpdateChecker;
+	appearanceApplier!: AppearanceApplier;
 	private busy = false;
 
 	async onload() {
@@ -73,8 +80,18 @@ export default class InstallCommunityPlugins extends Plugin {
 				extraKeys: parseSecretKeys(this.settings.extraSecretKeys),
 			}),
 			this.settingsBackup,
+			() => this.settings.syncAppearance,
+			() => liveAppearance(this.app),
 		);
-		this.setupPreview = new SetupPreview(this.fileManager);
+		this.appearanceApplier = new AppearanceApplier(
+			this.app,
+			this.fileManager,
+			this.networkManager,
+			this.settingsBackup,
+		);
+		this.setupPreview = new SetupPreview(this.fileManager, undefined, () =>
+			liveAppearance(this.app),
+		);
 		this.updateChecker = new UpdateChecker(
 			this.fileManager,
 			this.networkManager,
@@ -175,6 +192,41 @@ export default class InstallCommunityPlugins extends Plugin {
 		await this.runExclusive(() =>
 			this.withBackup("Import", () => this.installPluginsFromFile()),
 		);
+	}
+
+	// Applies community-appearance.json if syncing it is on. Returns notes
+	// for the import summary.
+	private async applyAppearanceFile(
+		progress: ProgressNotice,
+	): Promise<string[]> {
+		const path = this.fileManager.configPath(APPEARANCE_FILE);
+		if (!this.settings.syncAppearance || !(await this.fileManager.exists(path))) {
+			return [];
+		}
+		let setup = null;
+		try {
+			setup = parseAppearance(
+				JSON.parse((await this.fileManager.readFile(path)) ?? ""),
+			);
+		} catch (err: unknown) {
+			logger.warn(`Invalid JSON in ${APPEARANCE_FILE}:`, err);
+		}
+		if (!setup) {
+			return [`${APPEARANCE_FILE} is not valid, so the theme and snippets were skipped.`];
+		}
+
+		progress.setDetail("Applying theme and CSS snippets");
+		const result = await this.appearanceApplier.apply(setup);
+		const notes: string[] = [];
+		if (result.theme) {
+			notes.push(`${result.theme}.`);
+		}
+		if (result.snippetsWritten > 0) {
+			notes.push(
+				`Added or updated ${result.snippetsWritten} CSS snippet${result.snippetsWritten === 1 ? "" : "s"}.`,
+			);
+		}
+		return [...notes, ...result.problems];
 	}
 
 	async exportPluginSetup(): Promise<void> {
@@ -392,6 +444,7 @@ export default class InstallCommunityPlugins extends Plugin {
 		try {
 			const report = await this.setupPreview.buildReport(
 				this.settings.loadSettingsOnInstall,
+				this.settings.syncAppearance,
 			);
 			if (!report) {
 				return;
@@ -424,6 +477,10 @@ export default class InstallCommunityPlugins extends Plugin {
 		// user turns this on; new installs leave secrets out.
 		if (data && data.redactSecretsOnExport === undefined) {
 			this.settings.redactSecretsOnExport = false;
+		}
+		// Same for themes and snippets: existing installs opt in.
+		if (data && data.syncAppearance === undefined) {
+			this.settings.syncAppearance = false;
 		}
 
 		this.applyLogLevel(this.settings.logLevel || "error");
@@ -562,7 +619,9 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (entries.length === 0) {
-				progress.finish("No plugins to install.");
+				const appearanceNotes = await this.applyAppearanceFile(progress);
+				progress.setTitle("Import finished");
+				progress.finish(["No plugins to install.", ...appearanceNotes].join(" "));
 				return;
 			}
 
@@ -651,6 +710,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				);
 			}
 			notes.push(...failed);
+			notes.push(...(await this.applyAppearanceFile(progress)));
 
 			const changed = newlyInstalled.length + keptOff.length;
 			const summary =
@@ -944,6 +1004,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				},
 			},
 			{
+				name: "Sync theme and CSS snippets",
+				desc: "Export saves your community theme and CSS snippets to community-appearance.json, and import installs and switches to that theme and adds the snippets.",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.syncAppearance)
+							.onChange(async (value) => {
+								this.plugin.settings.syncAppearance = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+				},
+			},
+			{
 				name: "Logging level",
 				desc: "How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
 				render: (setting: Setting) => {
@@ -1098,6 +1172,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.extraSecretKeys)
 					.onChange(async (value) => {
 						this.plugin.settings.extraSecretKeys = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Sync theme and CSS snippets")
+			.setDesc(
+				"Export saves your community theme and CSS snippets to community-appearance.json, and import installs and switches to that theme and adds the snippets.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.syncAppearance)
+					.onChange(async (value) => {
+						this.plugin.settings.syncAppearance = value;
 						await this.plugin.saveSettings();
 					}),
 			);

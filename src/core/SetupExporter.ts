@@ -10,6 +10,8 @@ import { scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { redactSecrets } from "../utils/secrets";
 import { parseDevices } from "../utils/parsePluginList";
+import { LiveAppearance, readAppearance } from "./Appearance";
+import { APPEARANCE_FILE } from "../types";
 import { logger } from "../utils/Logger";
 
 export interface SecretOptions {
@@ -38,6 +40,8 @@ export class SetupExporter {
 			extraKeys: [],
 		}),
 		private backup?: SettingsBackup,
+		private includeAppearance: () => boolean = () => false,
+		private liveAppearance: () => LiveAppearance | null = () => null,
 	) {}
 
 	async listInstalledPlugins(): Promise<ExportedPlugin[]> {
@@ -170,6 +174,26 @@ export class SetupExporter {
 			throw new Error("could not write the setup JSON files");
 		}
 
+		let appearanceNote = "";
+		if (this.includeAppearance()) {
+			const appearance = await readAppearance(
+				this.fileManager,
+				this.liveAppearance(),
+			);
+			const appearancePath = this.fileManager.configPath(APPEARANCE_FILE);
+			await this.backup?.capture(appearancePath);
+			if (
+				await this.fileManager.writeFile(
+					appearancePath,
+					`${JSON.stringify(appearance, null, 2)}\n`,
+				)
+			) {
+				const count = Object.keys(appearance.snippets).length;
+				const theme = appearance.theme?.name || "the default theme";
+				appearanceNote = ` Also saved ${theme} and ${count} CSS snippet${count === 1 ? "" : "s"}.`;
+			}
+		}
+
 		const settingsCount = Object.keys(settings).length;
 		const pinnedCount = installed.filter((p) => p.version).length;
 		const keptNote =
@@ -180,7 +204,7 @@ export class SetupExporter {
 			redactedCount > 0
 				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
 				: "";
-		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}`;
+		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}${appearanceNote}`;
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
 		);
