@@ -245,29 +245,21 @@ export class PluginInstaller {
 				`Installing "${normalizedId}" via Obsidian installPlugin (${pluginMeta.repo}@${version})`,
 			);
 
-			// The import shows its own progress, so hide the "installing" and
-			// "installed" notices Obsidian shows for each plugin. Failures
-			// still get a notice from this plugin below.
-			const stopHiding = hideNoticesMentioning(manifest.name);
 			try {
-				try {
-					await pluginsApi.installPlugin(
-						pluginMeta.repo,
-						version,
-						manifest,
-					);
-				} catch (firstErr: unknown) {
-					const alt = version.startsWith("v")
-						? version.slice(1)
-						: `v${version}`;
-					logger.debug(
-						`installPlugin(${version}) failed, retrying with ${alt}`,
-						firstErr,
-					);
-					await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
-				}
-			} finally {
-				stopHiding();
+				await pluginsApi.installPlugin(
+					pluginMeta.repo,
+					version,
+					manifest,
+				);
+			} catch (firstErr: unknown) {
+				const alt = version.startsWith("v")
+					? version.slice(1)
+					: `v${version}`;
+				logger.debug(
+					`installPlugin(${version}) failed, retrying with ${alt}`,
+					firstErr,
+				);
+				await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
 			}
 
 			if (typeof pluginsApi.loadManifests === "function") {
@@ -393,35 +385,4 @@ export class PluginInstaller {
 		}
 		return null;
 	}
-}
-
-// Until the returned function is called, removes new notices whose text
-// contains `name`. Notices already on screen (the import progress) stay.
-function hideNoticesMentioning(name: string): () => void {
-	const body = typeof document === "undefined" ? undefined : document.body;
-	if (
-		!name ||
-		typeof MutationObserver === "undefined" ||
-		typeof body?.findAll !== "function"
-	) {
-		return () => {};
-	}
-	const before = new Set<Element>(body.findAll(".notice"));
-	const sweep = () => {
-		for (const notice of body.findAll(".notice")) {
-			if (!before.has(notice) && notice.textContent?.includes(name)) {
-				notice.remove();
-			}
-		}
-	};
-	const observer = new MutationObserver(sweep);
-	observer.observe(body, {
-		childList: true,
-		subtree: true,
-		characterData: true,
-	});
-	return () => {
-		sweep();
-		observer.disconnect();
-	};
 }
