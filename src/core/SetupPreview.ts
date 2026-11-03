@@ -11,6 +11,13 @@ import {
 	parsePluginList,
 } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
+import {
+	LiveVaultState,
+	describeVaultSetupChanges,
+	parseVaultSetup,
+	readVaultSetup,
+} from "./VaultSetup";
+import { VAULT_SETUP_FILE } from "../types";
 
 export type InstallPreviewAction =
 	| "install"
@@ -49,12 +56,15 @@ export interface SetupPreviewReport {
 	};
 	listMissing: boolean;
 	settingsMissing: boolean;
+	// Theme and snippet changes, when vault-setup.json is used.
+	vaultSetup?: string;
 }
 
 export class SetupPreview {
 	constructor(
 		private fileManager: FileManager,
 		private isMobile: () => boolean = () => Platform.isMobile,
+		private liveVaultState: () => LiveVaultState | null = () => null,
 	) {}
 
 	private async isFullyInstalled(pluginId: string): Promise<boolean> {
@@ -96,6 +106,41 @@ export class SetupPreview {
 	}
 
 	async buildReport(
+		loadSettingsOnInstall: boolean,
+		includeVaultSetup = false
+	): Promise<SetupPreviewReport | null> {
+		const report = await this.buildPluginReport(loadSettingsOnInstall);
+		if (report && includeVaultSetup) {
+			const vaultSetup = await this.describeVaultSetup();
+			if (vaultSetup) {
+				report.vaultSetup = vaultSetup;
+			}
+		}
+		return report;
+	}
+
+	private async describeVaultSetup(): Promise<string | null> {
+		const path = this.fileManager.configPath(VAULT_SETUP_FILE);
+		if (!(await this.fileManager.exists(path))) {
+			return null;
+		}
+		try {
+			const wanted = parseVaultSetup(
+				JSON.parse((await this.fileManager.readFile(path)) ?? "")
+			);
+			if (!wanted) {
+				return `${VAULT_SETUP_FILE} is not valid`;
+			}
+			return describeVaultSetupChanges(
+				wanted,
+				await readVaultSetup(this.fileManager, this.liveVaultState())
+			);
+		} catch {
+			return `${VAULT_SETUP_FILE} is not valid JSON`;
+		}
+	}
+
+	private async buildPluginReport(
 		loadSettingsOnInstall: boolean
 	): Promise<SetupPreviewReport | null> {
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
@@ -300,6 +345,9 @@ export class SetupPreview {
 		if (report.settingsMissing) {
 			lines.push(`Note: ${PLUGINS_SETTINGS_FILE} not found.`);
 		}
+		if (report.vaultSetup) {
+			lines.push(report.vaultSetup);
+		}
 
 		lines.push("");
 
@@ -398,6 +446,12 @@ export class SetupPreviewModal extends Modal {
 			contentEl.createDiv({
 				cls: "community-install-manager-preview-note",
 				text: `${PLUGINS_SETTINGS_FILE} was not found.`,
+			});
+		}
+		if (this.report.vaultSetup) {
+			contentEl.createDiv({
+				cls: "community-install-manager-preview-note",
+				text: this.report.vaultSetup,
 			});
 		}
 

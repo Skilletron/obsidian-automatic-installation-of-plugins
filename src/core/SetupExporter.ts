@@ -10,6 +10,8 @@ import { scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { redactSecrets } from "../utils/secrets";
 import { parseDevices } from "../utils/parsePluginList";
+import { LiveVaultState, readVaultSetup } from "./VaultSetup";
+import { VAULT_SETUP_FILE } from "../types";
 import { logger } from "../utils/Logger";
 
 export interface SecretOptions {
@@ -38,6 +40,8 @@ export class SetupExporter {
 			extraKeys: [],
 		}),
 		private backup?: SettingsBackup,
+		private includeVaultSetup: () => boolean = () => false,
+		private liveVaultState: () => LiveVaultState | null = () => null,
 	) {}
 
 	async listInstalledPlugins(): Promise<ExportedPlugin[]> {
@@ -170,6 +174,27 @@ export class SetupExporter {
 			throw new Error("could not write the setup JSON files");
 		}
 
+		let setupNote = "";
+		if (this.includeVaultSetup()) {
+			const vaultSetup = await readVaultSetup(
+				this.fileManager,
+				this.liveVaultState(),
+			);
+			const setupPath = this.fileManager.configPath(VAULT_SETUP_FILE);
+			await this.backup?.capture(setupPath);
+			if (
+				await this.fileManager.writeFile(
+					setupPath,
+					`${JSON.stringify(vaultSetup, null, 2)}\n`,
+				)
+			) {
+				const count = Object.keys(vaultSetup.snippets).length;
+				const hotkeys = Object.keys(vaultSetup.hotkeys ?? {}).length;
+				const theme = vaultSetup.theme?.name || "the default theme";
+				setupNote = ` Also saved ${theme}, ${count} CSS snippet${count === 1 ? "" : "s"}, ${hotkeys} custom hotkey${hotkeys === 1 ? "" : "s"} and your core plugins to ${VAULT_SETUP_FILE}.`;
+			}
+		}
+
 		const settingsCount = Object.keys(settings).length;
 		const pinnedCount = installed.filter((p) => p.version).length;
 		const keptNote =
@@ -180,7 +205,7 @@ export class SetupExporter {
 			redactedCount > 0
 				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
 				: "";
-		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}`;
+		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}${setupNote}`;
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
 		);

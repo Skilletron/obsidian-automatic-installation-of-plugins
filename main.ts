@@ -21,11 +21,17 @@ import {
 	updatePinsInList,
 } from "./src/core/UpdateChecker";
 import { UpdatesModal } from "./src/core/UpdatesModal";
+import {
+	VaultSetupApplier,
+	liveVaultState,
+	parseVaultSetup,
+} from "./src/core/VaultSetup";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
 	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
+	VAULT_SETUP_FILE,
 } from "./src/types";
 import {
 	isForThisDevice,
@@ -44,6 +50,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	setupPreview!: SetupPreview;
 	settingsBackup!: SettingsBackup;
 	updateChecker!: UpdateChecker;
+	vaultSetupApplier!: VaultSetupApplier;
 	private busy = false;
 
 	async onload() {
@@ -73,8 +80,18 @@ export default class InstallCommunityPlugins extends Plugin {
 				extraKeys: parseSecretKeys(this.settings.extraSecretKeys),
 			}),
 			this.settingsBackup,
+			() => this.settings.syncVaultSetup,
+			() => liveVaultState(this.app),
 		);
-		this.setupPreview = new SetupPreview(this.fileManager);
+		this.vaultSetupApplier = new VaultSetupApplier(
+			this.app,
+			this.fileManager,
+			this.networkManager,
+			this.settingsBackup,
+		);
+		this.setupPreview = new SetupPreview(this.fileManager, undefined, () =>
+			liveVaultState(this.app),
+		);
 		this.updateChecker = new UpdateChecker(
 			this.fileManager,
 			this.networkManager,
@@ -175,6 +192,51 @@ export default class InstallCommunityPlugins extends Plugin {
 		await this.runExclusive(() =>
 			this.withBackup("Import", () => this.installPluginsFromFile()),
 		);
+	}
+
+	// Applies vault-setup.json if syncing it is on. Returns notes
+	// for the import summary.
+	private async applyVaultSetupFile(
+		progress: ProgressNotice,
+	): Promise<string[]> {
+		const path = this.fileManager.configPath(VAULT_SETUP_FILE);
+		if (!this.settings.syncVaultSetup || !(await this.fileManager.exists(path))) {
+			return [];
+		}
+		let setup = null;
+		try {
+			setup = parseVaultSetup(
+				JSON.parse((await this.fileManager.readFile(path)) ?? ""),
+			);
+		} catch (err: unknown) {
+			logger.warn(`Invalid JSON in ${VAULT_SETUP_FILE}:`, err);
+		}
+		if (!setup) {
+			return [`${VAULT_SETUP_FILE} is not valid, so it was skipped.`];
+		}
+
+		progress.setDetail("Applying theme, snippets, hotkeys and core plugins");
+		const result = await this.vaultSetupApplier.apply(setup);
+		const notes: string[] = [];
+		if (result.theme) {
+			notes.push(`${result.theme}.`);
+		}
+		if (result.snippetsWritten > 0) {
+			notes.push(
+				`Added or updated ${result.snippetsWritten} CSS snippet${result.snippetsWritten === 1 ? "" : "s"}.`,
+			);
+		}
+		if (result.hotkeysChanged > 0) {
+			notes.push(
+				`Set hotkeys for ${result.hotkeysChanged} command${result.hotkeysChanged === 1 ? "" : "s"}.`,
+			);
+		}
+		if (result.corePluginsOn + result.corePluginsOff > 0) {
+			notes.push(
+				`Core plugins: turned on ${result.corePluginsOn}, turned off ${result.corePluginsOff}.`,
+			);
+		}
+		return [...notes, ...result.problems];
 	}
 
 	async exportPluginSetup(): Promise<void> {
@@ -392,6 +454,7 @@ export default class InstallCommunityPlugins extends Plugin {
 		try {
 			const report = await this.setupPreview.buildReport(
 				this.settings.loadSettingsOnInstall,
+				this.settings.syncVaultSetup,
 			);
 			if (!report) {
 				return;
@@ -424,6 +487,10 @@ export default class InstallCommunityPlugins extends Plugin {
 		// user turns this on; new installs leave secrets out.
 		if (data && data.redactSecretsOnExport === undefined) {
 			this.settings.redactSecretsOnExport = false;
+		}
+		// Same for themes and snippets: existing installs opt in.
+		if (data && data.syncVaultSetup === undefined) {
+			this.settings.syncVaultSetup = false;
 		}
 
 		this.applyLogLevel(this.settings.logLevel || "error");
@@ -562,7 +629,9 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			if (entries.length === 0) {
-				progress.finish("No plugins to install.");
+				const setupNotes = await this.applyVaultSetupFile(progress);
+				progress.setTitle("Import finished");
+				progress.finish(["No plugins to install.", ...setupNotes].join(" "));
 				return;
 			}
 
@@ -651,6 +720,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				);
 			}
 			notes.push(...failed);
+			notes.push(...(await this.applyVaultSetupFile(progress)));
 
 			const changed = newlyInstalled.length + keptOff.length;
 			const summary =
@@ -944,6 +1014,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				},
 			},
 			{
+				name: "Sync theme, snippets, hotkeys and core plugins",
+				desc: "Export saves your community theme, CSS snippets, custom hotkeys and which core plugins are on to vault-setup.json. Import applies them on the other device.",
+				render: (setting: Setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.syncVaultSetup)
+							.onChange(async (value) => {
+								this.plugin.settings.syncVaultSetup = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+				},
+			},
+			{
 				name: "Logging level",
 				desc: "How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
 				render: (setting: Setting) => {
@@ -1098,6 +1182,20 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.extraSecretKeys)
 					.onChange(async (value) => {
 						this.plugin.settings.extraSecretKeys = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Sync theme, snippets, hotkeys and core plugins")
+			.setDesc(
+				"Export saves your community theme, CSS snippets, custom hotkeys and which core plugins are on to vault-setup.json. Import applies them on the other device.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.syncVaultSetup)
+					.onChange(async (value) => {
+						this.plugin.settings.syncVaultSetup = value;
 						await this.plugin.saveSettings();
 					}),
 			);

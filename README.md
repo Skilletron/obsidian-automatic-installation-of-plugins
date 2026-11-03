@@ -12,6 +12,7 @@ The plugin reads two files in your vault’s `.obsidian` folder:
 
 - `community-plugins-list.json` — which community plugins to install (optionally with pinned versions)
 - `community-plugins-settings.json` — settings to apply to those plugins
+- `vault-setup.json` — your theme, CSS snippets, custom hotkeys and core plugins (optional)
 
 You can **export** your current vault setup into those files, **preview** what an import would do, then **import** on another machine.
 
@@ -64,7 +65,8 @@ No telemetry. Network use happens only when you import/install (or when auto-ins
 .vault/
 └── .obsidian/
     ├── community-plugins-list.json
-    └── community-plugins-settings.json
+    ├── community-plugins-settings.json
+    └── vault-setup.json   (optional)
 ```
 
 ### Plugin list — `community-plugins-list.json`
@@ -123,6 +125,29 @@ Maps plugin IDs to settings objects applied to each plugin:
 }
 ```
 
+### Theme, snippets, hotkeys and core plugins — `vault-setup.json`
+
+```json
+{
+  "theme": { "name": "Minimal", "version": "9.1.3" },
+  "snippets": {
+    "my-tweaks": { "enabled": true, "css": "body { --line-width: 44rem; }" }
+  },
+  "hotkeys": {
+    "editor:toggle-bold": [{ "modifiers": ["Mod", "Shift"], "key": "B" }]
+  },
+  "corePlugins": { "daily-notes": true, "graph": false }
+}
+```
+
+- `theme`: a community theme by its name in the theme browser, optionally pinned to a version. Import installs it if needed and switches to it. `"name": ""` switches back to the default theme. Leave `theme` out to keep whatever theme each device has.
+- `snippets`: CSS snippets by file name (without `.css`). Import writes new and changed ones; snippets it creates follow `enabled`, snippets that already exist keep their on/off state.
+
+- `hotkeys`: custom hotkeys by command id, in the same format as Obsidian's `hotkeys.json` (`Mod` is Ctrl on Windows and Linux, Cmd on macOS). Import sets them for the listed commands; other commands keep their hotkeys. An empty list removes a command's default hotkey.
+- `corePlugins`: core plugins by id, `true` for on and `false` for off. Import turns them on or off to match. Core plugins that this Obsidian version or device doesn't have are skipped.
+
+Every part is optional. Export writes all four for you when **Sync theme, snippets, hotkeys and core plugins** is on. Undo puts snippet files back, but it doesn't switch the theme back or undo hotkey and core plugin changes.
+
 ## Quick start
 
 1. On a vault that already has the plugins you want: Command Palette → **Export plugin setup to JSON**
@@ -154,6 +179,7 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Run automatic actions on mobile | Off | Let auto-install and sync on startup run on phones and tablets too |
 | Leave out secrets on export | On (off if you used the plugin before 1.3.0) | Replace tokens, passwords and API keys with a placeholder in the exported settings |
 | Extra secret setting names | — | More setting names to leave out, comma-separated |
+| Sync theme, snippets, hotkeys and core plugins | On (off if you used the plugin before 1.3.0) | Export and import them through `vault-setup.json` |
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
