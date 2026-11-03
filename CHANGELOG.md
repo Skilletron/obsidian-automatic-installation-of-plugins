@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import skips desktop-only plugins on mobile with a notice instead of failing
 - Export on mobile keeps list and settings entries for plugins not installed on that device
 - **Leave out secrets on export** (on for new installs, off for existing ones until turned on): tokens, passwords, API keys and similar values are replaced with a placeholder in the exported settings file; extra names can be added. Import and Apply settings never write the placeholder and keep the plugin's current value
+- Optional `devices` (`"desktop"`, `"mobile"` or both) and `enabled` fields in plugin list entries: Import skips plugins meant for other devices and installs `enabled: false` plugins without turning them on; Preview shows both. Export writes `enabled: false` for turned-off plugins and `devices: ["desktop"]` for desktop-only ones, and keeps `devices` and any custom fields you added
 - **Undo last change** command and button: restores the files changed by the last Import, Apply settings or Export and reloads affected plugins; the last 10 changes are kept
 - Unit tests (vitest) and a CI workflow that runs lint, tests, and build on pushes and pull requests
 - End-to-end tests in a real Obsidian (wdio-obsidian-service) on the minimum supported version and the latest one: import, re-import, version change, apply settings, export (`npm run test:e2e`, also run in CI)

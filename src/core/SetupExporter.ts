@@ -9,6 +9,7 @@ import {
 import { scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { redactSecrets } from "../utils/secrets";
+import { parseDevices } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
 
 export interface SecretOptions {
@@ -21,7 +22,12 @@ interface ExportedPlugin {
 	folderName: string;
 	pluginId: string;
 	version?: string;
+	isDesktopOnly?: true;
 }
+
+// Fields Export writes itself; any other field in an existing list entry
+// (a note, settings for a future version) is kept as it was.
+const MANAGED_FIELDS = new Set(["id", "version", "enabled", "devices"]);
 
 export class SetupExporter {
 	constructor(
@@ -39,7 +45,13 @@ export class SetupExporter {
 		const installed: ExportedPlugin[] = [];
 		const seenIds = new Set<string>();
 
-		for (const { folderName, pluginId, version, complete } of scanned) {
+		for (const {
+			folderName,
+			pluginId,
+			version,
+			complete,
+			isDesktopOnly,
+		} of scanned) {
 			if (
 				!complete ||
 				folderName === PLUGIN_ID ||
@@ -49,7 +61,11 @@ export class SetupExporter {
 				continue;
 			}
 			seenIds.add(pluginId);
-			installed.push({ folderName, pluginId, version });
+			const plugin: ExportedPlugin = { folderName, pluginId, version };
+			if (isDesktopOnly) {
+				plugin.isDesktopOnly = true;
+			}
+			installed.push(plugin);
 		}
 
 		installed.sort((a, b) => a.pluginId.localeCompare(b.pluginId));
@@ -63,13 +79,11 @@ export class SetupExporter {
 		redactedCount: number;
 	}> {
 		const installed = await this.listInstalledPlugins();
-		const listEntries: unknown[] = installed.map((p) => {
-			const entry: PluginListEntry = { id: p.pluginId };
-			if (p.version) {
-				entry.version = p.version;
-			}
-			return entry;
-		});
+		const enabledIds = await this.readEnabledIds();
+		const existingEntries = await this.readExistingEntries();
+		const listEntries: unknown[] = installed.map((p) =>
+			this.buildEntry(p, enabledIds, existingEntries.get(p.pluginId)),
+		);
 		const settings: Record<string, unknown> = {};
 		const { redact, extraKeys } = this.secretOptions();
 		let redactedCount = 0;
@@ -180,6 +194,73 @@ export class SetupExporter {
 			settingsCount,
 			redactedCount,
 		};
+	}
+
+	private buildEntry(
+		plugin: ExportedPlugin,
+		enabledIds: Set<string> | null,
+		existing: Record<string, unknown> | undefined,
+	): Record<string, unknown> {
+		const entry: PluginListEntry = { id: plugin.pluginId };
+		if (plugin.version) {
+			entry.version = plugin.version;
+		}
+		if (enabledIds && !enabledIds.has(plugin.pluginId)) {
+			entry.enabled = false;
+		}
+		// Keep devices someone set by hand; otherwise mark desktop-only
+		// plugins so phones skip them without asking GitHub.
+		const devices =
+			existing?.devices !== undefined ? parseDevices(existing.devices) : null;
+		if (devices) {
+			entry.devices = devices;
+		} else if (plugin.isDesktopOnly) {
+			entry.devices = ["desktop"];
+		}
+
+		const result: Record<string, unknown> = { ...entry };
+		for (const [key, value] of Object.entries(existing ?? {})) {
+			if (!MANAGED_FIELDS.has(key) && key !== "__proto__") {
+				result[key] = value;
+			}
+		}
+		return result;
+	}
+
+	// Ids from community-plugins.json, or null if it cannot be read.
+	private async readEnabledIds(): Promise<Set<string> | null> {
+		const enabled = await this.readJson(
+			this.fileManager.configPath("community-plugins.json"),
+		);
+		return Array.isArray(enabled)
+			? new Set(enabled.filter((id): id is string => typeof id === "string"))
+			: null;
+	}
+
+	// Object entries of the current list file, by id.
+	private async readExistingEntries(): Promise<
+		Map<string, Record<string, unknown>>
+	> {
+		const entries = new Map<string, Record<string, unknown>>();
+		const raw = await this.readJson(
+			this.fileManager.configPath(PLUGINS_LIST_FILE),
+		);
+		if (!Array.isArray(raw)) {
+			return entries;
+		}
+		for (const item of raw) {
+			const id = listItemId(item);
+			if (
+				id &&
+				!entries.has(id) &&
+				item !== null &&
+				typeof item === "object" &&
+				!Array.isArray(item)
+			) {
+				entries.set(id, item as Record<string, unknown>);
+			}
+		}
+		return entries;
 	}
 
 	// Entries from the current files whose plugin is not installed here.

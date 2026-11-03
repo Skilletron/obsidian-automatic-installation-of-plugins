@@ -90,3 +90,16 @@ describe("findPluginFolder", () => {
 		expect(findPluginFolder(installed, "missing")).toBeUndefined();
 	});
 });
+
+describe("scanInstalledPlugins isDesktopOnly", () => {
+	it("flags desktop-only plugins", async () => {
+		const { fileManager } = createTestVault({
+			...installedPlugin("git", { id: "git", isDesktopOnly: true }),
+			...installedPlugin("cal", { id: "cal", isDesktopOnly: false }),
+		});
+		const scanned = await scanInstalledPlugins(fileManager);
+		const byId = Object.fromEntries(scanned.map((p) => [p.pluginId, p]));
+		expect(byId.git.isDesktopOnly).toBe(true);
+		expect(byId.cal.isDesktopOnly).toBeUndefined();
+	});
+});

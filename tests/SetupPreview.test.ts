@@ -7,9 +7,9 @@ import { createTestVault, installedPlugin } from "./helpers";
 const LIST_PATH = `.obsidian/${PLUGINS_LIST_FILE}`;
 const SETTINGS_PATH = `.obsidian/${PLUGINS_SETTINGS_FILE}`;
 
-function preview(files: Record<string, string>) {
+function preview(files: Record<string, string>, isMobile = false) {
 	const vault = createTestVault(files);
-	return new SetupPreview(vault.fileManager);
+	return new SetupPreview(vault.fileManager, () => isMobile);
 }
 
 describe("SetupPreview.buildReport", () => {
@@ -165,5 +165,37 @@ describe("SetupPreview.formatReportText", () => {
 		const p = preview({ [LIST_PATH]: "[]" });
 		const text = p.formatReportText((await p.buildReport(true))!);
 		expect(text).toContain("(empty list)");
+	});
+});
+
+describe("SetupPreview with devices and enabled", () => {
+	const files = {
+		[LIST_PATH]: JSON.stringify([
+			{ id: "git", devices: "desktop" },
+			{ id: "calendar", enabled: false },
+		]),
+	};
+
+	it("marks plugins listed for other devices", async () => {
+		const report = await preview(files, true).buildReport(true);
+		expect(report?.summary.otherDevice).toBe(1);
+		expect(report?.summary.install).toBe(1);
+		expect(report?.rows[0]).toMatchObject({
+			id: "git",
+			installAction: "other-device",
+			settingsAction: "other-device",
+		});
+		expect(report?.rows[0].installNote).toContain("desktop only");
+	});
+
+	it("installs them on the right device", async () => {
+		const report = await preview(files, false).buildReport(true);
+		expect(report?.summary.otherDevice).toBe(0);
+		expect(report?.summary.install).toBe(2);
+	});
+
+	it("notes plugins that stay turned off", async () => {
+		const report = await preview(files, false).buildReport(true);
+		expect(report?.rows[1].installNote).toContain("left turned off");
 	});
 });

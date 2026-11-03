@@ -92,6 +92,21 @@ No telemetry. Network use happens only when you import/install (or when auto-ins
 
 You can mix plain IDs and `{ "id", "version" }` objects. Export writes pinned objects from your currently installed versions.
 
+**Per device and on/off** (optional fields):
+
+```json
+[
+  { "id": "obsidian-git", "devices": "desktop" },
+  { "id": "calendar", "devices": ["desktop", "mobile"] },
+  { "id": "dataview", "enabled": false }
+]
+```
+
+- `devices`: `"desktop"`, `"mobile"` or both. Import skips the plugin on other kinds of device, and Preview shows it as "Other device". Without it, the plugin is for every device.
+- `enabled: false`: Import installs the plugin but leaves it turned off. Plugins that are already installed keep their on/off state either way.
+
+Export fills these in for you: `enabled: false` for plugins that are turned off, and `devices: ["desktop"]` for desktop-only plugins. If you set `devices` or add your own fields (a `note`, for example), Export keeps them. Older versions of the plugin ignore these fields.
+
 ### Plugin settings — `community-plugins-settings.json`
 
 Maps plugin IDs to settings objects applied to each plugin:
