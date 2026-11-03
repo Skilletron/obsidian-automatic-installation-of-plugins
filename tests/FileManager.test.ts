@@ -117,3 +117,17 @@ describe("FileManager", () => {
 		});
 	});
 });
+
+describe("FileManager.writeFile on slow storage", () => {
+	it("waits until the new content reads back", async () => {
+		const { fileManager, adapter } = createTestVault();
+		const read = adapter.read.bind(adapter);
+		let staleReads = 2;
+		adapter.read = async (path: string) =>
+			staleReads-- > 0 ? "" : read(path);
+
+		expect(await fileManager.writeFile(".obsidian/a.json", "{}")).toBe(true);
+		expect(staleReads).toBeLessThan(0);
+		expect(await fileManager.readFile(".obsidian/a.json")).toBe("{}");
+	});
+});

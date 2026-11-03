@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import { SetupPreview } from "../src/core/SetupPreview";
 import { PLUGINS_LIST_FILE, PLUGINS_SETTINGS_FILE } from "../src/types";
 import { createTestVault, installedPlugin } from "./helpers";
+import { SettingsManager } from "../src/core/SettingsManager";
 
 const LIST_PATH = `.obsidian/${PLUGINS_LIST_FILE}`;
 const SETTINGS_PATH = `.obsidian/${PLUGINS_SETTINGS_FILE}`;
@@ -197,5 +198,35 @@ describe("SetupPreview with devices and enabled", () => {
 	it("notes plugins that stay turned off", async () => {
 		const report = await preview(files, false).buildReport(true);
 		expect(report?.rows[1].installNote).toContain("left turned off");
+	});
+});
+
+describe("SetupPreview settings changes", () => {
+	it("lists what applying the settings would change", async () => {
+		const vault = createTestVault({
+			...installedPlugin("dataview", { id: "dataview" }, { refresh: 100, keep: true }),
+			[LIST_PATH]: JSON.stringify(["dataview", "calendar"]),
+			[SETTINGS_PATH]: JSON.stringify({
+				dataview: { refresh: 500 },
+				calendar: { weekStart: "monday" },
+			}),
+		});
+		const preview = new SetupPreview(
+			vault.fileManager,
+			() => false,
+			() => null,
+			new SettingsManager(vault.fileManager, () => true),
+		);
+		const report = await preview.buildReport(true);
+		const [dataview, calendar] = report!.rows;
+
+		expect(dataview.settingsChanges).toEqual([
+			{ path: "refresh", kind: "changed", before: 100, after: 500 },
+		]);
+		expect(dataview.settingsNote).toContain("(1 change)");
+		expect(calendar.settingsChanges).toEqual([
+			{ path: "weekStart", kind: "added", after: "monday" },
+		]);
+		expect(preview.formatReportText(report!)).toContain("refresh: 100 → 500");
 	});
 });

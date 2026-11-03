@@ -6,6 +6,7 @@ import { logger } from "../utils/Logger";
 import { findPluginFolder, scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { restoreSecrets } from "../utils/secrets";
+import { SettingChange, diffSettings } from "../utils/settingsDiff";
 
 // Assigning "__proto__" would replace the result's prototype instead of
 // copying the value.
@@ -138,19 +139,39 @@ export class SettingsManager {
 		return targets;
 	}
 
+	// What data.json would contain after writing `target`, next to what it
+	// contains now.
+	private async buildPayload(target: SettingsTarget): Promise<{
+		dataJsonPath: string;
+		existing: unknown;
+		payload: unknown;
+	}> {
+		const dataJsonPath = this.fileManager.pluginsPath(
+			target.folderName,
+			"data.json",
+		);
+		const existing = await this.readExisting(dataJsonPath);
+		// Values removed on export keep what the plugin has now.
+		const incoming = restoreSecrets(target.settings, existing);
+		const payload =
+			this.shouldMergeSettings() && existing !== undefined
+				? mergeSettingsObjects(existing, incoming)
+				: incoming;
+		return { dataJsonPath, existing, payload };
+	}
+
+	// The changes writeSettings would make, without writing anything.
+	async previewSettings(target: SettingsTarget): Promise<SettingChange[]> {
+		if (!isSafePluginId(target.folderName)) {
+			return [];
+		}
+		const { existing, payload } = await this.buildPayload(target);
+		return payload === undefined ? [] : diffSettings(existing ?? {}, payload);
+	}
+
 	async writeSettings(target: SettingsTarget): Promise<boolean> {
 		try {
-			const dataJsonPath = this.fileManager.pluginsPath(
-				target.folderName,
-				"data.json",
-			);
-			const existing = await this.readExisting(dataJsonPath);
-			// Values removed on export keep what the plugin has now.
-			const incoming = restoreSecrets(target.settings, existing);
-			const payload =
-				this.shouldMergeSettings() && existing !== undefined
-					? mergeSettingsObjects(existing, incoming)
-					: incoming;
+			const { dataJsonPath, payload } = await this.buildPayload(target);
 			if (payload === undefined) {
 				return false;
 			}

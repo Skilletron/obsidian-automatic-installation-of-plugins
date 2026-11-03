@@ -89,8 +89,11 @@ export default class InstallCommunityPlugins extends Plugin {
 			this.networkManager,
 			this.settingsBackup,
 		);
-		this.setupPreview = new SetupPreview(this.fileManager, undefined, () =>
-			liveVaultState(this.app),
+		this.setupPreview = new SetupPreview(
+			this.fileManager,
+			undefined,
+			() => liveVaultState(this.app),
+			this.settingsManager,
 		);
 		this.updateChecker = new UpdateChecker(
 			this.fileManager,
