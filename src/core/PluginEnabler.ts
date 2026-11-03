@@ -185,10 +185,7 @@ export class PluginEnabler {
 	}
 
 	private isLoaded(pluginsApi: PluginsAPI, pluginId: string): boolean {
-		return Object.prototype.hasOwnProperty.call(
-			pluginsApi.plugins ?? {},
-			pluginId,
-		);
+		return pluginId in (pluginsApi.plugins ?? {});
 	}
 
 	// Runs `task` (which writes plugin files such as data.json) while the

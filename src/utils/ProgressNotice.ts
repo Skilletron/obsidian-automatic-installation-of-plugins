@@ -17,19 +17,24 @@ export class ProgressNotice {
 		ProgressNotice.current?.hide();
 		ProgressNotice.current = this;
 
-		const fragment = document.createDocumentFragment();
-		const root = el("div", "community-install-manager-progress");
-		this.titleEl = el("div", "community-install-manager-progress-title");
-		this.titleEl.textContent = title;
-		this.detailEl = el("div", "community-install-manager-progress-detail");
-		this.barEl = el("div", "community-install-manager-progress-bar");
-		this.fillEl = el("div", "community-install-manager-progress-fill");
-		this.barEl.appendChild(this.fillEl);
-		root.append(this.titleEl, this.detailEl);
+		const fragment = createFragment();
+		const root = fragment.createDiv({
+			cls: "community-install-manager-progress",
+		});
+		this.titleEl = root.createDiv({
+			cls: "community-install-manager-progress-title",
+			text: title,
+		});
+		this.detailEl = root.createDiv({
+			cls: "community-install-manager-progress-detail",
+		});
+		this.barEl = createDiv({ cls: "community-install-manager-progress-bar" });
+		this.fillEl = this.barEl.createDiv({
+			cls: "community-install-manager-progress-fill",
+		});
 		if (showBar) {
 			root.appendChild(this.barEl);
 		}
-		fragment.appendChild(root);
 
 		// Duration 0 keeps the notice open until finish() closes it.
 		this.notice = new Notice(fragment, 0);
@@ -52,7 +57,7 @@ export class ProgressNotice {
 		}
 		this.setIndeterminate(false);
 		const percent = total > 0 ? Math.round(((current - 1) / total) * 100) : 0;
-		this.fillEl.style.width = `${percent}%`;
+		setWidth(this.fillEl, `${percent}%`);
 		this.detailEl.textContent = `${current} of ${total} · ${detail}`;
 	}
 
@@ -63,7 +68,7 @@ export class ProgressNotice {
 		}
 		this.done = true;
 		this.setIndeterminate(false);
-		this.fillEl.style.width = "100%";
+		setWidth(this.fillEl, "100%");
 		this.detailEl.textContent = message;
 		window.setTimeout(() => this.hide(), timeoutMs);
 	}
@@ -81,8 +86,12 @@ export class ProgressNotice {
 	}
 }
 
-function el(tag: string, cls: string): HTMLElement {
-	const node = document.createElement(tag);
-	node.className = cls;
-	return node;
+// setCssProps arrived in later Obsidian versions; fall back to the plain
+// DOM call on older ones.
+function setWidth(el: HTMLElement, width: string): void {
+	if (typeof el.setCssProps === "function") {
+		el.setCssProps({ width });
+	} else {
+		el.style.setProperty("width", width);
+	}
 }
