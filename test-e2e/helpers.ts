@@ -8,12 +8,22 @@ export async function writeConfigJson(
 	name: string,
 	data: unknown,
 ): Promise<void> {
+	const text = JSON.stringify(data, null, 2);
 	await browser.executeObsidian(
 		async ({ app }, name, text) => {
-			await app.vault.adapter.write(`${app.vault.configDir}/${name}`, text);
+			const path = `${app.vault.configDir}/${name}`;
+			await app.vault.adapter.write(path, text);
+			// On slow Android emulators a read right after the write can
+			// still see the old content; wait until the file reads back.
+			for (let i = 0; i < 50; i++) {
+				if ((await app.vault.adapter.read(path)) === text) {
+					return;
+				}
+				await new Promise((resolve) => window.setTimeout(resolve, 100));
+			}
 		},
 		name,
-		JSON.stringify(data, null, 2),
+		text,
 	);
 }
 

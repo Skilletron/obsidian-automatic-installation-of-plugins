@@ -535,8 +535,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			const content = await this.fileManager.readFile(pluginsJsonPath);
-			if (!content) {
-				progress.hide();
+			if (!content?.trim()) {
+				progress.finish(
+					`${PLUGINS_LIST_FILE} is empty. Add plugin IDs to it and import again.`,
+				);
 				return;
 			}
 
