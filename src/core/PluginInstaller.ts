@@ -342,7 +342,7 @@ export class PluginInstaller {
 			typeof headManifest?.version === "string"
 				? normalizeVersion(headManifest.version)
 				: "";
-		if (!latestVersion) {
+		if (!headManifest || !latestVersion) {
 			logger.warn(`No version in repo manifest for ${pluginId}`);
 			return null;
 		}
@@ -353,7 +353,7 @@ export class PluginInstaller {
 			latestVersion,
 		);
 		return {
-			manifest: releaseManifest || headManifest!,
+			manifest: releaseManifest || headManifest,
 			version: latestVersion,
 		};
 	}
@@ -398,23 +398,24 @@ export class PluginInstaller {
 // Until the returned function is called, removes new notices whose text
 // contains `name`. Notices already on screen (the import progress) stay.
 function hideNoticesMentioning(name: string): () => void {
+	const body = typeof document === "undefined" ? undefined : document.body;
 	if (
 		!name ||
 		typeof MutationObserver === "undefined" ||
-		typeof document.querySelectorAll !== "function"
+		typeof body?.findAll !== "function"
 	) {
 		return () => {};
 	}
-	const before = new Set(Array.from(document.querySelectorAll(".notice")));
+	const before = new Set<Element>(body.findAll(".notice"));
 	const sweep = () => {
-		for (const notice of Array.from(document.querySelectorAll(".notice"))) {
+		for (const notice of body.findAll(".notice")) {
 			if (!before.has(notice) && notice.textContent?.includes(name)) {
 				notice.remove();
 			}
 		}
 	};
 	const observer = new MutationObserver(sweep);
-	observer.observe(document.body, {
+	observer.observe(body, {
 		childList: true,
 		subtree: true,
 		characterData: true,

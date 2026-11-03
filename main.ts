@@ -166,7 +166,7 @@ export default class InstallCommunityPlugins extends Plugin {
 		} catch (err: unknown) {
 			logger.error("Startup install pipeline failed:", err);
 			new Notice(
-				"[Installer] Startup install failed. See console for details.",
+				"Startup install failed. See console for details.",
 			);
 		}
 	}
@@ -449,7 +449,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	private async runExclusive(task: () => Promise<void>): Promise<void> {
 		if (this.busy) {
 			new Notice(
-				"[Installer] Another import or settings update is already running.",
+				"Another import, export or settings update is already running.",
 			);
 			return;
 		}
@@ -756,7 +756,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		new Setting(target)
 			.setName("Undo last change")
 			.setDesc(
-				"Put back the settings and setup files as they were before the last Import, Apply settings or Export. Installed plugins stay installed.",
+				"Put back the settings and setup files as they were before the last import, settings update or export. Installed plugins stay installed.",
 			)
 			.addButton((button) =>
 				button.setButtonText("Undo").onClick(async () => {
@@ -934,7 +934,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				render: (setting: Setting) => {
 					setting.addText((text) =>
 						text
-							.setPlaceholder("licenseCode, endpoint")
+							.setPlaceholder("License code, endpoint")
 							.setValue(this.plugin.settings.extraSecretKeys)
 							.onChange(async (value) => {
 								this.plugin.settings.extraSecretKeys = value;
@@ -945,7 +945,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Logging level",
-				desc: "How much detail to show in the console if something goes wrong. Leave on Error unless you are troubleshooting.",
+				desc: "How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
 				render: (setting: Setting) => {
 					setting.addDropdown((dropdown) => {
 						dropdown
@@ -1094,7 +1094,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("licenseCode, endpoint")
+					.setPlaceholder("License code, endpoint")
 					.setValue(this.plugin.settings.extraSecretKeys)
 					.onChange(async (value) => {
 						this.plugin.settings.extraSecretKeys = value;
@@ -1105,7 +1105,7 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Logging level")
 			.setDesc(
-				"How much detail to show in the console if something goes wrong. Leave on Error unless you are troubleshooting.",
+				"How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
 			)
 			.addDropdown((dropdown) => {
 				dropdown
