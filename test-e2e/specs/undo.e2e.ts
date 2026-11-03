@@ -7,6 +7,7 @@ import {
 	runPluginMethod,
 	updateOwnSettings,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 const DATA_JSON = `plugins/${HIDER}/data.json`;
@@ -14,7 +15,7 @@ const PLACEHOLDER = "<secret removed on export>";
 
 describe("Secrets on export and undo", () => {
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await updateOwnSettings({ redactSecretsOnExport: true });
 		await writeConfigJson("community-plugins-list.json", [
 			{ id: HIDER, version: "1.7.1" },

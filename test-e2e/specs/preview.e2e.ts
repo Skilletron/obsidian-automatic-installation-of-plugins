@@ -1,6 +1,6 @@
 import { browser, expect } from "@wdio/globals";
 import { before, describe, it } from "mocha";
-import { HIDER, PLUGIN_ID, runPluginMethod, writeConfigJson } from "../helpers";
+import { HIDER, PLUGIN_ID, runPluginMethod, writeConfigJson, openEmptyVault } from "../helpers";
 
 interface Row {
 	id: string;
@@ -9,7 +9,7 @@ interface Row {
 
 describe("Settings changes in the import preview", () => {
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await writeConfigJson("community-plugins-list.json", [
 			{ id: HIDER, version: "1.7.1" },
 		]);

@@ -20,6 +20,7 @@ import {
 import { VAULT_SETUP_FILE } from "../types";
 import { SettingsManager } from "./SettingsManager";
 import { SettingChange, formatChange } from "../utils/settingsDiff";
+import { t } from "../i18n";
 
 export type InstallPreviewAction =
 	| "install"
@@ -134,14 +135,14 @@ export class SetupPreview {
 				JSON.parse((await this.fileManager.readFile(path)) ?? "")
 			);
 			if (!wanted) {
-				return `${VAULT_SETUP_FILE} is not valid`;
+				return t("preview.vaultSetupInvalid", { file: VAULT_SETUP_FILE });
 			}
 			return describeVaultSetupChanges(
 				wanted,
 				await readVaultSetup(this.fileManager, this.liveVaultState())
 			);
 		} catch {
-			return `${VAULT_SETUP_FILE} is not valid JSON`;
+			return t("preview.vaultSetupInvalidJson", { file: VAULT_SETUP_FILE });
 		}
 	}
 
@@ -155,9 +156,7 @@ export class SetupPreview {
 		const settingsMissing = !(await this.fileManager.exists(settingsPath));
 
 		if (listMissing) {
-			new Notice(
-				`[Installer] Preview: ${PLUGINS_LIST_FILE} not found.`
-			);
+			new Notice(t("preview.listNotFound", { file: PLUGINS_LIST_FILE }));
 			return {
 				rows: [],
 				summary: {
@@ -182,7 +181,7 @@ export class SetupPreview {
 		try {
 			parsedList = JSON.parse(listRaw) as unknown;
 		} catch (err: unknown) {
-			new Notice(`[Installer] Preview: invalid JSON in ${PLUGINS_LIST_FILE}.`);
+			new Notice(t("preview.listInvalidJson", { file: PLUGINS_LIST_FILE }));
 			logger.error("Preview list parse failed:", err);
 			return null;
 		}
@@ -253,16 +252,18 @@ export class SetupPreview {
 
 		if (!isForThisDevice(entry, this.isMobile())) {
 			summary.otherDevice++;
-			const devices = (entry.devices ?? []).join(" and ");
+			const devices = (entry.devices ?? [])
+				.map((d) => t(d === "mobile" ? "device.mobile" : "device.desktop"))
+				.join(t("common.and"));
 			return {
 				id,
 				pinnedVersion,
 				localVersion: installed ? await this.getLocalVersion(id) : null,
 				installed,
 				installAction: "other-device",
-				installNote: `Listed for ${devices} only; skipped on this device`,
+				installNote: t("preview.otherDevice", { devices }),
 				settingsAction: "other-device",
-				settingsNote: "Not applied on this device",
+				settingsNote: t("preview.notOnDevice"),
 			};
 		}
 		const localVersion = installed ? await this.getLocalVersion(id) : null;
@@ -273,30 +274,33 @@ export class SetupPreview {
 		if (!installed) {
 			installAction = "install";
 			installNote = pinnedVersion
-				? `Would install @${pinnedVersion}`
-				: "Would install (latest stable)";
+				? t("preview.installPinned", { version: pinnedVersion })
+				: t("preview.installLatest");
 			if (entry.enabled === false) {
-				installNote += ", left turned off";
+				installNote += t("preview.leftOff");
 			}
 			summary.install++;
 		} 
 		else if (pinnedVersion) {
 			if (localVersion && localVersion === pinnedVersion) {
 				installAction = "ok-pinned";
-				installNote = `Already at pinned ${pinnedVersion}`;
+				installNote = t("preview.alreadyPinned", { version: pinnedVersion });
 				summary.okPinned++;
 			} 
 			else {
 				installAction = "repin";
-				installNote = `Would change ${localVersion ?? "unknown"} → ${pinnedVersion}`;
+				installNote = t("preview.wouldChange", {
+					from: localVersion ?? t("preview.unknownVersion"),
+					to: pinnedVersion,
+				});
 				summary.repin++;
 			}
 		} 
 		else {
 			installAction = "skip";
 			installNote = localVersion
-				? `Already installed @${localVersion} (unpinned, skip)`
-				: "Already installed (unpinned, skip)";
+				? t("preview.installedSkip", { version: localVersion })
+				: t("preview.installedSkipNoVersion");
 			summary.skip++;
 		}
 
@@ -305,20 +309,19 @@ export class SetupPreview {
 
 		if (settingsMissing) {
 			settingsAction = "settings-file-missing";
-			settingsNote = `${PLUGINS_SETTINGS_FILE} missing`;
+			settingsNote = t("preview.settingsMissing", { file: PLUGINS_SETTINGS_FILE });
 		} 
 		else if (!Object.prototype.hasOwnProperty.call(settingsMap, id)) {
 			settingsAction = "no-settings-entry";
-			settingsNote = "No settings entry";
+			settingsNote = t("preview.noEntry");
 		} 
 		else if (!installed && !loadSettingsOnInstall) {
 			settingsAction = "plugin-not-installed";
-			settingsNote =
-				"Settings exist, but Apply on install is off and plugin missing";
+			settingsNote = t("preview.blocked");
 		} 
 		else if (!installed && loadSettingsOnInstall) {
 			settingsAction = "would-apply";
-			settingsNote = "Would apply settings after install";
+			settingsNote = t("preview.afterInstall");
 			summary.wouldApplySettings++;
 		} 
 		else {
@@ -327,8 +330,8 @@ export class SetupPreview {
 			// for the rest it takes Apply settings (or sync on startup).
 			settingsNote =
 				loadSettingsOnInstall && installAction === "repin"
-					? "Would apply settings after the version change"
-					: "Would apply with Apply settings or sync on startup";
+					? t("preview.afterRepin")
+					: t("preview.viaApply");
 			summary.wouldApplySettings++;
 		}
 
@@ -342,8 +345,8 @@ export class SetupPreview {
 			const count = settingsChanges.length;
 			settingsNote +=
 				count > 0
-					? ` (${count} change${count === 1 ? "" : "s"})`
-					: " (already matches)";
+					? t("preview.changes", { count })
+					: t("preview.matches");
 		}
 
 		return {
@@ -395,33 +398,33 @@ export class SetupPreview {
 function installBadgeLabel(action: InstallPreviewAction): string {
 	switch (action) {
 		case "install":
-			return "Install";
+			return t("preview.badgeInstall");
 		case "repin":
-			return "Re-pin";
+			return t("preview.badgeRepin");
 		case "ok-pinned":
-			return "Pinned OK";
+			return t("preview.badgeOkPinned");
 		case "other-device":
-			return "Other device";
+			return t("preview.badgeOtherDevice");
 		case "skip":
 		default:
-			return "Skip";
+			return t("preview.badgeSkip");
 	}
 }
 
 function settingsBadgeLabel(action: SettingsPreviewAction): string {
 	switch (action) {
 		case "would-apply":
-			return "Settings";
+			return t("preview.badgeSettings");
 		case "no-settings-entry":
-			return "No settings";
+			return t("preview.badgeNoSettings");
 		case "plugin-not-installed":
-			return "Settings blocked";
+			return t("preview.badgeBlocked");
 		case "settings-file-missing":
-			return "No settings file";
+			return t("preview.badgeNoFile");
 		case "other-device":
-			return "Not here";
+			return t("preview.badgeNotHere");
 		default:
-			return "Settings";
+			return t("preview.badgeSettings");
 	}
 }
 
@@ -438,31 +441,31 @@ export class SetupPreviewModal extends Modal {
 
 		contentEl.empty();
 		contentEl.addClass("community-install-manager-preview-modal");
-		contentEl.createEl("h2", { text: "Import preview" });
+		contentEl.createEl("h2", { text: t("preview.title") });
 
 		const summary = contentEl.createDiv({
 			cls: "community-install-manager-preview-summary",
 		});
 
-		this.addStat(summary, "Install", this.report.summary.install, "install");
-		this.addStat(summary, "Skip", this.report.summary.skip, "skip");
-		this.addStat(summary, "Re-pin", this.report.summary.repin, "repin");
+		this.addStat(summary, t("preview.badgeInstall"), this.report.summary.install, "install");
+		this.addStat(summary, t("preview.badgeSkip"), this.report.summary.skip, "skip");
+		this.addStat(summary, t("preview.badgeRepin"), this.report.summary.repin, "repin");
 		this.addStat(
 			summary,
-			"Pinned OK",
+			t("preview.badgeOkPinned"),
 			this.report.summary.okPinned,
 			"ok"
 		);
 		this.addStat(
 			summary,
-			"Settings",
+			t("preview.badgeSettings"),
 			this.report.summary.wouldApplySettings,
 			"settings"
 		);
 		if (this.report.summary.otherDevice > 0) {
 			this.addStat(
 				summary,
-				"Other devices",
+				t("preview.statOtherDevices"),
 				this.report.summary.otherDevice,
 				"skip"
 			);
@@ -471,7 +474,7 @@ export class SetupPreviewModal extends Modal {
 		if (this.report.settingsMissing) {
 			contentEl.createDiv({
 				cls: "community-install-manager-preview-note",
-				text: `${PLUGINS_SETTINGS_FILE} was not found.`,
+				text: t("preview.fileNotFound", { file: PLUGINS_SETTINGS_FILE }),
 			});
 		}
 		if (this.report.vaultSetup) {
@@ -488,7 +491,7 @@ export class SetupPreviewModal extends Modal {
 		if (this.report.rows.length === 0) {
 			list.createDiv({
 				cls: "community-install-manager-preview-empty",
-				text: "No plugins in the list.",
+				text: t("preview.empty"),
 			});
 		} else {
 			for (const row of this.report.rows) {
@@ -497,7 +500,7 @@ export class SetupPreviewModal extends Modal {
 		}
 
 		new Setting(contentEl).addButton((button) =>
-			button.setButtonText("Close").setCta().onClick(() => this.close())
+			button.setButtonText(t("common.close")).setCta().onClick(() => this.close())
 		);
 	}
 
@@ -577,7 +580,7 @@ export class SetupPreviewModal extends Modal {
 				cls: "community-install-manager-preview-changes",
 			});
 			details.createEl("summary", {
-				text: `Show ${changes.length} setting change${changes.length === 1 ? "" : "s"}`,
+				text: t("preview.showChanges", { count: changes.length }),
 			});
 			const list = details.createEl("ul");
 			for (const change of changes) {

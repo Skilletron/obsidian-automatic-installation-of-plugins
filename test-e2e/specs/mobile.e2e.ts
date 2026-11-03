@@ -7,6 +7,7 @@ import {
 	runPluginMethod,
 	updateOwnSettings,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 // A desktop-only plugin (isDesktopOnly: true in its manifest).
@@ -23,7 +24,7 @@ describe("Automatic actions and desktop-only plugins on mobile", () => {
 	let mobile = false;
 
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		mobile = await isMobile();
 		await writeConfigJson("community-plugins-list.json", [
 			URL_INTO_SELECTION,

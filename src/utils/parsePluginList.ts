@@ -1,6 +1,7 @@
 import { Notice } from "obsidian";
 import { DeviceKind, PluginListEntry, PLUGINS_LIST_FILE } from "../types";
 import { logger } from "./Logger";
+import { t } from "../i18n";
 
 export function normalizeVersion(version: string): string {
 	return version.trim().replace(/^v(?=\d)/i, "");
@@ -56,9 +57,7 @@ export function isForThisDevice(
 
 export function parsePluginList(raw: unknown): PluginListEntry[] | null {
 	if (!Array.isArray(raw)) {
-		new Notice(
-			`[Installer] ${PLUGINS_LIST_FILE} must contain an array of plugin IDs or { id, version } objects.`,
-		);
+		new Notice(t("list.notArray", { file: PLUGINS_LIST_FILE }));
 		return null;
 	}
 
@@ -132,9 +131,7 @@ export function parsePluginList(raw: unknown): PluginListEntry[] | null {
 	}
 
 	if (skipped > 0) {
-		new Notice(
-			`[Installer] Skipped ${skipped} invalid entr${skipped === 1 ? "y" : "ies"} in ${PLUGINS_LIST_FILE}. See console.`,
-		);
+		new Notice(t("list.skipped", { count: skipped, file: PLUGINS_LIST_FILE }));
 	}
 
 	return entries;

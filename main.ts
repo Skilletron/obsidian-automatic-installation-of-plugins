@@ -50,6 +50,31 @@ import {
 	parsePluginList,
 } from "./src/utils/parsePluginList";
 import { logger, LogLevel } from "./src/utils/Logger";
+import { MessageKey, detectLanguage, setLanguage, t } from "./src/i18n";
+
+// Backups made before translations stored the reason as English text.
+const LEGACY_REASONS: Record<string, string> = {
+	Import: "import",
+	Export: "export",
+	"Apply settings": "apply",
+	"Update plugins": "update",
+	"Import setup pack": "pack",
+	"Settings change": "settings",
+};
+
+function reasonLabel(reason: string): string {
+	const key = `reason.${LEGACY_REASONS[reason] ?? reason}`;
+	return key in REASON_KEYS ? t(key as MessageKey) : reason.toLowerCase();
+}
+
+const REASON_KEYS: Record<string, true> = {
+	"reason.import": true,
+	"reason.export": true,
+	"reason.apply": true,
+	"reason.update": true,
+	"reason.pack": true,
+	"reason.settings": true,
+};
 
 export default class InstallCommunityPlugins extends Plugin {
 	settings!: InstallCommunityPluginsSettings;
@@ -66,6 +91,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	private busy = false;
 
 	async onload() {
+		setLanguage(detectLanguage());
 		await this.loadSettings();
 
 		this.fileManager = new FileManager(this.app);
@@ -114,7 +140,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "export-plugin-setup",
-			name: "Export plugin setup to JSON",
+			name: t("cmd.export"),
 			callback: async () => {
 				await this.exportPluginSetup();
 			},
@@ -122,7 +148,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "preview-plugin-setup",
-			name: "Preview plugin setup import",
+			name: t("cmd.preview"),
 			callback: async () => {
 				await this.previewPluginSetup();
 			},
@@ -130,7 +156,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "import-plugin-setup",
-			name: "Import plugin setup from JSON",
+			name: t("cmd.import"),
 			callback: async () => {
 				await this.runImportPipeline();
 			},
@@ -138,7 +164,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "apply-plugin-settings",
-			name: "Apply settings from JSON",
+			name: t("cmd.apply"),
 			callback: async () => {
 				await this.applySettingsToInstalledPlugins();
 			},
@@ -146,7 +172,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "export-setup-pack",
-			name: "Export shareable setup pack",
+			name: t("cmd.exportPack"),
 			callback: async () => {
 				await this.exportSetupPack();
 			},
@@ -154,7 +180,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "import-setup-pack",
-			name: "Import setup pack from a link",
+			name: t("cmd.importPack"),
 			callback: () => {
 				new PackLinkModal(this.app, (input) => {
 					void this.loadSetupPack(input);
@@ -172,7 +198,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "check-plugin-updates",
-			name: "Check for plugin updates",
+			name: t("cmd.checkUpdates"),
 			callback: async () => {
 				await this.checkForUpdates();
 			},
@@ -180,7 +206,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 		this.addCommand({
 			id: "undo-last-change",
-			name: "Undo last import, export or settings change",
+			name: t("cmd.undo"),
 			callback: async () => {
 				await this.undoLastChange();
 			},
@@ -223,15 +249,13 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 		} catch (err: unknown) {
 			logger.error("Startup install pipeline failed:", err);
-			new Notice(
-				"Startup install failed. See console for details.",
-			);
+			new Notice(t("common.startupFailed"));
 		}
 	}
 
 	async runImportPipeline(): Promise<void> {
 		await this.runExclusive(() =>
-			this.withBackup("Import", () => this.installPluginsFromFile()),
+			this.withBackup("import", () => this.installPluginsFromFile()),
 		);
 	}
 
@@ -248,7 +272,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				listEntries,
 				settings,
 				vaultSetup,
-				`${this.app.vault.getName()} setup`,
+				t("pack.name", { vault: this.app.vault.getName() }),
 			);
 			const path = normalizePath(PACK_FILE);
 			if (
@@ -257,22 +281,26 @@ export default class InstallCommunityPlugins extends Plugin {
 					`${JSON.stringify(pack, null, 2)}\n`,
 				))
 			) {
-				throw new Error(`could not write ${PACK_FILE}`);
+				throw new Error(t("pack.writeFailed", { file: PACK_FILE }));
 			}
 			const secrets =
 				redactedCount > 0
-					? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"}.`
+					? t("pack.savedSecrets", { count: redactedCount })
 					: "";
 			ProgressNotice.show(
-				"Setup pack saved",
-				`${PACK_FILE} in your vault has ${listEntries.length} plugin${listEntries.length === 1 ? "" : "s"}.${secrets} Share it (for example as a GitHub gist) and others can use Import setup pack from a link.`,
+				t("pack.savedTitle"),
+				t("pack.savedBody", {
+					file: PACK_FILE,
+					count: listEntries.length,
+					secrets,
+				}),
 				10000,
 			);
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+				err instanceof Error ? err.message : t("common.unknownError");
 			logger.error("Setup pack export failed:", err);
-			ProgressNotice.show("Setup pack not saved", errorMessage, 12000);
+			ProgressNotice.show(t("pack.notSavedTitle"), errorMessage, 12000);
 		}
 	}
 
@@ -286,22 +314,22 @@ export default class InstallCommunityPlugins extends Plugin {
 				source = url;
 				raw = await this.networkManager.fetchJson<unknown>(url);
 			} else if (/^[a-z]+:/i.test(input)) {
-				throw new Error("only https links can be loaded");
+				throw new Error(t("pack.httpsOnly"));
 			} else {
 				const path = normalizePath(input);
 				const text = (await this.fileManager.exists(path))
 					? await this.fileManager.readFile(path)
 					: null;
 				if (text === null) {
-					throw new Error(`${path} was not found in this vault`);
+					throw new Error(t("pack.notFound", { path }));
 				}
 				raw = JSON.parse(text) as unknown;
 			}
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+				err instanceof Error ? err.message : t("common.unknownError");
 			ProgressNotice.show(
-				"Could not load the setup pack",
+				t("pack.loadFailedTitle"),
 				NetworkManager.describeError(err) || errorMessage,
 				12000,
 			);
@@ -311,8 +339,8 @@ export default class InstallCommunityPlugins extends Plugin {
 		const pack = parseSetupPack(raw);
 		if (!pack) {
 			ProgressNotice.show(
-				"Not a setup pack",
-				"The file is not a setup pack made with Export shareable setup pack.",
+				t("pack.notPackTitle"),
+				t("pack.notPackBody"),
 				12000,
 			);
 			return;
@@ -331,7 +359,7 @@ export default class InstallCommunityPlugins extends Plugin {
 
 	private async useSetupPack(pack: ParsedPack): Promise<void> {
 		await this.runExclusive(() =>
-			this.withBackup("Import setup pack", async () => {
+			this.withBackup("pack", async () => {
 				try {
 					await mergePackIntoSetup(
 						this.fileManager,
@@ -340,9 +368,9 @@ export default class InstallCommunityPlugins extends Plugin {
 					);
 				} catch (err: unknown) {
 					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
+						err instanceof Error ? err.message : t("common.unknownError");
 					logger.error("Merging the setup pack failed:", err);
-					ProgressNotice.show("Setup pack not added", errorMessage, 12000);
+					ProgressNotice.show(t("pack.notAddedTitle"), errorMessage, 12000);
 					return;
 				}
 				// The user saw and confirmed the pack, theme and snippets included.
@@ -375,10 +403,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			logger.warn(`Invalid JSON in ${VAULT_SETUP_FILE}:`, err);
 		}
 		if (!setup) {
-			return [`${VAULT_SETUP_FILE} is not valid, so it was skipped.`];
+			return [t("vaultSetup.invalid", { file: VAULT_SETUP_FILE })];
 		}
 
-		progress.setDetail("Applying theme, snippets, hotkeys and core plugins");
+		progress.setDetail(t("vaultSetup.applying"));
 		const result = await this.vaultSetupApplier.apply(setup);
 		const notes: string[] = [];
 		if (result.theme) {
@@ -386,17 +414,18 @@ export default class InstallCommunityPlugins extends Plugin {
 		}
 		if (result.snippetsWritten > 0) {
 			notes.push(
-				`Added or updated ${result.snippetsWritten} CSS snippet${result.snippetsWritten === 1 ? "" : "s"}.`,
+				t("vaultSetup.snippetsWritten", { count: result.snippetsWritten }),
 			);
 		}
 		if (result.hotkeysChanged > 0) {
-			notes.push(
-				`Set hotkeys for ${result.hotkeysChanged} command${result.hotkeysChanged === 1 ? "" : "s"}.`,
-			);
+			notes.push(t("vaultSetup.hotkeysSet", { count: result.hotkeysChanged }));
 		}
 		if (result.corePluginsOn + result.corePluginsOff > 0) {
 			notes.push(
-				`Core plugins: turned on ${result.corePluginsOn}, turned off ${result.corePluginsOff}.`,
+				t("vaultSetup.corePlugins", {
+					on: result.corePluginsOn,
+					off: result.corePluginsOff,
+				}),
 			);
 		}
 		return [...notes, ...result.problems];
@@ -404,15 +433,15 @@ export default class InstallCommunityPlugins extends Plugin {
 
 	async exportPluginSetup(): Promise<void> {
 		await this.runExclusive(() =>
-			this.withBackup("Export", async () => {
+			this.withBackup("export", async () => {
 				try {
 					const { message } = await this.setupExporter.exportSetup();
-					ProgressNotice.show("Export finished", message);
+					ProgressNotice.show(t("export.finished"), message);
 				} catch (err: unknown) {
 					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
+						err instanceof Error ? err.message : t("common.unknownError");
 					logger.error("Export failed:", err);
-					ProgressNotice.show("Export failed", errorMessage, 12000);
+					ProgressNotice.show(t("export.failed"), errorMessage, 12000);
 				}
 			}),
 		);
@@ -443,25 +472,25 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	async findUpdates(): Promise<PluginUpdate[] | null> {
-		const progress = new ProgressNotice("Checking for plugin updates");
+		const progress = new ProgressNotice(t("updates.checking"));
 		try {
 			const updates = await this.updateChecker.check((current, total, id) =>
 				progress.update(current, total, id),
 			);
 			const count = updates.filter((u) => u.available).length;
-			progress.setTitle("Update check finished");
+			progress.setTitle(t("updates.checkFinished"));
 			progress.finish(
 				count > 0
-					? `${count} plugin${count === 1 ? " has an update" : "s have updates"}.`
-					: "All community plugins are up to date.",
+					? t("updates.found", { count })
+					: t("updates.none"),
 				3000,
 			);
 			return updates;
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+				err instanceof Error ? err.message : t("common.unknownError");
 			logger.error("Update check failed:", err);
-			progress.setTitle("Update check failed");
+			progress.setTitle(t("updates.checkFailed"));
 			progress.finish(NetworkManager.describeError(err) || errorMessage, 12000);
 			return null;
 		}
@@ -475,8 +504,8 @@ export default class InstallCommunityPlugins extends Plugin {
 			return;
 		}
 		await this.runExclusive(() =>
-			this.withBackup("Update plugins", async () => {
-				const progress = new ProgressNotice("Updating plugins");
+			this.withBackup("update", async () => {
+				const progress = new ProgressNotice(t("updates.updating"));
 				const updated = new Map<string, string>();
 				const failed: string[] = [];
 				try {
@@ -487,7 +516,7 @@ export default class InstallCommunityPlugins extends Plugin {
 						progress.update(
 							i + 1,
 							targets.length,
-							`Updating ${pluginId} to ${version}`,
+							t("updates.step", { id: pluginId, version }),
 						);
 						let result = "";
 						await this.pluginEnabler.runWithPluginsStopped(
@@ -510,23 +539,31 @@ export default class InstallCommunityPlugins extends Plugin {
 					await this.pluginEnabler.refreshPluginsUI();
 
 					const notes = [
-						`Updated ${updated.size} of ${targets.length} plugin${targets.length === 1 ? "" : "s"}.`,
+						t("updates.updated", {
+							done: updated.size,
+							count: targets.length,
+						}),
 					];
 					if (pinsMoved > 0) {
 						notes.push(
-							`Moved ${pinsMoved} pin${pinsMoved === 1 ? "" : "s"} in ${PLUGINS_LIST_FILE}.`,
+							t("updates.pinsMoved", {
+								count: pinsMoved,
+								file: PLUGINS_LIST_FILE,
+							}),
 						);
 					}
 					notes.push(...failed);
 					progress.setTitle(
-						failed.length > 0 ? "Update finished with problems" : "Update finished",
+						failed.length > 0
+							? t("updates.finishedProblems")
+							: t("updates.finished"),
 					);
 					progress.finish(notes.join(" "), failed.length > 0 ? 12000 : 6000);
 				} catch (err: unknown) {
 					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
+						err instanceof Error ? err.message : t("common.unknownError");
 					logger.error("Update failed:", err);
-					progress.setTitle("Update failed");
+					progress.setTitle(t("updates.failed"));
 					progress.finish(errorMessage, 12000);
 				} finally {
 					this.pluginInstaller.clearCaches();
@@ -559,10 +596,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			try {
 				const latest = await this.settingsBackup.latest();
 				if (!latest) {
-					ProgressNotice.show(
-						"Nothing to undo",
-						"No earlier Import, Apply settings or Export to undo.",
-					);
+					ProgressNotice.show(t("undo.nothingTitle"), t("undo.nothingBody"));
 					return;
 				}
 				const { name, snapshot } = latest;
@@ -587,27 +621,29 @@ export default class InstallCommunityPlugins extends Plugin {
 
 				if (restored.length < snapshot.entries.length) {
 					ProgressNotice.show(
-						"Undo incomplete",
-						`Restored ${restored.length} of ${snapshot.entries.length} files. The backup is kept; see console for details.`,
+						t("undo.incompleteTitle"),
+						t("undo.incompleteBody", {
+							restored: restored.length,
+							total: snapshot.entries.length,
+						}),
 						12000,
 					);
 					return;
 				}
 				await this.settingsBackup.remove(name);
 
-				const files = `${restored.length} file${restored.length === 1 ? "" : "s"}`;
-				const reload =
-					deferred > 0
-						? " Plugins will reload when you close Settings."
-						: "";
 				ProgressNotice.show(
-					`Undid ${snapshot.reason.toLowerCase()}`,
-					`From ${new Date(snapshot.createdAt).toLocaleString()}: restored ${files}.${reload}`,
+					t("undo.doneTitle", { reason: reasonLabel(snapshot.reason) }),
+					t("undo.doneBody", {
+						date: new Date(snapshot.createdAt).toLocaleString(),
+						count: restored.length,
+						reload: deferred > 0 ? t("undo.reload") : "",
+					}),
 				);
 			} catch (err: unknown) {
 				const errorMessage =
-					err instanceof Error ? err.message : "Unknown error";
-				ProgressNotice.show("Undo failed", errorMessage, 12000);
+					err instanceof Error ? err.message : t("common.unknownError");
+				ProgressNotice.show(t("undo.failed"), errorMessage, 12000);
 				logger.error("Undo failed:", err);
 			}
 		});
@@ -630,8 +666,8 @@ export default class InstallCommunityPlugins extends Plugin {
 			new SetupPreviewModal(this.app, report).open();
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
-			new Notice(`[Installer] Preview failed: ${errorMessage}`);
+				err instanceof Error ? err.message : t("common.unknownError");
+			new Notice(t("preview.failed", { error: errorMessage }));
 			logger.error("Preview failed:", err);
 		}
 	}
@@ -678,9 +714,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	// is in progress is dropped with a notice.
 	private async runExclusive(task: () => Promise<void>): Promise<void> {
 		if (this.busy) {
-			new Notice(
-				"Another import, export or settings update is already running.",
-			);
+			new Notice(t("common.busy"));
 			return;
 		}
 		this.busy = true;
@@ -693,12 +727,12 @@ export default class InstallCommunityPlugins extends Plugin {
 
 	async applySettingsToInstalledPlugins(): Promise<void> {
 		await this.runExclusive(() =>
-			this.withBackup("Apply settings", () => this.applySettings()),
+			this.withBackup("apply", () => this.applySettings()),
 		);
 	}
 
 	private async applySettings(): Promise<void> {
-		const progress = new ProgressNotice("Applying plugin settings");
+		const progress = new ProgressNotice(t("apply.title"));
 		try {
 			const targets = await this.settingsManager.collectSettingsTargets();
 			if (targets.length === 0) {
@@ -717,28 +751,26 @@ export default class InstallCommunityPlugins extends Plugin {
 					},
 				);
 			if (applied.length === 0) {
-				progress.finish("No settings were written.");
+				progress.finish(t("apply.none"));
 				return;
 			}
 			await this.pluginEnabler.refreshPluginsUI();
 
-			const count = `${applied.length} plugin${applied.length === 1 ? "" : "s"}`;
-			progress.setTitle("Settings applied");
+			const plugins = t("apply.plugins", { count: applied.length });
+			progress.setTitle(t("apply.done"));
 			if (deferred > 0) {
-				progress.finish(
-					`Updated ${count}. ${deferred} running plugin${deferred === 1 ? "" : "s"} will reload when you close Settings.`,
-				);
+				progress.finish(t("apply.deferred", { plugins, count: deferred }));
 			} else if (restarted > 0) {
-				progress.finish(`Updated ${count} (${restarted} reloaded).`);
+				progress.finish(t("apply.restarted", { plugins, restarted }));
 			} else {
-				progress.finish(`Updated ${count}.`);
+				progress.finish(t("apply.updated", { plugins }));
 			}
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+				err instanceof Error ? err.message : t("common.unknownError");
 			logger.error("File system access error:", err);
-			progress.setTitle("Applying settings failed");
-			progress.finish(`Cannot access file system: ${errorMessage}`, 12000);
+			progress.setTitle(t("apply.failed"));
+			progress.finish(t("apply.fsError", { error: errorMessage }), 12000);
 		}
 	}
 
@@ -746,7 +778,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	async installPluginsFromFile(options: { forceVaultSetup?: boolean } = {}) {
 		// One notice for the whole run, updated in place. Problems with a
 		// single plugin still get a notice of their own.
-		const progress = new ProgressNotice("Importing plugin setup");
+		const progress = new ProgressNotice(t("import.title"));
 		try {
 			this.pluginInstaller.clearCaches();
 			const pluginsJsonPath =
@@ -759,17 +791,15 @@ export default class InstallCommunityPlugins extends Plugin {
 				);
 				progress.finish(
 					created
-						? `Created an empty ${PLUGINS_LIST_FILE}. Add plugin IDs to it and import again.`
-						: `Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`,
+						? t("import.createdEmpty", { file: PLUGINS_LIST_FILE })
+						: t("import.cannotCreate", { file: PLUGINS_LIST_FILE }),
 				);
 				return;
 			}
 
 			const content = await this.fileManager.readFile(pluginsJsonPath);
 			if (!content?.trim()) {
-				progress.finish(
-					`${PLUGINS_LIST_FILE} is empty. Add plugin IDs to it and import again.`,
-				);
+				progress.finish(t("import.empty", { file: PLUGINS_LIST_FILE }));
 				return;
 			}
 
@@ -778,10 +808,13 @@ export default class InstallCommunityPlugins extends Plugin {
 				rawList = JSON.parse(content) as unknown;
 			} catch (err: unknown) {
 				const errorMessage =
-					err instanceof Error ? err.message : "Unknown error";
+					err instanceof Error ? err.message : t("common.unknownError");
 				logger.error(`JSON parse error in ${PLUGINS_LIST_FILE}:`, err);
 				progress.finish(
-					`Invalid JSON in ${PLUGINS_LIST_FILE}: ${errorMessage}.`,
+					t("import.invalidJson", {
+						file: PLUGINS_LIST_FILE,
+						error: errorMessage,
+					}),
 				);
 				return;
 			}
@@ -794,8 +827,8 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			if (entries.length === 0) {
 				const setupNotes = await this.applyVaultSetupFile(progress, options.forceVaultSetup);
-				progress.setTitle("Import finished");
-				progress.finish(["No plugins to install.", ...setupNotes].join(" "));
+				progress.setTitle(t("import.finished"));
+				progress.finish([t("import.noPlugins"), ...setupNotes].join(" "));
 				return;
 			}
 
@@ -806,7 +839,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			const otherDeviceCount = entries.length - forThisDevice.length;
 			if (forThisDevice.length === 0) {
 				progress.finish(
-					`No plugins in the list are meant for this ${isMobile ? "mobile" : "desktop"} device.`,
+					t(isMobile ? "import.notForMobile" : "import.notForDesktop"),
 				);
 				return;
 			}
@@ -825,7 +858,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				const label = entry.version
 					? `${entry.id}@${entry.version}`
 					: entry.id;
-				progress.update(i + 1, totalPlugins, `Installing ${label}`);
+				progress.update(i + 1, totalPlugins, t("import.installing", { label }));
 
 				const result = await this.pluginInstaller.installPlugin(entry);
 
@@ -850,7 +883,7 @@ export default class InstallCommunityPlugins extends Plugin {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
 					newlyInstalled,
 					(current, total, pluginId) => {
-						progress.update(current, total, `Turning on ${pluginId}`);
+						progress.update(current, total, t("import.turningOn", { id: pluginId }));
 					},
 				);
 				if (result.failed > 0) {
@@ -859,29 +892,23 @@ export default class InstallCommunityPlugins extends Plugin {
 						result.failedPlugins,
 					);
 					notes.push(
-						`Could not turn on: ${result.failedPlugins.join(", ")}.`,
+						t("import.couldNotEnable", { ids: result.failedPlugins.join(", ") }),
 					);
 				}
 			} else if (newlyInstalled.length > 0) {
-				notes.push("Auto-enable is off, so new plugins stay off.");
+				notes.push(t("import.autoEnableOff"));
 			}
 
 			await this.pluginEnabler.refreshPluginsUI();
 
 			if (skippedCount > 0) {
-				notes.push(
-					`Skipped ${skippedCount} desktop-only plugin${skippedCount > 1 ? "s" : ""} on this device.`,
-				);
+				notes.push(t("import.skippedDesktopOnly", { count: skippedCount }));
 			}
 			if (otherDeviceCount > 0) {
-				notes.push(
-					`${otherDeviceCount} plugin${otherDeviceCount > 1 ? "s are" : " is"} listed for other devices only.`,
-				);
+				notes.push(t("import.otherDevices", { count: otherDeviceCount }));
 			}
 			if (keptOff.length > 0) {
-				notes.push(
-					`Left ${keptOff.length} turned off as set in the list.`,
-				);
+				notes.push(t("import.keptOff", { count: keptOff.length }));
 			}
 			notes.push(...failed);
 			notes.push(...(await this.applyVaultSetupFile(progress, options.forceVaultSetup)));
@@ -889,28 +916,43 @@ export default class InstallCommunityPlugins extends Plugin {
 			const changed = newlyInstalled.length + keptOff.length;
 			const summary =
 				changed > 0
-					? `Installed or updated ${changed} plugin${changed === 1 ? "" : "s"}`
-					: "Everything was already up to date";
+					? t("import.changed", { count: changed })
+					: t("import.upToDate");
 			progress.setTitle(
-				failed.length > 0 ? "Import finished with problems" : "Import finished",
+				failed.length > 0
+					? t("import.finishedProblems")
+					: t("import.finished"),
 			);
 			progress.finish(
-				[`${summary} (${installedCount} of ${totalPlugins} OK).`, ...notes].join(
-					" ",
-				),
+				[
+					t("import.summary", {
+						summary,
+						ok: installedCount,
+						total: totalPlugins,
+					}),
+					...notes,
+				].join(" "),
 				failed.length > 0 ? 12000 : 6000,
 			);
 		} catch (err: unknown) {
 			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+				err instanceof Error ? err.message : t("common.unknownError");
 			logger.error("Installation error:", err);
-			progress.setTitle("Import failed");
-			progress.finish(`${errorMessage}. See console for details.`, 12000);
+			progress.setTitle(t("import.failed"));
+			progress.finish(t("import.error", { error: errorMessage }), 12000);
 		} finally {
 			this.pluginInstaller.clearCaches();
 		}
 	}
 }
+
+type BooleanSetting = {
+	[K in keyof InstallCommunityPluginsSettings]-?: InstallCommunityPluginsSettings[K] extends boolean
+		? K
+		: never;
+}[keyof InstallCommunityPluginsSettings];
+
+type LogLevelName = NonNullable<InstallCommunityPluginsSettings["logLevel"]>;
 
 class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 	plugin: InstallCommunityPlugins;
@@ -920,345 +962,219 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	private addExportImportButtons(containerEl?: HTMLElement): void {
-		const target = containerEl ?? this.containerEl;
-
-		new Setting(target)
-			.setName("Preview import")
-			.setDesc(
-				"See which plugins would be installed, skipped, or updated, and which settings would change — without changing your vault.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Preview").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.previewPluginSetup();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-
-		new Setting(target)
-			.setName("Export plugin setup")
-			.setDesc(
-				`Save your installed community plugins and their settings into the JSON files in ${this.app.vault.configDir}.`,
-			)
-			.addButton((button) =>
-				button.setButtonText("Export").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.exportPluginSetup();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-
-		new Setting(target)
-			.setName("Import plugin setup")
-			.setDesc(
-				"Install plugins from the list file. Enabling and applying settings follow the options below.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Import").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.runImportPipeline();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-
-		new Setting(target)
-			.setName("Share your setup")
-			.setDesc(
-				"Save everything you have installed as setup-pack.json in your vault, with secrets left out, to share with others.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Export pack").onClick(async () => {
-					await this.plugin.exportSetupPack();
-				}),
-			);
-
-		new Setting(target)
-			.setName("Import a setup pack")
-			.setDesc(
-				"Add someone else's setup pack to yours from a link. You see what it contains before anything is installed.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Import from link").onClick(() => {
-					new PackLinkModal(this.app, (input) => {
-						void this.plugin.loadSetupPack(input);
-					}).open();
-				}),
-			);
-
-		new Setting(target)
-			.setName("Check for updates")
-			.setDesc(
-				"See which installed community plugins have newer versions, and update them. Pins in your plugin list move along.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Check").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.checkForUpdates();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-
-		new Setting(target)
-			.setName("Undo last change")
-			.setDesc(
-				"Put back the settings and setup files as they were before the last import, settings update or export. Installed plugins stay installed.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Undo").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.undoLastChange();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-
-		new Setting(target)
-			.setName("Apply settings")
-			.setDesc(
-				"Update installed plugins from the settings file without reinstalling them.",
-			)
-			.addButton((button) =>
-				button.setButtonText("Apply").onClick(async () => {
-					button.setDisabled(true);
-					try {
-						await this.plugin.applySettingsToInstalledPlugins();
-					} finally {
-						button.setDisabled(false);
-					}
-				}),
-			);
-	}
-
-	getSettingDefinitions() {
+	// The action buttons, in the order they appear.
+	private actions(): Array<{
+		name: MessageKey;
+		desc: string;
+		button: MessageKey;
+		shortButton: MessageKey;
+		run: () => Promise<void> | void;
+	}> {
+		const dir = this.app.vault.configDir;
+		const openPackLink = () => {
+			new PackLinkModal(this.app, (input) => {
+				void this.plugin.loadSetupPack(input);
+			}).open();
+		};
 		return [
 			{
-				name: "Security warning",
-				desc: "This can download and install community plugins. Only use it with trusted vaults, and review your plugin list before enabling auto-install.",
+				name: "settings.previewName",
+				desc: t("settings.previewDesc"),
+				button: "settings.previewButton",
+				shortButton: "settings.previewButton",
+				run: () => this.plugin.previewPluginSetup(),
 			},
 			{
-				name: "Export / Import",
-				desc: `Manage the plugin list and settings files in ${this.app.vault.configDir}.`,
-				render: (setting: Setting) => {
-					setting.addButton((button) =>
-						button.setButtonText("Preview").onClick(async () => {
-							await this.plugin.previewPluginSetup();
-						}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Export").onClick(async () => {
-							await this.plugin.exportPluginSetup();
-						}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Import").onClick(async () => {
-							await this.plugin.runImportPipeline();
-						}),
-					);
-					setting.addButton((button) =>
-						button
-							.setButtonText("Apply settings")
-							.onClick(async () => {
-								await this.plugin.applySettingsToInstalledPlugins();
-							}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Check for updates").onClick(async () => {
-							await this.plugin.checkForUpdates();
-						}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Export pack").onClick(async () => {
-							await this.plugin.exportSetupPack();
-						}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Import pack").onClick(() => {
-							new PackLinkModal(this.app, (input) => {
-								void this.plugin.loadSetupPack(input);
-							}).open();
-						}),
-					);
-					setting.addButton((button) =>
-						button.setButtonText("Undo").onClick(async () => {
-							await this.plugin.undoLastChange();
-						}),
-					);
-				},
+				name: "settings.exportName",
+				desc: t("settings.exportDesc", { dir }),
+				button: "settings.exportButton",
+				shortButton: "settings.exportButton",
+				run: () => this.plugin.exportPluginSetup(),
 			},
 			{
-				name: "Auto-install plugins on startup",
-				desc: "When Obsidian starts, install any plugins from your list that are not installed yet.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.autoInstallPlugins)
-							.onChange(async (value) => {
-								this.plugin.settings.autoInstallPlugins = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
+				name: "settings.importName",
+				desc: t("settings.importDesc"),
+				button: "settings.importButton",
+				shortButton: "settings.importButton",
+				run: () => this.plugin.runImportPipeline(),
 			},
 			{
-				name: "Auto-enable plugins after installation",
-				desc: "Turn plugins on after they are installed.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.autoEnablePlugins)
-							.onChange(async (value) => {
-								this.plugin.settings.autoEnablePlugins = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
+				name: "settings.applyName",
+				desc: t("settings.applyDesc"),
+				button: "settings.applyButton",
+				shortButton: "settings.applyName",
+				run: () => this.plugin.applySettingsToInstalledPlugins(),
 			},
 			{
-				name: "Apply settings on installation",
-				desc: "After installing a plugin, apply its settings from your settings file.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.loadSettingsOnInstall)
-							.onChange(async (value) => {
-								this.plugin.settings.loadSettingsOnInstall = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
+				name: "settings.updatesName",
+				desc: t("settings.updatesDesc"),
+				button: "settings.updatesButton",
+				shortButton: "settings.updatesLongButton",
+				run: () => this.plugin.checkForUpdates(),
 			},
 			{
-				name: "Merge settings instead of replace",
-				desc: "Update matching settings and keep the rest. When off, the plugin’s saved settings are replaced entirely.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.mergePluginSettings)
-							.onChange(async (value) => {
-								this.plugin.settings.mergePluginSettings = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
+				name: "settings.shareName",
+				desc: t("settings.shareDesc"),
+				button: "settings.shareButton",
+				shortButton: "settings.shareButton",
+				run: () => this.plugin.exportSetupPack(),
 			},
 			{
-				name: "Sync settings on every startup",
-				desc: "Each time Obsidian starts, apply your settings file to installed plugins.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.loadSettingsOnStartup)
-							.onChange(async (value) => {
-								this.plugin.settings.loadSettingsOnStartup = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
+				name: "settings.importPackName",
+				desc: t("settings.importPackDesc"),
+				button: "settings.importPackButton",
+				shortButton: "settings.importPackShortButton",
+				run: openPackLink,
 			},
 			{
-				name: "Run automatic actions on mobile",
-				desc: "Let auto-install and settings sync on startup run on phones and tablets. Off by default, so a synced desktop setup does not start downloads on mobile data.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.allowAutoActionsOnMobile)
-							.onChange(async (value) => {
-								this.plugin.settings.allowAutoActionsOnMobile = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
-			},
-			{
-				name: "Leave out secrets on export",
-				desc: "Replace tokens, passwords and API keys with a placeholder in the exported settings file. Import never writes the placeholder over a real value.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.redactSecretsOnExport)
-							.onChange(async (value) => {
-								this.plugin.settings.redactSecretsOnExport = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
-			},
-			{
-				name: "Extra secret setting names",
-				desc: "Comma-separated setting names to leave out as well, for example: licenseCode, endpoint",
-				render: (setting: Setting) => {
-					setting.addText((text) =>
-						text
-							.setPlaceholder("License code, endpoint")
-							.setValue(this.plugin.settings.extraSecretKeys)
-							.onChange(async (value) => {
-								this.plugin.settings.extraSecretKeys = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
-			},
-			{
-				name: "Sync theme, snippets, hotkeys and core plugins",
-				desc: "Export saves your community theme, CSS snippets, custom hotkeys and which core plugins are on to vault-setup.json. Import applies them on the other device.",
-				render: (setting: Setting) => {
-					setting.addToggle((toggle) =>
-						toggle
-							.setValue(this.plugin.settings.syncVaultSetup)
-							.onChange(async (value) => {
-								this.plugin.settings.syncVaultSetup = value;
-								await this.plugin.saveSettings();
-							}),
-					);
-				},
-			},
-			{
-				name: "Logging level",
-				desc: "How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
-				render: (setting: Setting) => {
-					setting.addDropdown((dropdown) => {
-						dropdown
-							.addOption("debug", "Debug (most detail)")
-							.addOption("info", "Info")
-							.addOption("warn", "Warn")
-							.addOption("error", "Error (recommended)")
-							.addOption("none", "None")
-							.setValue(this.plugin.settings.logLevel || "error")
-							.onChange(
-								async (
-									value:
-										| "debug"
-										| "info"
-										| "warn"
-										| "error"
-										| "none",
-								) => {
-									this.plugin.settings.logLevel = value;
-									await this.plugin.saveSettings();
-									this.plugin.applyLogLevel(value);
-								},
-							);
-					});
-				},
+				name: "settings.undoName",
+				desc: t("settings.undoDesc"),
+				button: "settings.undoButton",
+				shortButton: "settings.undoButton",
+				run: () => this.plugin.undoLastChange(),
 			},
 		];
 	}
 
+	private toggles(): Array<{
+		key: BooleanSetting;
+		name: MessageKey;
+		desc: MessageKey;
+	}> {
+		return [
+			{
+				key: "autoInstallPlugins",
+				name: "settings.autoInstallName",
+				desc: "settings.autoInstallDesc",
+			},
+			{
+				key: "autoEnablePlugins",
+				name: "settings.autoEnableName",
+				desc: "settings.autoEnableDesc",
+			},
+			{
+				key: "loadSettingsOnInstall",
+				name: "settings.applyOnInstallName",
+				desc: "settings.applyOnInstallDesc",
+			},
+			{
+				key: "mergePluginSettings",
+				name: "settings.mergeName",
+				desc: "settings.mergeDesc",
+			},
+			{
+				key: "loadSettingsOnStartup",
+				name: "settings.syncOnStartupName",
+				desc: "settings.syncOnStartupDesc",
+			},
+			{
+				key: "allowAutoActionsOnMobile",
+				name: "settings.mobileName",
+				desc: "settings.mobileDesc",
+			},
+			{
+				key: "redactSecretsOnExport",
+				name: "settings.redactName",
+				desc: "settings.redactDesc",
+			},
+			{
+				key: "syncVaultSetup",
+				name: "settings.syncVaultSetupName",
+				desc: "settings.syncVaultSetupDesc",
+			},
+		];
+	}
+
+	private addToggle(setting: Setting, key: BooleanSetting): void {
+		setting.addToggle((toggle) =>
+			toggle.setValue(this.plugin.settings[key]).onChange(async (value) => {
+				this.plugin.settings[key] = value;
+				await this.plugin.saveSettings();
+			}),
+		);
+	}
+
+	private addExtraSecretsField(setting: Setting): void {
+		setting.addText((text) =>
+			text
+				.setPlaceholder(t("settings.extraSecretsPlaceholder"))
+				.setValue(this.plugin.settings.extraSecretKeys)
+				.onChange(async (value) => {
+					this.plugin.settings.extraSecretKeys = value;
+					await this.plugin.saveSettings();
+				}),
+		);
+	}
+
+	private addLogLevelDropdown(setting: Setting): void {
+		const options: Array<[LogLevelName, MessageKey]> = [
+			["debug", "settings.logDebug"],
+			["info", "settings.logInfo"],
+			["warn", "settings.logWarn"],
+			["error", "settings.logError"],
+			["none", "settings.logNone"],
+		];
+		setting.addDropdown((dropdown) => {
+			for (const [value, label] of options) {
+				dropdown.addOption(value, t(label));
+			}
+			dropdown
+				.setValue(this.plugin.settings.logLevel || "error")
+				.onChange(async (value) => {
+					const level = value as LogLevelName;
+					this.plugin.settings.logLevel = level;
+					await this.plugin.saveSettings();
+					this.plugin.applyLogLevel(level);
+				});
+		});
+	}
+
+	// The other settings after the toggles: secret names and logging.
+	private extraDefinitions() {
+		return [
+			{
+				name: t("settings.extraSecretsName"),
+				desc: t("settings.extraSecretsDesc"),
+				render: (setting: Setting) => this.addExtraSecretsField(setting),
+			},
+			{
+				name: t("settings.logLevelName"),
+				desc: t("settings.logLevelDesc"),
+				render: (setting: Setting) => this.addLogLevelDropdown(setting),
+			},
+		];
+	}
+
+	// Obsidian 1.13+ builds the tab (and settings search) from these.
+	getSettingDefinitions() {
+		return [
+			{
+				name: t("settings.warningName"),
+				desc: t("settings.warningDesc"),
+			},
+			{
+				name: t("settings.actionsName"),
+				desc: t("settings.actionsDesc", { dir: this.app.vault.configDir }),
+				render: (setting: Setting) => {
+					for (const action of this.actions()) {
+						setting.addButton((button) =>
+							button.setButtonText(t(action.shortButton)).onClick(async () => {
+								await action.run();
+							}),
+						);
+					}
+				},
+			},
+			...this.toggles().map((toggle) => ({
+				name: t(toggle.name),
+				desc: t(toggle.desc),
+				render: (setting: Setting) => this.addToggle(setting, toggle.key),
+			})),
+			...this.extraDefinitions(),
+		];
+	}
+
+	// Older Obsidian versions call display().
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -1266,162 +1182,38 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		const warningDiv = containerEl.createDiv({
 			cls: "community-install-manager-warning setting-item-description",
 		});
-		warningDiv.createEl("strong", {
-			text: "Security warning: ",
-		});
-		warningDiv.appendText(
-			"This can download and install community plugins. Only use it with trusted vaults, and review your plugin list before enabling auto-install.",
-		);
+		warningDiv.createEl("strong", { text: t("settings.warningPrefix") });
+		warningDiv.appendText(t("settings.warningDesc"));
 
-		this.addExportImportButtons(containerEl);
-
-		new Setting(containerEl)
-			.setName("Auto-install plugins on startup")
-			.setDesc(
-				"When Obsidian starts, install any plugins from your list that are not installed yet.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoInstallPlugins)
-					.onChange(async (value) => {
-						this.plugin.settings.autoInstallPlugins = value;
-						await this.plugin.saveSettings();
+		for (const action of this.actions()) {
+			new Setting(containerEl)
+				.setName(t(action.name))
+				.setDesc(action.desc)
+				.addButton((button) =>
+					button.setButtonText(t(action.button)).onClick(async () => {
+						button.setDisabled(true);
+						try {
+							await action.run();
+						} finally {
+							button.setDisabled(false);
+						}
 					}),
-			);
+				);
+		}
 
-		new Setting(containerEl)
-			.setName("Auto-enable plugins after installation")
-			.setDesc("Turn plugins on after they are installed.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoEnablePlugins)
-					.onChange(async (value) => {
-						this.plugin.settings.autoEnablePlugins = value;
-						await this.plugin.saveSettings();
-					}),
+		for (const toggle of this.toggles()) {
+			this.addToggle(
+				new Setting(containerEl).setName(t(toggle.name)).setDesc(t(toggle.desc)),
+				toggle.key,
 			);
+		}
 
-		new Setting(containerEl)
-			.setName("Apply settings on installation")
-			.setDesc(
-				"After installing a plugin, apply its settings from your settings file.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.loadSettingsOnInstall)
-					.onChange(async (value) => {
-						this.plugin.settings.loadSettingsOnInstall = value;
-						await this.plugin.saveSettings();
-					}),
+		for (const definition of this.extraDefinitions()) {
+			definition.render(
+				new Setting(containerEl)
+					.setName(definition.name)
+					.setDesc(definition.desc),
 			);
-
-		new Setting(containerEl)
-			.setName("Merge settings instead of replace")
-			.setDesc(
-				"Update matching settings and keep the rest. When off, the plugin’s saved settings are replaced entirely.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.mergePluginSettings)
-					.onChange(async (value) => {
-						this.plugin.settings.mergePluginSettings = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Sync settings on every startup")
-			.setDesc(
-				"Each time Obsidian starts, apply your settings file to installed plugins.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.loadSettingsOnStartup)
-					.onChange(async (value) => {
-						this.plugin.settings.loadSettingsOnStartup = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Run automatic actions on mobile")
-			.setDesc(
-				"Let auto-install and settings sync on startup run on phones and tablets. Off by default, so a synced desktop setup does not start downloads on mobile data.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.allowAutoActionsOnMobile)
-					.onChange(async (value) => {
-						this.plugin.settings.allowAutoActionsOnMobile = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Leave out secrets on export")
-			.setDesc(
-				"Replace tokens, passwords and API keys with a placeholder in the exported settings file. Import never writes the placeholder over a real value.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.redactSecretsOnExport)
-					.onChange(async (value) => {
-						this.plugin.settings.redactSecretsOnExport = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Extra secret setting names")
-			.setDesc(
-				"Comma-separated setting names to leave out as well, for example: licenseCode, endpoint",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("License code, endpoint")
-					.setValue(this.plugin.settings.extraSecretKeys)
-					.onChange(async (value) => {
-						this.plugin.settings.extraSecretKeys = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Sync theme, snippets, hotkeys and core plugins")
-			.setDesc(
-				"Export saves your community theme, CSS snippets, custom hotkeys and which core plugins are on to vault-setup.json. Import applies them on the other device.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.syncVaultSetup)
-					.onChange(async (value) => {
-						this.plugin.settings.syncVaultSetup = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Logging level")
-			.setDesc(
-				"How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",
-			)
-			.addDropdown((dropdown) => {
-				dropdown
-					.addOption("debug", "Debug (most detail)")
-					.addOption("info", "Info")
-					.addOption("warn", "Warn")
-					.addOption("error", "Error (recommended)")
-					.addOption("none", "None")
-					.setValue(this.plugin.settings.logLevel || "error")
-					.onChange(
-						async (
-							value: "debug" | "info" | "warn" | "error" | "none",
-						) => {
-							this.plugin.settings.logLevel = value;
-							await this.plugin.saveSettings();
-							this.plugin.applyLogLevel(value);
-						},
-					);
-			});
+		}
 	}
 }

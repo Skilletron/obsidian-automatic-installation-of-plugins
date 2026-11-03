@@ -1,5 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 import { ParsedPack } from "./SetupPack";
+import { t } from "../i18n";
 
 // Asks for a link to a setup pack (or a path to one in the vault).
 export class PackLinkModal extends Modal {
@@ -15,15 +16,15 @@ export class PackLinkModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Import a setup pack" });
+		contentEl.createEl("h2", { text: t("pack.linkTitle") });
 		contentEl.createEl("p", {
 			cls: "setting-item-description",
-			text: "Paste a web link to a setup pack (a GitHub gist or a file on GitHub works too), or the path of a pack file in this vault. Nothing is installed until you confirm on the next screen.",
+			text: t("pack.linkDesc"),
 		});
 
-		new Setting(contentEl).setName("Link or path").addText((text) => {
+		new Setting(contentEl).setName(t("pack.linkName")).addText((text) => {
 			text
-				.setPlaceholder("Link or vault path")
+				.setPlaceholder(t("pack.linkPlaceholder"))
 				.onChange((value) => {
 					this.value = value;
 				});
@@ -38,12 +39,12 @@ export class PackLinkModal extends Modal {
 		new Setting(contentEl)
 			.addButton((button) =>
 				button
-					.setButtonText("Load")
+					.setButtonText(t("pack.load"))
 					.setCta()
 					.onClick(() => this.submit()),
 			)
 			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => this.close()),
+				button.setButtonText(t("common.cancel")).onClick(() => this.close()),
 			);
 	}
 
@@ -77,22 +78,25 @@ export class PackConfirmModal extends Modal {
 		const { pack } = this;
 		contentEl.empty();
 		contentEl.addClass("community-install-manager-pack-modal");
-		contentEl.createEl("h2", { text: pack.name || "Setup pack" });
+		contentEl.createEl("h2", { text: pack.name || t("pack.defaultName") });
 		if (pack.description) {
 			contentEl.createEl("p", { text: pack.description });
 		}
 		contentEl.createDiv({
 			cls: "community-install-manager-pack-source setting-item-description",
-			text: `From: ${this.source}`,
+			text: t("pack.from", { source: this.source }),
 		});
 		contentEl.createDiv({
 			cls: "community-install-manager-warning setting-item-description",
-			text: "Community plugins can read and change your notes. Only continue if you trust whoever made this pack.",
+			text: t("pack.warning"),
 		});
 
 		const settingsCount = Object.keys(pack.settings).length;
 		contentEl.createEl("h3", {
-			text: `${pack.plugins.length} plugin${pack.plugins.length === 1 ? "" : "s"} (${settingsCount} with settings)`,
+			text: t("pack.pluginCount", {
+				count: pack.plugins.length,
+				withSettings: settingsCount,
+			}),
 		});
 		const list = contentEl.createEl("ul", {
 			cls: "community-install-manager-pack-plugins",
@@ -103,13 +107,19 @@ export class PackConfirmModal extends Modal {
 				parts.push(`@${plugin.version}`);
 			}
 			if (plugin.devices) {
-				parts.push(` (${plugin.devices.join(", ")} only)`);
+				parts.push(
+					t("pack.devicesOnly", {
+						devices: plugin.devices
+							.map((d) => t(d === "mobile" ? "device.mobile" : "device.desktop"))
+							.join(", "),
+					}),
+				);
 			}
 			if (plugin.enabled === false) {
-				parts.push(" (stays off)");
+				parts.push(t("pack.staysOff"));
 			}
 			if (plugin.id in pack.settings) {
-				parts.push(" · settings");
+				parts.push(t("pack.hasSettings"));
 			}
 			list.createEl("li", { text: parts.join("") });
 		}
@@ -122,13 +132,13 @@ export class PackConfirmModal extends Modal {
 		}
 		contentEl.createEl("p", {
 			cls: "setting-item-description",
-			text: "The pack is added to your own plugin list and settings files (it wins where both have something), then the import runs. Undo last change puts the files back.",
+			text: t("pack.explain"),
 		});
 
 		new Setting(contentEl)
 			.addButton((button) =>
 				button
-					.setButtonText("Add to my setup and import")
+					.setButtonText(t("pack.confirm"))
 					.setCta()
 					.onClick(async () => {
 						this.close();
@@ -136,7 +146,7 @@ export class PackConfirmModal extends Modal {
 					}),
 			)
 			.addButton((button) =>
-				button.setButtonText("Cancel").onClick(() => this.close()),
+				button.setButtonText(t("common.cancel")).onClick(() => this.close()),
 			);
 	}
 

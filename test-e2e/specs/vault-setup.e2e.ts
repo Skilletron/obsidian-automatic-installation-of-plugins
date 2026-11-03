@@ -5,6 +5,7 @@ import {
 	readConfigJson,
 	runPluginMethod,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 const VAULT_SETUP = "vault-setup.json";
@@ -39,7 +40,7 @@ async function themeState(): Promise<ThemeState> {
 
 describe("Theme and CSS snippets", () => {
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await writeConfigJson("community-plugins-list.json", []);
 		await writeConfigJson(VAULT_SETUP, {
 			theme: { name: "Minimal", version: "9.1.3" },
@@ -112,7 +113,7 @@ describe("Hotkeys and core plugins", () => {
 	}
 
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await writeConfigJson("community-plugins-list.json", []);
 		await writeConfigJson(VAULT_SETUP, {
 			hotkeys: { "editor:toggle-bold": [bold] },

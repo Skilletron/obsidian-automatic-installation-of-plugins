@@ -148,6 +148,12 @@ export const Platform = { isMobile: false, isDesktop: true };
 
 export const apiVersion = "1.15.0";
 
+export function getLanguage(): string {
+	return "en";
+}
+
+export const moment = { locale: () => "en" };
+
 export class App {}
 
 export class Modal {

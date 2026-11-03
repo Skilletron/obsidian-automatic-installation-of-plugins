@@ -7,6 +7,7 @@ import { findPluginFolder, scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { restoreSecrets } from "../utils/secrets";
 import { SettingChange, diffSettings } from "../utils/settingsDiff";
+import { t } from "../i18n";
 
 // Assigning "__proto__" would replace the result's prototype instead of
 // copying the value.
@@ -88,9 +89,7 @@ export class SettingsManager {
 		const settingsFile = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
 
 		if (!(await this.fileManager.exists(settingsFile))) {
-			new Notice(
-				`[Installer] No ${PLUGINS_SETTINGS_FILE} file found, skipping applying settings.`,
-			);
+			new Notice(t("apply.noSettingsFile", { file: PLUGINS_SETTINGS_FILE }));
 			return [];
 		}
 
@@ -181,16 +180,14 @@ export class SettingsManager {
 				JSON.stringify(payload, null, 2),
 			);
 			if (!written) {
-				new Notice(
-					`[Installer] Cannot write settings for plugin ${target.pluginId}. Check file permissions.`,
-				);
+				new Notice(t("apply.cannotWrite", { id: target.pluginId }));
 			}
 			return written;
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Failed to write data.json for plugin ${target.pluginId}: ${errorMessage}`,
+				t("apply.writeFailed", { id: target.pluginId, error: errorMessage }),
 			);
 			logger.error(`Failed to write settings for ${target.pluginId}:`, err);
 			return false;

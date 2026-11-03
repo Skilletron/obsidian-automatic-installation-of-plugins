@@ -1,5 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 import { PluginUpdate } from "./UpdateChecker";
+import { t } from "../i18n";
 
 // Lists plugins with newer versions and lets the user update some or all.
 export class UpdatesModal extends Modal {
@@ -15,12 +16,12 @@ export class UpdatesModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("community-install-manager-updates-modal");
-		contentEl.createEl("h2", { text: "Plugin updates" });
+		contentEl.createEl("h2", { text: t("updates.modalTitle") });
 
 		const updatable = this.updates.filter((u) => u.available);
 		if (this.updates.length === 0) {
 			contentEl.createEl("p", {
-				text: "All community plugins are up to date.",
+				text: t("updates.none"),
 			});
 		}
 
@@ -30,7 +31,7 @@ export class UpdatesModal extends Modal {
 				.setDesc(describe(update));
 			if (update.available) {
 				setting.addButton((button) =>
-					button.setButtonText("Update").onClick(async () => {
+					button.setButtonText(t("updates.update")).onClick(async () => {
 						this.close();
 						await this.onUpdate([update]);
 					}),
@@ -42,7 +43,7 @@ export class UpdatesModal extends Modal {
 		if (updatable.length > 1) {
 			footer.addButton((button) =>
 				button
-					.setButtonText(`Update all (${updatable.length})`)
+					.setButtonText(t("updates.updateAll", { count: updatable.length }))
 					.setCta()
 					.onClick(async () => {
 						this.close();
@@ -51,7 +52,7 @@ export class UpdatesModal extends Modal {
 			);
 		}
 		footer.addButton((button) =>
-			button.setButtonText("Close").onClick(() => this.close()),
+			button.setButtonText(t("common.close")).onClick(() => this.close()),
 		);
 	}
 }
@@ -61,15 +62,18 @@ function describe(update: PluginUpdate): string {
 	if (update.available) {
 		parts.push(`${update.installed} → ${update.available}`);
 	} else {
-		parts.push(`Installed ${update.installed}`);
+		parts.push(t("updates.installed", { version: update.installed }));
 	}
 	if (update.newerNeedsApp) {
 		parts.push(
-			`${update.newerNeedsApp.version} needs Obsidian ${update.newerNeedsApp.minAppVersion}`,
+			t("updates.needsApp", {
+				version: update.newerNeedsApp.version,
+				minApp: update.newerNeedsApp.minAppVersion,
+			}),
 		);
 	}
 	if (update.pinned && update.available) {
-		parts.push(`the pin in your plugin list (${update.pinned}) will be updated too`);
+		parts.push(t("updates.pinToo", { version: update.pinned }));
 	}
 	return parts.join(" · ");
 }

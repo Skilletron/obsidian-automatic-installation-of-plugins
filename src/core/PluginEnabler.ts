@@ -3,6 +3,7 @@ import { FileManager } from "../utils/FileManager";
 import { PLUGIN_ID } from "../types";
 import { isSafePluginId } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
+import { t } from "../i18n";
 
 interface PluginsAPI {
 	manifests?: Record<string, { id?: string }>;
@@ -73,9 +74,7 @@ export class PluginEnabler {
 
 		const pluginsApi = this.getPluginsApi();
 		if (!pluginsApi) {
-			new Notice(
-				"Cannot access plugins API. Plugins will need to be enabled manually.",
-			);
+			new Notice(t("enable.noApi"));
 			return { enabled: 0, failed: 0, failedPlugins: pluginIds };
 		}
 

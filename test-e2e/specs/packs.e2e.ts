@@ -8,6 +8,7 @@ import {
 	runPluginMethod,
 	updateOwnSettings,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 const PLACEHOLDER = "<secret removed on export>";
@@ -41,7 +42,7 @@ describe("Setup packs", () => {
 	let packText = "";
 
 	it("exports a shareable pack with secrets left out", async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await writeConfigJson("community-plugins-list.json", [
 			{ id: HIDER, version: "1.7.1" },
 		]);
@@ -69,7 +70,7 @@ describe("Setup packs", () => {
 	});
 
 	it("imports a pack only after confirmation", async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await browser.executeObsidian(({ app }) =>
 			app.vault.adapter.mkdir("shared"),
 		);

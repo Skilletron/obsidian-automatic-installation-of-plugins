@@ -1,4 +1,5 @@
 import { Notice } from "obsidian";
+import { t } from "../i18n";
 
 // The plugin's single notice. A long task updates it in place, with a
 // progress bar, instead of showing a new notice for every step. Starting a
@@ -58,7 +59,7 @@ export class ProgressNotice {
 		this.setIndeterminate(false);
 		const percent = total > 0 ? Math.round(((current - 1) / total) * 100) : 0;
 		setWidth(this.fillEl, `${percent}%`);
-		this.detailEl.textContent = `${current} of ${total} · ${detail}`;
+		this.detailEl.textContent = t("progress.step", { current, total, detail });
 	}
 
 	// A step without a count, e.g. a final step after the per-plugin ones.

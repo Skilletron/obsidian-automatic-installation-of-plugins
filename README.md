@@ -42,6 +42,10 @@ This plugin can download and install other community plugins.
 - Auto-enable after install and apply settings on install (**on** by default for new installs)
 - Merge plugin settings into existing ones (on by default for new installs)
 
+## Languages
+
+The plugin follows Obsidian's language: English, Russian, Ukrainian, German, French, Spanish, Italian, Portuguese (Brazil), Polish, Turkish, Japanese, Korean, Chinese (Simplified) and Chinese (Traditional). Anything not translated falls back to English. Translations live in `src/i18n/locales/`; to add a language, copy `en.ts`, translate the texts and register it in `index.ts`. The tests check that every language has every text, the same `{placeholders}` and the plural forms its language needs.
+
 ## Network use
 
 | Remote service | Purpose |
