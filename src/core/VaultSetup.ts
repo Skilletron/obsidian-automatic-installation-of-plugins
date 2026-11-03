@@ -2,7 +2,11 @@ import { App } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { NetworkManager } from "../utils/NetworkManager";
 import { logger } from "../utils/Logger";
-import { isSafePathSegment, normalizeVersion } from "../utils/parsePluginList";
+import {
+	isSafePathSegment,
+	isSafePluginId,
+	normalizeVersion,
+} from "../utils/parsePluginList";
 import { COMMUNITY_THEMES_URL } from "../types";
 import { SettingsBackup } from "./SettingsBackup";
 
@@ -11,12 +15,97 @@ export interface SnippetSetup {
 	enabled?: boolean;
 }
 
-// Contents of community-appearance.json.
-export interface AppearanceSetup {
+// Same shape as in Obsidian's hotkeys.json. "Mod" is Ctrl on Windows and
+// Linux and Cmd on macOS.
+export interface Hotkey {
+	modifiers: string[];
+	key: string;
+}
+
+// Contents of vault-setup.json.
+export interface VaultSetup {
 	// Community theme to use. name "" is Obsidian's default theme; no
 	// version means the newest one. Unset: Import leaves the theme alone.
 	theme?: { name: string; version?: string };
 	snippets: Record<string, SnippetSetup>;
+	// Custom hotkeys by command id. An empty list removes the default one.
+	hotkeys?: Record<string, Hotkey[]>;
+	// Core plugins by id: true on, false off.
+	corePlugins?: Record<string, boolean>;
+}
+
+const MODIFIERS = new Set(["Mod", "Ctrl", "Meta", "Shift", "Alt"]);
+
+// Command ids look like "plugin-id:command" or "app:open-settings".
+function isSafeCommandId(id: string): boolean {
+	return /^[\w.-]+(:[\w.-]+)*$/.test(id);
+}
+
+function parseHotkeys(raw: unknown): Record<string, Hotkey[]> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		return undefined;
+	}
+	const hotkeys: Record<string, Hotkey[]> = {};
+	for (const [id, value] of Object.entries(raw)) {
+		if (!isSafeCommandId(id) || !Array.isArray(value)) {
+			logger.warn(`Ignoring hotkeys for "${id}".`);
+			continue;
+		}
+		const keys = value.filter(
+			(k): k is Hotkey =>
+				!!k &&
+				typeof k === "object" &&
+				typeof (k as Hotkey).key === "string" &&
+				(k as Hotkey).key !== "" &&
+				Array.isArray((k as Hotkey).modifiers) &&
+				(k as Hotkey).modifiers.every((m) => MODIFIERS.has(m)),
+		);
+		hotkeys[id] = keys.map((k) => ({
+			modifiers: [...k.modifiers],
+			key: k.key,
+		}));
+	}
+	return hotkeys;
+}
+
+// core-plugins.json is a list of enabled ids in older Obsidian versions and
+// an id -> on/off map in newer ones.
+function parseCorePlugins(raw: unknown): Record<string, boolean> | undefined {
+	if (Array.isArray(raw)) {
+		return Object.fromEntries(
+			raw
+				.filter((id): id is string => typeof id === "string" && isSafePluginId(id))
+				.map((id) => [id, true]),
+		);
+	}
+	if (!raw || typeof raw !== "object") {
+		return undefined;
+	}
+	const plugins: Record<string, boolean> = {};
+	for (const [id, on] of Object.entries(raw)) {
+		if (isSafePluginId(id) && typeof on === "boolean") {
+			plugins[id] = on;
+		}
+	}
+	return plugins;
+}
+
+// app.hotkeyManager and app.internalPlugins, also not public API.
+interface HotkeyManager {
+	setHotkeys?: (commandId: string, keys: Hotkey[]) => void;
+	save?: () => Promise<void>;
+}
+
+interface InternalPlugins {
+	plugins?: Record<
+		string,
+		{
+			enabled?: boolean;
+			enable?: (byUser?: boolean) => unknown;
+			disable?: (byUser?: boolean) => unknown;
+		}
+	>;
+	saveConfig?: () => Promise<void>;
 }
 
 interface ThemeRegistryEntry {
@@ -42,12 +131,12 @@ function isSafeSnippetName(name: string): boolean {
 }
 
 // Validates parsed JSON; invalid snippets are dropped with a warning.
-export function parseAppearance(raw: unknown): AppearanceSetup | null {
+export function parseVaultSetup(raw: unknown): VaultSetup | null {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
 		return null;
 	}
 	const obj = raw as Record<string, unknown>;
-	const setup: AppearanceSetup = { snippets: {} };
+	const setup: VaultSetup = { snippets: {} };
 
 	if (typeof obj.theme === "string") {
 		setup.theme = { name: obj.theme.trim() };
@@ -82,30 +171,54 @@ export function parseAppearance(raw: unknown): AppearanceSetup | null {
 			}
 		}
 	}
+
+	const hotkeys = parseHotkeys(obj.hotkeys);
+	if (hotkeys) {
+		setup.hotkeys = hotkeys;
+	}
+	const corePlugins =
+		obj.corePlugins && !Array.isArray(obj.corePlugins)
+			? parseCorePlugins(obj.corePlugins)
+			: undefined;
+	if (corePlugins) {
+		setup.corePlugins = corePlugins;
+	}
 	return setup;
 }
 
 // The active theme and enabled snippets as Obsidian has them in memory.
 // appearance.json on disk is saved with a delay and can lag behind.
-export interface LiveAppearance {
+export interface LiveVaultState {
 	theme: string;
 	enabledSnippets: string[];
+	corePlugins?: Record<string, boolean>;
 }
 
-export function liveAppearance(app: App): LiveAppearance | null {
+export function liveVaultState(app: App): LiveVaultState | null {
 	const css = (app as App & { customCss?: CustomCss }).customCss;
 	if (typeof css?.theme !== "string" || !css.enabledSnippets) {
 		return null;
 	}
-	return { theme: css.theme, enabledSnippets: [...css.enabledSnippets] };
+	const state: LiveVaultState = {
+		theme: css.theme,
+		enabledSnippets: [...css.enabledSnippets],
+	};
+	const internal = (app as App & { internalPlugins?: InternalPlugins })
+		.internalPlugins?.plugins;
+	if (internal) {
+		state.corePlugins = Object.fromEntries(
+			Object.entries(internal).map(([id, p]) => [id, p.enabled === true]),
+		);
+	}
+	return state;
 }
 
 // Reads the current theme and CSS snippets from the config folder, using
 // `live` for the active theme and enabled snippets when given.
-export async function readAppearance(
+export async function readVaultSetup(
 	fileManager: FileManager,
-	live: LiveAppearance | null = null,
-): Promise<AppearanceSetup> {
+	live: LiveVaultState | null = null,
+): Promise<VaultSetup> {
 	const config = await readJsonObject(
 		fileManager,
 		fileManager.configPath("appearance.json"),
@@ -121,7 +234,7 @@ export async function readAppearance(
 				: []),
 	);
 
-	const setup: AppearanceSetup = { theme: { name: themeName }, snippets: {} };
+	const setup: VaultSetup = { theme: { name: themeName }, snippets: {} };
 	if (themeName && isSafePathSegment(themeName)) {
 		const manifest = await readJsonObject(
 			fileManager,
@@ -151,7 +264,31 @@ export async function readAppearance(
 			setup.snippets[name] = { css, enabled: enabled.has(name) };
 		}
 	}
+
+	setup.hotkeys = parseHotkeys(
+		await readJsonValue(fileManager, fileManager.configPath("hotkeys.json")),
+	) ?? {};
+	setup.corePlugins =
+		live?.corePlugins ??
+		parseCorePlugins(
+			await readJsonValue(fileManager, fileManager.configPath("core-plugins.json")),
+		) ??
+		{};
 	return setup;
+}
+
+async function readJsonValue(
+	fileManager: FileManager,
+	path: string,
+): Promise<unknown> {
+	if (!(await fileManager.exists(path))) {
+		return undefined;
+	}
+	try {
+		return JSON.parse((await fileManager.readFile(path)) ?? "") as unknown;
+	} catch {
+		return undefined;
+	}
 }
 
 async function readJsonObject(
@@ -173,9 +310,9 @@ async function readJsonObject(
 
 // One line for the import preview: what Import would do with the theme
 // and snippets, compared with what is in this vault now.
-export function describeAppearanceChanges(
-	wanted: AppearanceSetup,
-	current: AppearanceSetup,
+export function describeVaultSetupChanges(
+	wanted: VaultSetup,
+	current: VaultSetup,
 ): string {
 	const parts: string[] = [];
 	if (wanted.theme) {
@@ -199,20 +336,74 @@ export function describeAppearanceChanges(
 			`Snippets: ${names.length} (${added} new, ${changed} changed, ${names.length - added - changed} unchanged)`,
 		);
 	}
+	if (wanted.hotkeys) {
+		const ids = Object.keys(wanted.hotkeys);
+		const changed = changedHotkeys(wanted.hotkeys, current.hotkeys ?? {}).length;
+		if (ids.length > 0) {
+			parts.push(`Hotkeys: ${ids.length} commands (${changed} would change)`);
+		}
+	}
+	if (wanted.corePlugins) {
+		const { on, off } = corePluginChanges(
+			wanted.corePlugins,
+			current.corePlugins ?? {},
+		);
+		if (on.length > 0 || off.length > 0) {
+			parts.push(
+				`Core plugins: would turn on ${on.length}, turn off ${off.length}`,
+			);
+		} else if (Object.keys(wanted.corePlugins).length > 0) {
+			parts.push("Core plugins: already as listed");
+		}
+	}
 	return parts.join(" · ");
 }
 
-export interface AppearanceResult {
+function changedHotkeys(
+	wanted: Record<string, Hotkey[]>,
+	current: Record<string, Hotkey[]>,
+): string[] {
+	return Object.keys(wanted).filter(
+		(id) => JSON.stringify(wanted[id]) !== JSON.stringify(current[id]),
+	);
+}
+
+// Core plugins whose state differs; ids this Obsidian doesn't know are left
+// out when `known` is given.
+function corePluginChanges(
+	wanted: Record<string, boolean>,
+	current: Record<string, boolean>,
+	known?: Set<string>,
+): { on: string[]; off: string[] } {
+	const on: string[] = [];
+	const off: string[] = [];
+	for (const [id, enabled] of Object.entries(wanted)) {
+		if (known && !known.has(id)) {
+			continue;
+		}
+		if (enabled && current[id] !== true) {
+			on.push(id);
+		} else if (!enabled && current[id] === true) {
+			off.push(id);
+		}
+	}
+	return { on, off };
+}
+
+export interface VaultSetupResult {
 	// What happened to the theme, for the import summary; null if the file
 	// does not mention a theme.
 	theme: string | null;
 	snippetsWritten: number;
 	snippetsEnabled: number;
+	hotkeysChanged: number;
+	corePluginsOn: number;
+	corePluginsOff: number;
 	problems: string[];
 }
 
-// Applies an AppearanceSetup through Obsidian's theme manager.
-export class AppearanceApplier {
+// Applies an VaultSetup through Obsidian's theme manager.
+export class VaultSetupApplier {
 	constructor(
 		private app: App,
 		private fileManager: FileManager,
@@ -224,25 +415,101 @@ export class AppearanceApplier {
 		return (this.app as App & { customCss?: CustomCss }).customCss;
 	}
 
-	async apply(setup: AppearanceSetup): Promise<AppearanceResult> {
-		const result: AppearanceResult = {
+	async apply(setup: VaultSetup): Promise<VaultSetupResult> {
+		const result: VaultSetupResult = {
 			theme: null,
 			snippetsWritten: 0,
 			snippetsEnabled: 0,
+			hotkeysChanged: 0,
+			corePluginsOn: 0,
+			corePluginsOff: 0,
 			problems: [],
 		};
 		await this.applySnippets(setup.snippets, result);
 		if (setup.theme) {
 			await this.applyTheme(setup.theme, result);
 		}
+		if (setup.hotkeys) {
+			await this.applyHotkeys(setup.hotkeys, result);
+		}
+		if (setup.corePlugins) {
+			await this.applyCorePlugins(setup.corePlugins, result);
+		}
 		return result;
+	}
+
+	// Sets hotkeys for the listed commands; other commands keep theirs.
+	private async applyHotkeys(
+		hotkeys: Record<string, Hotkey[]>,
+		result: VaultSetupResult,
+	): Promise<void> {
+		const current =
+			parseHotkeys(
+				await readJsonValue(
+					this.fileManager,
+					this.fileManager.configPath("hotkeys.json"),
+				),
+			) ?? {};
+		const changed = changedHotkeys(hotkeys, current);
+		if (changed.length === 0) {
+			return;
+		}
+		const manager = (this.app as App & { hotkeyManager?: HotkeyManager })
+			.hotkeyManager;
+		if (!manager?.setHotkeys || !manager.save) {
+			result.problems.push("Obsidian's hotkey manager is not available.");
+			return;
+		}
+		for (const id of changed) {
+			manager.setHotkeys(id, hotkeys[id]);
+		}
+		await manager.save();
+		result.hotkeysChanged = changed.length;
+	}
+
+	// Turns core plugins on or off as listed. Ones this Obsidian version or
+	// platform doesn't have are skipped.
+	private async applyCorePlugins(
+		wanted: Record<string, boolean>,
+		result: VaultSetupResult,
+	): Promise<void> {
+		const internal = (this.app as App & { internalPlugins?: InternalPlugins })
+			.internalPlugins;
+		const plugins = internal?.plugins;
+		if (!plugins) {
+			result.problems.push("Obsidian's core plugin manager is not available.");
+			return;
+		}
+		const current = Object.fromEntries(
+			Object.entries(plugins).map(([id, p]) => [id, p.enabled === true]),
+		);
+		const { on, off } = corePluginChanges(
+			wanted,
+			current,
+			new Set(Object.keys(plugins)),
+		);
+		for (const id of on) {
+			await plugins[id].enable?.(true);
+			if (plugins[id].enabled) {
+				result.corePluginsOn++;
+			}
+		}
+		for (const id of off) {
+			await plugins[id].disable?.(true);
+			if (!plugins[id].enabled) {
+				result.corePluginsOff++;
+			}
+		}
+		if (on.length > 0 || off.length > 0) {
+			await internal.saveConfig?.();
+		}
 	}
 
 	// Writes snippet files that are new or changed. Only snippets created
 	// here follow "enabled"; existing ones keep their on/off state.
 	private async applySnippets(
 		snippets: Record<string, SnippetSetup>,
-		result: AppearanceResult,
+		result: VaultSetupResult,
 	): Promise<void> {
 		const names = Object.keys(snippets);
 		if (names.length === 0) {
@@ -278,7 +545,7 @@ export class AppearanceApplier {
 
 	private async applyTheme(
 		theme: { name: string; version?: string },
-		result: AppearanceResult,
+		result: VaultSetupResult,
 	): Promise<void> {
 		const css = this.customCss;
 		if (!css?.setTheme) {

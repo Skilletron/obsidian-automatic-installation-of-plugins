@@ -10,8 +10,8 @@ import { scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { redactSecrets } from "../utils/secrets";
 import { parseDevices } from "../utils/parsePluginList";
-import { LiveAppearance, readAppearance } from "./Appearance";
-import { APPEARANCE_FILE } from "../types";
+import { LiveVaultState, readVaultSetup } from "./VaultSetup";
+import { VAULT_SETUP_FILE } from "../types";
 import { logger } from "../utils/Logger";
 
 export interface SecretOptions {
@@ -40,8 +40,8 @@ export class SetupExporter {
 			extraKeys: [],
 		}),
 		private backup?: SettingsBackup,
-		private includeAppearance: () => boolean = () => false,
-		private liveAppearance: () => LiveAppearance | null = () => null,
+		private includeVaultSetup: () => boolean = () => false,
+		private liveVaultState: () => LiveVaultState | null = () => null,
 	) {}
 
 	async listInstalledPlugins(): Promise<ExportedPlugin[]> {
@@ -174,23 +174,24 @@ export class SetupExporter {
 			throw new Error("could not write the setup JSON files");
 		}
 
-		let appearanceNote = "";
-		if (this.includeAppearance()) {
-			const appearance = await readAppearance(
+		let setupNote = "";
+		if (this.includeVaultSetup()) {
+			const vaultSetup = await readVaultSetup(
 				this.fileManager,
-				this.liveAppearance(),
+				this.liveVaultState(),
 			);
-			const appearancePath = this.fileManager.configPath(APPEARANCE_FILE);
-			await this.backup?.capture(appearancePath);
+			const setupPath = this.fileManager.configPath(VAULT_SETUP_FILE);
+			await this.backup?.capture(setupPath);
 			if (
 				await this.fileManager.writeFile(
-					appearancePath,
-					`${JSON.stringify(appearance, null, 2)}\n`,
+					setupPath,
+					`${JSON.stringify(vaultSetup, null, 2)}\n`,
 				)
 			) {
-				const count = Object.keys(appearance.snippets).length;
-				const theme = appearance.theme?.name || "the default theme";
-				appearanceNote = ` Also saved ${theme} and ${count} CSS snippet${count === 1 ? "" : "s"}.`;
+				const count = Object.keys(vaultSetup.snippets).length;
+				const hotkeys = Object.keys(vaultSetup.hotkeys ?? {}).length;
+				const theme = vaultSetup.theme?.name || "the default theme";
+				setupNote = ` Also saved ${theme}, ${count} CSS snippet${count === 1 ? "" : "s"}, ${hotkeys} custom hotkey${hotkeys === 1 ? "" : "s"} and your core plugins to ${VAULT_SETUP_FILE}.`;
 			}
 		}
 
@@ -204,7 +205,7 @@ export class SetupExporter {
 			redactedCount > 0
 				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
 				: "";
-		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}${appearanceNote}`;
+		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}${setupNote}`;
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
 		);

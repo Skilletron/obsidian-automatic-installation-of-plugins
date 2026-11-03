@@ -11,7 +11,7 @@ export interface InstallCommunityPluginsSettings {
 	// Comma-separated extra setting names to treat as secrets.
 	extraSecretKeys: string;
 	// Export and import the theme and CSS snippets too.
-	syncAppearance: boolean;
+	syncVaultSetup: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error" | "none";
 }
 
@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS: InstallCommunityPluginsSettings = {
 	allowAutoActionsOnMobile: false,
 	redactSecretsOnExport: true,
 	extraSecretKeys: "",
-	syncAppearance: true,
+	syncVaultSetup: true,
 	logLevel: "error",
 };
 
@@ -61,7 +61,7 @@ export const PLUGIN_REGISTRY_URL =
 export const PLUGIN_ID = "automatic-installation-of-plugins";
 export const PLUGINS_LIST_FILE = "community-plugins-list.json";
 export const PLUGINS_SETTINGS_FILE = "community-plugins-settings.json";
-export const APPEARANCE_FILE = "community-appearance.json";
+export const VAULT_SETUP_FILE = "vault-setup.json";
 export const COMMUNITY_THEMES_URL =
 	"https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-css-themes.json";
 export const USER_AGENT = "obsidian-community-install-manager";
