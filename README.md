@@ -159,7 +159,7 @@ Every part is optional. Export writes all four for you when **Sync theme, snippe
 
 | Command | Action |
 |---|---|
-| Preview plugin setup import | Shows what would be installed, skipped, re-pinned, or updated in settings — without changing anything |
+| Preview plugin setup import | Shows what would be installed, skipped or re-pinned, and exactly which settings would change for each plugin (old → new, with secrets masked) — without changing anything |
 | Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
 | Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
 | Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |

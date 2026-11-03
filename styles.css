@@ -291,3 +291,29 @@
     opacity: 0.4;
   }
 }
+
+/* Settings changes in the import preview */
+.community-install-manager-preview-changes {
+  margin-top: var(--size-2-2, 4px);
+  font-size: var(--font-ui-smaller, 0.85em);
+  color: var(--text-muted);
+}
+
+.community-install-manager-preview-changes summary {
+  cursor: pointer;
+}
+
+.community-install-manager-preview-changes ul {
+  margin: var(--size-2-2, 4px) 0 0;
+  padding-left: var(--size-4-4, 16px);
+  font-family: var(--font-monospace);
+  overflow-wrap: anywhere;
+}
+
+.community-install-manager-preview-changes li.is-added {
+  color: var(--text-success, var(--color-green));
+}
+
+.community-install-manager-preview-changes li.is-removed {
+  color: var(--text-error, var(--color-red));
+}

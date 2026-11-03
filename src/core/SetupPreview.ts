@@ -18,6 +18,8 @@ import {
 	readVaultSetup,
 } from "./VaultSetup";
 import { VAULT_SETUP_FILE } from "../types";
+import { SettingsManager } from "./SettingsManager";
+import { SettingChange, formatChange } from "../utils/settingsDiff";
 
 export type InstallPreviewAction =
 	| "install"
@@ -42,6 +44,8 @@ export interface PluginPreviewRow {
 	installNote: string;
 	settingsAction: SettingsPreviewAction;
 	settingsNote: string;
+	// What applying the settings entry would change in data.json.
+	settingsChanges?: SettingChange[];
 }
 
 export interface SetupPreviewReport {
@@ -65,6 +69,7 @@ export class SetupPreview {
 		private fileManager: FileManager,
 		private isMobile: () => boolean = () => Platform.isMobile,
 		private liveVaultState: () => LiveVaultState | null = () => null,
+		private settingsManager?: SettingsManager,
 	) {}
 
 	private async isFullyInstalled(pluginId: string): Promise<boolean> {
@@ -318,10 +323,27 @@ export class SetupPreview {
 		} 
 		else {
 			settingsAction = "would-apply";
-			settingsNote = loadSettingsOnInstall
-				? "Would apply settings on import/install"
-				: "Would apply only via Apply settings / startup sync";
+			// Import writes settings only for plugins it installs or re-pins;
+			// for the rest it takes Apply settings (or sync on startup).
+			settingsNote =
+				loadSettingsOnInstall && installAction === "repin"
+					? "Would apply settings after the version change"
+					: "Would apply with Apply settings or sync on startup";
 			summary.wouldApplySettings++;
+		}
+
+		let settingsChanges: SettingChange[] | undefined;
+		if (settingsAction === "would-apply" && this.settingsManager) {
+			settingsChanges = await this.settingsManager.previewSettings({
+				pluginId: id,
+				folderName: id,
+				settings: settingsMap[id],
+			});
+			const count = settingsChanges.length;
+			settingsNote +=
+				count > 0
+					? ` (${count} change${count === 1 ? "" : "s"})`
+					: " (already matches)";
 		}
 
 		return {
@@ -333,6 +355,7 @@ export class SetupPreview {
 			installNote,
 			settingsAction,
 			settingsNote,
+			...(settingsChanges ? { settingsChanges } : {}),
 		};
 	}
 
@@ -356,6 +379,9 @@ export class SetupPreview {
 			lines.push(`• ${row.id}${pin}`);
 			lines.push(`    install:  ${row.installNote}`);
 			lines.push(`    settings: ${row.settingsNote}`);
+			for (const change of row.settingsChanges ?? []) {
+				lines.push(`      ${formatChange(change)}`);
+			}
 		}
 
 		if (report.rows.length === 0) {
@@ -544,6 +570,23 @@ export class SetupPreviewModal extends Modal {
 			cls: "community-install-manager-preview-row-meta is-settings",
 			text: row.settingsNote,
 		});
+
+		const changes = row.settingsChanges ?? [];
+		if (changes.length > 0) {
+			const details = item.createEl("details", {
+				cls: "community-install-manager-preview-changes",
+			});
+			details.createEl("summary", {
+				text: `Show ${changes.length} setting change${changes.length === 1 ? "" : "s"}`,
+			});
+			const list = details.createEl("ul");
+			for (const change of changes) {
+				list.createEl("li", {
+					cls: `is-${change.kind}`,
+					text: formatChange(change),
+				});
+			}
+		}
 	}
 
 	onClose(): void {

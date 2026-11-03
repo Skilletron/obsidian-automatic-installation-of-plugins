@@ -351,3 +351,41 @@ describe("SettingsManager.applySettingsForPlugin", () => {
 		expect(vault.adapter.files.size).toBe(1);
 	});
 });
+
+describe("SettingsManager.previewSettings", () => {
+	const files = () => ({
+		...installedPlugin("ai", { id: "ai" }, { apiKey: "real", model: "old", keep: 1 }),
+	});
+	const target = (settings: unknown) => ({ pluginId: "ai", folderName: "ai", settings });
+
+	it("shows only real changes when merging, and never the placeholder", async () => {
+		const vault = createTestVault(files());
+		const manager = new SettingsManager(vault.fileManager, () => true);
+		expect(
+			await manager.previewSettings(
+				target({ apiKey: SECRET_PLACEHOLDER, model: "new" }),
+			),
+		).toEqual([{ path: "model", kind: "changed", before: "old", after: "new" }]);
+		expect(vault.readJson(dataPath("ai"))).toEqual({
+			apiKey: "real",
+			model: "old",
+			keep: 1,
+		});
+	});
+
+	it("shows removed keys when replacing", async () => {
+		const vault = createTestVault(files());
+		const manager = new SettingsManager(vault.fileManager, () => false);
+		expect(
+			await manager.previewSettings(target({ apiKey: SECRET_PLACEHOLDER, model: "old" })),
+		).toEqual([{ path: "keep", kind: "removed", before: 1 }]);
+	});
+
+	it("shows everything as added for a plugin without data.json", async () => {
+		const vault = createTestVault(installedPlugin("ai", { id: "ai" }));
+		const manager = new SettingsManager(vault.fileManager, () => true);
+		expect(await manager.previewSettings(target({ a: 1 }))).toEqual([
+			{ path: "a", kind: "added", after: 1 },
+		]);
+	});
+});
