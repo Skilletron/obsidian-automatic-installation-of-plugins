@@ -184,6 +184,29 @@ describe("PluginInstaller.installPlugin", () => {
 		});
 	});
 
+	it("skips the settings file when asked to", async () => {
+		serve({
+			[PLUGIN_REGISTRY_URL]: registry,
+			[release("1.2.0")]: manifest("1.2.0"),
+		});
+		const { installer, vault } = setup({
+			loadSettingsOnInstall: true,
+			files: {
+				[`.obsidian/${PLUGINS_SETTINGS_FILE}`]: JSON.stringify({
+					dataview: { a: 1 },
+				}),
+			},
+		});
+
+		expect(
+			await installer.installPlugin(
+				{ id: "dataview", version: "1.2.0" },
+				{ applySettings: false },
+			),
+		).toBe("installed");
+		expect(vault.read(".obsidian/plugins/dataview/data.json")).toBeUndefined();
+	});
+
 	it("installs a pinned version from its release manifest", async () => {
 		serve({
 			[PLUGIN_REGISTRY_URL]: registry,

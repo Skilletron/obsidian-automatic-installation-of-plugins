@@ -15,6 +15,12 @@ import { SetupExporter } from "./src/core/SetupExporter";
 import { SetupPreview, SetupPreviewModal } from "./src/core/SetupPreview";
 import { SettingsBackup } from "./src/core/SettingsBackup";
 import { ProgressNotice } from "./src/utils/ProgressNotice";
+import {
+	PluginUpdate,
+	UpdateChecker,
+	updatePinsInList,
+} from "./src/core/UpdateChecker";
+import { UpdatesModal } from "./src/core/UpdatesModal";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
@@ -37,6 +43,7 @@ export default class InstallCommunityPlugins extends Plugin {
 	setupExporter!: SetupExporter;
 	setupPreview!: SetupPreview;
 	settingsBackup!: SettingsBackup;
+	updateChecker!: UpdateChecker;
 	private busy = false;
 
 	async onload() {
@@ -68,6 +75,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			this.settingsBackup,
 		);
 		this.setupPreview = new SetupPreview(this.fileManager);
+		this.updateChecker = new UpdateChecker(
+			this.fileManager,
+			this.networkManager,
+		);
 
 		this.addCommand({
 			id: "export-plugin-setup",
@@ -98,6 +109,14 @@ export default class InstallCommunityPlugins extends Plugin {
 			name: "Apply settings from JSON",
 			callback: async () => {
 				await this.applySettingsToInstalledPlugins();
+			},
+		});
+
+		this.addCommand({
+			id: "check-plugin-updates",
+			name: "Check for plugin updates",
+			callback: async () => {
+				await this.checkForUpdates();
 			},
 		});
 
@@ -186,6 +205,128 @@ export default class InstallCommunityPlugins extends Plugin {
 		} finally {
 			await this.settingsBackup.end();
 		}
+	}
+
+	// Looks for newer versions and opens a list to pick from.
+	async checkForUpdates(): Promise<void> {
+		const updates = await this.findUpdates();
+		if (updates) {
+			new UpdatesModal(this.app, updates, (picked) =>
+				this.updatePlugins(picked),
+			).open();
+		}
+	}
+
+	async findUpdates(): Promise<PluginUpdate[] | null> {
+		const progress = new ProgressNotice("Checking for plugin updates");
+		try {
+			const updates = await this.updateChecker.check((current, total, id) =>
+				progress.update(current, total, id),
+			);
+			const count = updates.filter((u) => u.available).length;
+			progress.setTitle("Update check finished");
+			progress.finish(
+				count > 0
+					? `${count} plugin${count === 1 ? " has an update" : "s have updates"}.`
+					: "All community plugins are up to date.",
+				3000,
+			);
+			return updates;
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error";
+			logger.error("Update check failed:", err);
+			progress.setTitle("Update check failed");
+			progress.finish(NetworkManager.describeError(err) || errorMessage, 12000);
+			return null;
+		}
+	}
+
+	// Installs the newer versions, restarting plugins that are running, and
+	// moves their pins in the plugin list along so Import does not go back.
+	async updatePlugins(updates: PluginUpdate[]): Promise<void> {
+		const targets = updates.filter((u) => u.available);
+		if (targets.length === 0) {
+			return;
+		}
+		await this.runExclusive(() =>
+			this.withBackup("Update plugins", async () => {
+				const progress = new ProgressNotice("Updating plugins");
+				const updated = new Map<string, string>();
+				const failed: string[] = [];
+				try {
+					this.pluginInstaller.clearCaches();
+					for (let i = 0; i < targets.length; i++) {
+						const { pluginId, available } = targets[i];
+						const version = available as string;
+						progress.update(
+							i + 1,
+							targets.length,
+							`Updating ${pluginId} to ${version}`,
+						);
+						let result = "";
+						await this.pluginEnabler.runWithPluginsStopped(
+							[pluginId],
+							async () => {
+								result = await this.pluginInstaller.installPlugin(
+									{ id: pluginId, version },
+									{ applySettings: false },
+								);
+							},
+						);
+						if (result === "installed" || result === "unchanged") {
+							updated.set(pluginId, version);
+						} else {
+							failed.push(this.pluginInstaller.lastFailure || pluginId);
+						}
+					}
+
+					const pinsMoved = await this.movePins(updated);
+					await this.pluginEnabler.refreshPluginsUI();
+
+					const notes = [
+						`Updated ${updated.size} of ${targets.length} plugin${targets.length === 1 ? "" : "s"}.`,
+					];
+					if (pinsMoved > 0) {
+						notes.push(
+							`Moved ${pinsMoved} pin${pinsMoved === 1 ? "" : "s"} in ${PLUGINS_LIST_FILE}.`,
+						);
+					}
+					notes.push(...failed);
+					progress.setTitle(
+						failed.length > 0 ? "Update finished with problems" : "Update finished",
+					);
+					progress.finish(notes.join(" "), failed.length > 0 ? 12000 : 6000);
+				} catch (err: unknown) {
+					const errorMessage =
+						err instanceof Error ? err.message : "Unknown error";
+					logger.error("Update failed:", err);
+					progress.setTitle("Update failed");
+					progress.finish(errorMessage, 12000);
+				} finally {
+					this.pluginInstaller.clearCaches();
+				}
+			}),
+		);
+	}
+
+	private async movePins(versions: Map<string, string>): Promise<number> {
+		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
+		if (versions.size === 0 || !(await this.fileManager.exists(listPath))) {
+			return 0;
+		}
+		const text = await this.fileManager.readFile(listPath);
+		const updated = text ? updatePinsInList(text, versions) : null;
+		if (!updated) {
+			return 0;
+		}
+		const before = JSON.parse(text as string) as unknown[];
+		const after = JSON.parse(updated) as unknown[];
+		const moved = after.filter(
+			(item, i) => JSON.stringify(item) !== JSON.stringify(before[i]),
+		).length;
+		await this.settingsBackup.capture(listPath);
+		return (await this.fileManager.writeFile(listPath, updated)) ? moved : 0;
 	}
 
 	async undoLastChange(): Promise<void> {
@@ -394,8 +535,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			}
 
 			const content = await this.fileManager.readFile(pluginsJsonPath);
-			if (!content) {
-				progress.hide();
+			if (!content?.trim()) {
+				progress.finish(
+					`${PLUGINS_LIST_FILE} is empty. Add plugin IDs to it and import again.`,
+				);
 				return;
 			}
 
@@ -595,6 +738,22 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(target)
+			.setName("Check for updates")
+			.setDesc(
+				"See which installed community plugins have newer versions, and update them. Pins in your plugin list move along.",
+			)
+			.addButton((button) =>
+				button.setButtonText("Check").onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await this.plugin.checkForUpdates();
+					} finally {
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(target)
 			.setName("Undo last change")
 			.setDesc(
 				"Put back the settings and setup files as they were before the last Import, Apply settings or Export. Installed plugins stay installed.",
@@ -658,6 +817,11 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 							.onClick(async () => {
 								await this.plugin.applySettingsToInstalledPlugins();
 							}),
+					);
+					setting.addButton((button) =>
+						button.setButtonText("Check for updates").onClick(async () => {
+							await this.plugin.checkForUpdates();
+						}),
 					);
 					setting.addButton((button) =>
 						button.setButtonText("Undo").onClick(async () => {
