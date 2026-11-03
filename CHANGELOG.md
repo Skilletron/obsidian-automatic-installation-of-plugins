@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - End-to-end tests in a real Obsidian (wdio-obsidian-service) on the minimum supported version and the latest one: import, re-import, version change, apply settings, export (`npm run test:e2e`, also run in CI)
 
 ### Changed
-- The plugin shows one notice at a time instead of a notice for every plugin. Import and Apply settings update it in place with a progress bar; Export and Undo use it for their result; a new one replaces the previous one. Obsidian's own "installing" and "installed" notices are hidden during Import, and plugins that fail to install are listed with the reason in the final summary
+- The plugin shows one notice at a time instead of a notice for every plugin. Import and Apply settings update it in place with a progress bar; Export and Undo use it for their result; a new one replaces the previous one. Plugins that fail to install are listed with the reason in the final summary
 - Release workflow runs tests and uses Node 22
 - Updated esbuild to 0.27 and `@types/node` to 22
 
