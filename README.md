@@ -138,6 +138,7 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
 | Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
 | Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |
+| Check for plugin updates | Lists installed community plugins that have newer versions and updates the ones you pick |
 | Undo last import, export or settings change | Puts the files the last Import, Apply settings or Export changed back the way they were |
 
 ## Settings
@@ -156,6 +157,10 @@ Maps plugin IDs to settings objects applied to each plugin:
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
+
+### Updates
+
+**Check for plugin updates** looks up the newest version of each installed community plugin the same way Obsidian does, and shows the ones that can be updated. If the newest version needs a newer Obsidian, it offers the newest one that runs on yours and says so. Updating keeps the plugin's settings, restarts it if it was running, and moves its pin in `community-plugins-list.json` to the new version, so the next Import doesn't take you back.
 
 ### Secrets and undo
 

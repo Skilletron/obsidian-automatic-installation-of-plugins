@@ -119,7 +119,12 @@ export class PluginInstaller {
 		logger.warn(this.lastFailure);
 	}
 
-	async installPlugin(entry: PluginListEntry): Promise<InstallResult> {
+	// applySettings: false skips the settings file, for updates that should
+	// keep the settings the plugin has.
+	async installPlugin(
+		entry: PluginListEntry,
+		options: { applySettings?: boolean } = {},
+	): Promise<InstallResult> {
 		this.lastFailure = "";
 		if (
 			!entry?.id ||
@@ -273,7 +278,7 @@ export class PluginInstaller {
 				}
 			}
 
-			if (this.shouldLoadSettingsOnInstall()) {
+			if (options.applySettings !== false && this.shouldLoadSettingsOnInstall()) {
 				const installedFolderId = (await this.fileManager.exists(
 					this.fileManager.pluginsPath(manifest.id, "main.js"),
 				))

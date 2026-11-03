@@ -146,6 +146,8 @@ export async function requestUrl(
 
 export const Platform = { isMobile: false, isDesktop: true };
 
+export const apiVersion = "1.15.0";
+
 export class App {}
 
 export class Modal {
