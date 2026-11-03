@@ -129,12 +129,6 @@ export class PluginEnabler {
 		await this.saveEnabledSet(pluginsApi);
 		await this.showCommunityPluginsTab();
 
-		new Notice(
-			failedPlugins.length > 0
-				? `[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length === 1 ? "" : "s"}; failed: ${failedPlugins.join(", ")}.`
-				: `[Installer] Enabled ${enabledIds.length} plugin${enabledIds.length === 1 ? "" : "s"}.`,
-		);
-
 		return {
 			enabled: enabledIds.length,
 			failed: failedPlugins.length,

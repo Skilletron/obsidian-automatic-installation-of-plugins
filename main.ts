@@ -14,6 +14,7 @@ import { PluginEnabler } from "./src/core/PluginEnabler";
 import { SetupExporter } from "./src/core/SetupExporter";
 import { SetupPreview, SetupPreviewModal } from "./src/core/SetupPreview";
 import { SettingsBackup } from "./src/core/SettingsBackup";
+import { ProgressNotice } from "./src/utils/ProgressNotice";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
@@ -161,12 +162,13 @@ export default class InstallCommunityPlugins extends Plugin {
 		await this.runExclusive(() =>
 			this.withBackup("Export", async () => {
 				try {
-					await this.setupExporter.exportSetup();
+					const { message } = await this.setupExporter.exportSetup();
+					ProgressNotice.show("Export finished", message);
 				} catch (err: unknown) {
 					const errorMessage =
 						err instanceof Error ? err.message : "Unknown error";
-					new Notice(`[Installer] Export failed: ${errorMessage}`);
 					logger.error("Export failed:", err);
+					ProgressNotice.show("Export failed", errorMessage, 12000);
 				}
 			}),
 		);
@@ -191,7 +193,10 @@ export default class InstallCommunityPlugins extends Plugin {
 			try {
 				const latest = await this.settingsBackup.latest();
 				if (!latest) {
-					new Notice("[Installer] Nothing to undo.");
+					ProgressNotice.show(
+						"Nothing to undo",
+						"No earlier Import, Apply settings or Export to undo.",
+					);
 					return;
 				}
 				const { name, snapshot } = latest;
@@ -215,8 +220,10 @@ export default class InstallCommunityPlugins extends Plugin {
 				await this.pluginEnabler.refreshPluginsUI();
 
 				if (restored.length < snapshot.entries.length) {
-					new Notice(
-						`[Installer] Undo restored ${restored.length} of ${snapshot.entries.length} files. The backup is kept; see console for details.`,
+					ProgressNotice.show(
+						"Undo incomplete",
+						`Restored ${restored.length} of ${snapshot.entries.length} files. The backup is kept; see console for details.`,
+						12000,
 					);
 					return;
 				}
@@ -227,13 +234,14 @@ export default class InstallCommunityPlugins extends Plugin {
 					deferred > 0
 						? " Plugins will reload when you close Settings."
 						: "";
-				new Notice(
-					`[Installer] Undid ${snapshot.reason.toLowerCase()} from ${new Date(snapshot.createdAt).toLocaleString()}: restored ${files}.${reload}`,
+				ProgressNotice.show(
+					`Undid ${snapshot.reason.toLowerCase()}`,
+					`From ${new Date(snapshot.createdAt).toLocaleString()}: restored ${files}.${reload}`,
 				);
 			} catch (err: unknown) {
 				const errorMessage =
 					err instanceof Error ? err.message : "Unknown error";
-				new Notice(`[Installer] Undo failed: ${errorMessage}`);
+				ProgressNotice.show("Undo failed", errorMessage, 12000);
 				logger.error("Undo failed:", err);
 			}
 		});
@@ -251,10 +259,8 @@ export default class InstallCommunityPlugins extends Plugin {
 				"Import preview:\n" +
 					this.setupPreview.formatReportText(report),
 			);
+			// The modal shows the summary, so no notice.
 			new SetupPreviewModal(this.app, report).open();
-			new Notice(
-				`[Installer] Preview: install ${report.summary.install}, skip ${report.summary.skip}, re-pin ${report.summary.repin}.`,
-			);
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
@@ -321,10 +327,12 @@ export default class InstallCommunityPlugins extends Plugin {
 	}
 
 	private async applySettings(): Promise<void> {
-		new Notice("Applying plugin settings...");
+		const progress = new ProgressNotice("Applying plugin settings");
 		try {
 			const targets = await this.settingsManager.collectSettingsTargets();
 			if (targets.length === 0) {
+				// collectSettingsTargets explains why in its own notice.
+				progress.hide();
 				return;
 			}
 
@@ -338,67 +346,56 @@ export default class InstallCommunityPlugins extends Plugin {
 					},
 				);
 			if (applied.length === 0) {
+				progress.finish("No settings were written.");
 				return;
 			}
 			await this.pluginEnabler.refreshPluginsUI();
 
 			const count = `${applied.length} plugin${applied.length === 1 ? "" : "s"}`;
+			progress.setTitle("Settings applied");
 			if (deferred > 0) {
-				new Notice(
-					`[Installer] Applied settings to ${count}. ${deferred} running plugin${deferred === 1 ? "" : "s"} will reload when you close Settings.`,
+				progress.finish(
+					`Updated ${count}. ${deferred} running plugin${deferred === 1 ? "" : "s"} will reload when you close Settings.`,
 				);
 			} else if (restarted > 0) {
-				new Notice(
-					`[Installer] Applied settings to ${count} (${restarted} reloaded).`,
-				);
+				progress.finish(`Updated ${count} (${restarted} reloaded).`);
 			} else {
-				new Notice(`[Installer] Applied settings to ${count}.`);
+				progress.finish(`Updated ${count}.`);
 			}
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
-			new Notice(
-				`[Installer] Cannot access file system: ${errorMessage}`,
-			);
 			logger.error("File system access error:", err);
+			progress.setTitle("Applying settings failed");
+			progress.finish(`Cannot access file system: ${errorMessage}`, 12000);
 		}
 	}
 
 	async installPluginsFromFile() {
-		new Notice("Starting plugin setup import...");
+		// One notice for the whole run, updated in place. Problems with a
+		// single plugin still get a notice of their own.
+		const progress = new ProgressNotice("Importing plugin setup");
 		try {
 			this.pluginInstaller.clearCaches();
 			const pluginsJsonPath =
 				this.fileManager.configPath(PLUGINS_LIST_FILE);
 
 			if (!(await this.fileManager.exists(pluginsJsonPath))) {
-				try {
-					const created = await this.fileManager.writeFile(
-						pluginsJsonPath,
-						"[]",
-					);
-					if (!created) {
-						new Notice(
-							`[Installer] Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`,
-						);
-						return;
-					}
-					new Notice(
-						`[Installer] Created empty ${PLUGINS_LIST_FILE}`,
-					);
-				} catch (err: unknown) {
-					const errorMessage =
-						err instanceof Error ? err.message : "Unknown error";
-					new Notice(
-						`[Installer] Failed to create ${PLUGINS_LIST_FILE}: ${errorMessage}`,
-					);
-					logger.error(`Failed to create ${PLUGINS_LIST_FILE}:`, err);
-				}
+				const created = await this.fileManager.writeFile(
+					pluginsJsonPath,
+					"[]",
+				);
+				progress.finish(
+					created
+						? `Created an empty ${PLUGINS_LIST_FILE}. Add plugin IDs to it and import again.`
+						: `Cannot create ${PLUGINS_LIST_FILE}. Check file permissions.`,
+				);
 				return;
 			}
 
 			const content = await this.fileManager.readFile(pluginsJsonPath);
 			if (!content) {
+				progress.hide();
 				return;
 			}
 
@@ -408,20 +405,21 @@ export default class InstallCommunityPlugins extends Plugin {
 			} catch (err: unknown) {
 				const errorMessage =
 					err instanceof Error ? err.message : "Unknown error";
-				new Notice(
-					`[Installer] Invalid JSON in ${PLUGINS_LIST_FILE}: ${errorMessage}.`,
-				);
 				logger.error(`JSON parse error in ${PLUGINS_LIST_FILE}:`, err);
+				progress.finish(
+					`Invalid JSON in ${PLUGINS_LIST_FILE}: ${errorMessage}.`,
+				);
 				return;
 			}
 
 			const entries = parsePluginList(rawList);
 			if (!entries) {
+				progress.hide();
 				return;
 			}
 
 			if (entries.length === 0) {
-				new Notice("No plugins to install.");
+				progress.finish("No plugins to install.");
 				return;
 			}
 
@@ -431,8 +429,8 @@ export default class InstallCommunityPlugins extends Plugin {
 			);
 			const otherDeviceCount = entries.length - forThisDevice.length;
 			if (forThisDevice.length === 0) {
-				new Notice(
-					`[Installer] No plugins in the list are meant for this ${isMobile ? "mobile" : "desktop"} device.`,
+				progress.finish(
+					`No plugins in the list are meant for this ${isMobile ? "mobile" : "desktop"} device.`,
 				);
 				return;
 			}
@@ -440,6 +438,7 @@ export default class InstallCommunityPlugins extends Plugin {
 			const totalPlugins = forThisDevice.length;
 			let installedCount = 0;
 			let skippedCount = 0;
+			const failed: string[] = [];
 			// Plugins whose files changed in this run; only these get enabled.
 			const newlyInstalled: string[] = [];
 			// Installed in this run but marked "enabled": false in the list.
@@ -447,20 +446,18 @@ export default class InstallCommunityPlugins extends Plugin {
 
 			for (let i = 0; i < forThisDevice.length; i++) {
 				const entry = forThisDevice[i];
-				const current = i + 1;
 				const label = entry.version
 					? `${entry.id}@${entry.version}`
 					: entry.id;
-
-				new Notice(
-					`[Installer] Installing plugin ${current} of ${totalPlugins}: ${label}...`,
-				);
+				progress.update(i + 1, totalPlugins, `Installing ${label}`);
 
 				const result = await this.pluginInstaller.installPlugin(entry);
 
 				if (result === "skipped") {
 					skippedCount++;
-				} else if (result !== "failed") {
+				} else if (result === "failed") {
+					failed.push(this.pluginInstaller.lastFailure || entry.id);
+				} else {
 					installedCount++;
 				}
 				if (result === "installed") {
@@ -472,13 +469,12 @@ export default class InstallCommunityPlugins extends Plugin {
 				}
 			}
 
+			const notes: string[] = [];
 			if (newlyInstalled.length > 0 && this.settings.autoEnablePlugins) {
 				const result = await this.pluginEnabler.enableInstalledPlugins(
 					newlyInstalled,
 					(current, total, pluginId) => {
-						new Notice(
-							`[Installer] Enabling plugin ${current} of ${total}: ${pluginId}...`,
-						);
+						progress.update(current, total, `Turning on ${pluginId}`);
 					},
 				);
 				if (result.failed > 0) {
@@ -486,16 +482,16 @@ export default class InstallCommunityPlugins extends Plugin {
 						"Some plugins failed to enable:",
 						result.failedPlugins,
 					);
+					notes.push(
+						`Could not turn on: ${result.failedPlugins.join(", ")}.`,
+					);
 				}
 			} else if (newlyInstalled.length > 0) {
-				new Notice(
-					"[Installer] Auto-enable is off; plugins were installed but not turned on.",
-				);
+				notes.push("Auto-enable is off, so new plugins stay off.");
 			}
 
 			await this.pluginEnabler.refreshPluginsUI();
 
-			const notes: string[] = [];
 			if (skippedCount > 0) {
 				notes.push(
 					`Skipped ${skippedCount} desktop-only plugin${skippedCount > 1 ? "s" : ""} on this device.`,
@@ -511,23 +507,28 @@ export default class InstallCommunityPlugins extends Plugin {
 					`Left ${keptOff.length} turned off as set in the list.`,
 				);
 			}
-			const skippedNote = notes.length > 0 ? ` ${notes.join(" ")}` : "";
-			if (installedCount + skippedCount === totalPlugins) {
-				new Notice(
-					`[Installer] Successfully installed ${installedCount} plugin${installedCount === 1 ? "" : "s"}.${skippedNote}`,
-				);
-			} else {
-				new Notice(
-					`[Installer] Installed ${installedCount} of ${totalPlugins} plugin${totalPlugins > 1 ? "s" : ""}.${skippedNote}`,
-				);
-			}
+			notes.push(...failed);
+
+			const changed = newlyInstalled.length + keptOff.length;
+			const summary =
+				changed > 0
+					? `Installed or updated ${changed} plugin${changed === 1 ? "" : "s"}`
+					: "Everything was already up to date";
+			progress.setTitle(
+				failed.length > 0 ? "Import finished with problems" : "Import finished",
+			);
+			progress.finish(
+				[`${summary} (${installedCount} of ${totalPlugins} OK).`, ...notes].join(
+					" ",
+				),
+				failed.length > 0 ? 12000 : 6000,
+			);
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
-			new Notice(
-				`[Installer] Error during installation: ${errorMessage}. See console for details.`,
-			);
 			logger.error("Installation error:", err);
+			progress.setTitle("Import failed");
+			progress.finish(`${errorMessage}. See console for details.`, 12000);
 		} finally {
 			this.pluginInstaller.clearCaches();
 		}

@@ -85,7 +85,7 @@ describe("SetupExporter", () => {
 
 		const result = await new SetupExporter(vault.fileManager).exportSetup();
 
-		expect(result).toEqual({
+		expect(result).toMatchObject({
 			pluginCount: 4,
 			settingsCount: 1,
 			redactedCount: 0,
@@ -286,7 +286,7 @@ describe("SetupExporter", () => {
 		const vault = createTestVault();
 		const result = await new SetupExporter(vault.fileManager).exportSetup();
 
-		expect(result).toEqual({
+		expect(result).toMatchObject({
 			pluginCount: 0,
 			settingsCount: 0,
 			redactedCount: 0,

@@ -1,4 +1,4 @@
-import { Notice, Platform } from "obsidian";
+import { Platform } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import {
 	PLUGIN_ID,
@@ -77,6 +77,7 @@ export class SetupExporter {
 		pluginCount: number;
 		settingsCount: number;
 		redactedCount: number;
+		message: string;
 	}> {
 		const installed = await this.listInstalledPlugins();
 		const enabledIds = await this.readEnabledIds();
@@ -166,10 +167,7 @@ export class SetupExporter {
 		);
 
 		if (!listWritten || !settingsWritten) {
-			new Notice(
-				"[Installer] Export failed: could not write setup JSON files.",
-			);
-			return { pluginCount: 0, settingsCount: 0, redactedCount: 0 };
+			throw new Error("could not write the setup JSON files");
 		}
 
 		const settingsCount = Object.keys(settings).length;
@@ -182,9 +180,7 @@ export class SetupExporter {
 			redactedCount > 0
 				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
 				: "";
-		new Notice(
-			`[Installer] Exported ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}`,
-		);
+		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}`;
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
 		);
@@ -193,6 +189,7 @@ export class SetupExporter {
 			pluginCount: listEntries.length,
 			settingsCount,
 			redactedCount,
+			message,
 		};
 	}
 

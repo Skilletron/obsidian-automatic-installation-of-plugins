@@ -223,3 +223,71 @@
     justify-content: flex-start;
   }
 }
+
+/* Progress notice for Import and Apply settings */
+.community-install-manager-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2, 4px);
+  min-width: 220px;
+}
+
+.community-install-manager-progress-title {
+  font-weight: var(--font-semibold, 600);
+}
+
+.community-install-manager-progress-detail {
+  font-size: var(--font-ui-smaller, 0.85em);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.community-install-manager-progress-detail:empty {
+  display: none;
+}
+
+.community-install-manager-progress-bar {
+  position: relative;
+  height: 4px;
+  margin-top: var(--size-2-1, 2px);
+  border-radius: var(--radius-s, 4px);
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.community-install-manager-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--interactive-accent);
+  transition: width 200ms ease-out;
+}
+
+.community-install-manager-progress-bar.is-indeterminate
+  .community-install-manager-progress-fill {
+  position: absolute;
+  width: 30%;
+  animation: community-install-manager-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes community-install-manager-progress-slide {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .community-install-manager-progress-fill {
+    transition: none;
+  }
+  .community-install-manager-progress-bar.is-indeterminate
+    .community-install-manager-progress-fill {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

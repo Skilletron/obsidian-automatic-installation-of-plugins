@@ -1,4 +1,4 @@
-import { App, Notice, Platform, PluginManifest } from "obsidian";
+import { App, Platform, PluginManifest } from "obsidian";
 import { FileManager } from "../utils/FileManager";
 import { NetworkManager } from "../utils/NetworkManager";
 import { SettingsManager } from "./SettingsManager";
@@ -30,6 +30,9 @@ export type InstallResult = "installed" | "unchanged" | "skipped" | "failed";
 
 export class PluginInstaller {
 	private registryCache: PluginRegistryEntry[] | null = null;
+	// Why the last installPlugin() call returned "failed", for the import
+	// summary.
+	lastFailure = "";
 
 	constructor(
 		private app: App,
@@ -111,19 +114,25 @@ export class PluginInstaller {
 		);
 	}
 
+	private fail(message: string): void {
+		this.lastFailure = message.replace(/^\[Installer\] /, "");
+		logger.warn(this.lastFailure);
+	}
+
 	async installPlugin(entry: PluginListEntry): Promise<InstallResult> {
+		this.lastFailure = "";
 		if (
 			!entry?.id ||
 			typeof entry.id !== "string" ||
 			entry.id.trim() === ""
 		) {
-			new Notice("Invalid plugin ID provided.");
+			this.fail("Invalid plugin ID provided.");
 			return "failed";
 		}
 
 		const normalizedId = entry.id.trim();
 		if (!isSafePluginId(normalizedId)) {
-			new Notice(`Invalid plugin ID: "${normalizedId}".`);
+			this.fail(`Invalid plugin ID: "${normalizedId}".`);
 			return "failed";
 		}
 
@@ -135,7 +144,7 @@ export class PluginInstaller {
 		const fullyInstalled = await this.isFullyInstalled(normalizedId);
 
 		if (fullyInstalled && !pinnedVersion) {
-			new Notice(`Plugin "${normalizedId}" already installed.`);
+			logger.info(`Plugin "${normalizedId}" already installed.`);
 			return "unchanged";
 		}
 
@@ -143,7 +152,7 @@ export class PluginInstaller {
 			const localVersion =
 				await this.getLocalInstalledVersion(normalizedId);
 			if (localVersion && localVersion === pinnedVersion) {
-				new Notice(
+				logger.info(
 					`Plugin "${normalizedId}" already at pinned version ${pinnedVersion}.`,
 				);
 				return "unchanged";
@@ -154,7 +163,7 @@ export class PluginInstaller {
 		}
 
 		if (!pluginsApi?.installPlugin) {
-			new Notice(
+			this.fail(
 				"[Installer] Obsidian installPlugin API is unavailable. Update Obsidian and try again.",
 			);
 			return "failed";
@@ -171,14 +180,14 @@ export class PluginInstaller {
 			);
 
 			if (!pluginMeta) {
-				new Notice(
+				this.fail(
 					`Plugin "${normalizedId}" not found in Obsidian Community Plugins registry.`,
 				);
 				return "failed";
 			}
 
 			if (!pluginMeta.repo || typeof pluginMeta.repo !== "string") {
-				new Notice(
+				this.fail(
 					`Plugin "${normalizedId}" has invalid repository information in registry.`,
 				);
 				return "failed";
@@ -186,7 +195,7 @@ export class PluginInstaller {
 
 			const repoParts = pluginMeta.repo.split("/");
 			if (repoParts.length !== 2) {
-				new Notice(
+				this.fail(
 					`Plugin "${normalizedId}" has invalid repository format: ${pluginMeta.repo}`,
 				);
 				return "failed";
@@ -201,11 +210,11 @@ export class PluginInstaller {
 			);
 			if (!resolved) {
 				if (pinnedVersion) {
-					new Notice(
+					this.fail(
 						`[Installer] Could not fetch manifest for "${normalizedId}" ${pinnedVersion}. GitHub may be rate-limiting requests.`,
 					);
 				} else {
-					new Notice(
+					this.fail(
 						`No suitable release found for plugin "${normalizedId}".`,
 					);
 				}
@@ -214,14 +223,14 @@ export class PluginInstaller {
 
 			const { manifest, version } = resolved;
 			if (!manifest?.id || !version) {
-				new Notice(
+				this.fail(
 					`[Installer] Invalid manifest.json for "${normalizedId}".`,
 				);
 				return "failed";
 			}
 
 			if (manifest.isDesktopOnly && this.isMobile()) {
-				new Notice(
+				logger.info(
 					`Plugin "${normalizedId}" is desktop-only; skipped on this device.`,
 				);
 				return "skipped";
@@ -231,21 +240,29 @@ export class PluginInstaller {
 				`Installing "${normalizedId}" via Obsidian installPlugin (${pluginMeta.repo}@${version})`,
 			);
 
+			// The import shows its own progress, so hide the "installing" and
+			// "installed" notices Obsidian shows for each plugin. Failures
+			// still get a notice from this plugin below.
+			const stopHiding = hideNoticesMentioning(manifest.name);
 			try {
-				await pluginsApi.installPlugin(
-					pluginMeta.repo,
-					version,
-					manifest,
-				);
-			} catch (firstErr: unknown) {
-				const alt = version.startsWith("v")
-					? version.slice(1)
-					: `v${version}`;
-				logger.debug(
-					`installPlugin(${version}) failed, retrying with ${alt}`,
-					firstErr,
-				);
-				await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
+				try {
+					await pluginsApi.installPlugin(
+						pluginMeta.repo,
+						version,
+						manifest,
+					);
+				} catch (firstErr: unknown) {
+					const alt = version.startsWith("v")
+						? version.slice(1)
+						: `v${version}`;
+					logger.debug(
+						`installPlugin(${version}) failed, retrying with ${alt}`,
+						firstErr,
+					);
+					await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
+				}
+			} finally {
+				stopHiding();
 			}
 
 			if (typeof pluginsApi.loadManifests === "function") {
@@ -275,7 +292,7 @@ export class PluginInstaller {
 				}
 			}
 
-			new Notice(
+			logger.info(
 				pinnedVersion
 					? `Plugin "${normalizedId}" installed at ${version}.`
 					: `Plugin "${normalizedId}" installed successfully.`,
@@ -283,7 +300,7 @@ export class PluginInstaller {
 			return "installed";
 		} catch (err: unknown) {
 			const errorMessage = NetworkManager.describeError(err);
-			new Notice(
+			this.fail(
 				`[Installer] Failed to install plugin "${normalizedId}": ${errorMessage}`,
 			);
 			logger.error(`Installation error for ${normalizedId}:`, err);
@@ -371,4 +388,34 @@ export class PluginInstaller {
 		}
 		return null;
 	}
+}
+
+// Until the returned function is called, removes new notices whose text
+// contains `name`. Notices already on screen (the import progress) stay.
+function hideNoticesMentioning(name: string): () => void {
+	if (
+		!name ||
+		typeof MutationObserver === "undefined" ||
+		typeof document.querySelectorAll !== "function"
+	) {
+		return () => {};
+	}
+	const before = new Set(Array.from(document.querySelectorAll(".notice")));
+	const sweep = () => {
+		for (const notice of Array.from(document.querySelectorAll(".notice"))) {
+			if (!before.has(notice) && notice.textContent?.includes(name)) {
+				notice.remove();
+			}
+		}
+	};
+	const observer = new MutationObserver(sweep);
+	observer.observe(document.body, {
+		childList: true,
+		subtree: true,
+		characterData: true,
+	});
+	return () => {
+		sweep();
+		observer.disconnect();
+	};
 }
