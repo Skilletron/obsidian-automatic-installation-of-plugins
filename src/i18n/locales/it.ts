@@ -344,9 +344,6 @@ export const it: LocaleMessages = {
 	"settings.warningPrefix": "Avviso di sicurezza: ",
 	"settings.warningDesc":
 		"Questo plugin può scaricare e installare plugin della community. Usalo solo con vault attendibili e controlla l’elenco dei plugin prima di attivare l’installazione automatica.",
-	"settings.actionsName": "Esporta / Importa",
-	"settings.actionsDesc":
-		"Gestisci l’elenco dei plugin e i file di impostazioni in {dir}.",
 	"settings.previewName": "Anteprima importazione",
 	"settings.previewDesc":
 		"Mostra quali plugin verrebbero installati, saltati o aggiornati e quali impostazioni cambierebbero, senza modificare il vault.",
@@ -367,12 +364,10 @@ export const it: LocaleMessages = {
 	"settings.importPackDesc":
 		"Aggiungi alla tua configurazione il pacchetto di qualcun altro tramite un link. Vedi cosa contiene prima che venga installato qualcosa.",
 	"settings.importPackButton": "Importa da link",
-	"settings.importPackShortButton": "Importa pacchetto",
 	"settings.updatesName": "Controlla aggiornamenti",
 	"settings.updatesDesc":
 		"Mostra quali plugin della community installati hanno versioni più recenti e li aggiorna. Le versioni fissate nel tuo elenco di plugin vengono aggiornate di conseguenza.",
 	"settings.updatesButton": "Controlla",
-	"settings.updatesLongButton": "Controlla aggiornamenti",
 	"settings.undoName": "Annulla l’ultima modifica",
 	"settings.undoDesc":
 		"Ripristina i file di impostazioni e di configurazione com’erano prima dell’ultima importazione, aggiornamento delle impostazioni o esportazione. I plugin installati restano installati.",
@@ -404,7 +399,7 @@ export const it: LocaleMessages = {
 	"settings.extraSecretsName": "Nomi aggiuntivi di impostazioni segrete",
 	"settings.extraSecretsDesc":
 		"Nomi di impostazioni separati da virgole da escludere anch’essi, ad esempio: licenseCode, endpoint",
-	"settings.extraSecretsPlaceholder": "Codice di licenza, endpoint",
+	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
 		"Sincronizza tema, snippet, tasti di scelta rapida e plugin principali",
 	"settings.syncVaultSetupDesc":

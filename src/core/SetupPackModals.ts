@@ -16,13 +16,17 @@ export class PackLinkModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
+		contentEl.addClass("community-install-manager-pack-link-modal");
 		contentEl.createEl("h2", { text: t("pack.linkTitle") });
 		contentEl.createEl("p", {
 			cls: "setting-item-description",
 			text: t("pack.linkDesc"),
 		});
 
-		new Setting(contentEl).setName(t("pack.linkName")).addText((text) => {
+		const link = new Setting(contentEl).setName(t("pack.linkName"));
+		// The input gets a row of its own so the whole link stays readable.
+		link.settingEl.addClass("community-install-manager-pack-link");
+		link.addText((text) => {
 			text
 				.setPlaceholder(t("pack.linkPlaceholder"))
 				.onChange((value) => {

@@ -278,8 +278,6 @@ export const ko: LocaleMessages = {
 	"settings.warningPrefix": "보안 경고: ",
 	"settings.warningDesc":
 		"이 기능은 커뮤니티 플러그인을 다운로드하고 설치할 수 있습니다. 신뢰할 수 있는 보관소에서만 사용하고, 자동 설치를 켜기 전에 플러그인 목록을 검토하세요.",
-	"settings.actionsName": "내보내기 / 가져오기",
-	"settings.actionsDesc": "{dir}의 플러그인 목록과 설정 파일을 관리합니다.",
 	"settings.previewName": "가져오기 미리보기",
 	"settings.previewDesc":
 		"보관소를 변경하지 않고, 어떤 플러그인이 설치되거나 건너뛰어지거나 업데이트되는지, 어떤 설정이 바뀌는지 확인합니다.",
@@ -300,12 +298,10 @@ export const ko: LocaleMessages = {
 	"settings.importPackDesc":
 		"다른 사람의 구성 팩을 링크에서 내 구성에 추가합니다. 설치하기 전에 어떤 내용이 들어 있는지 확인할 수 있습니다.",
 	"settings.importPackButton": "링크에서 가져오기",
-	"settings.importPackShortButton": "팩 가져오기",
 	"settings.updatesName": "업데이트 확인",
 	"settings.updatesDesc":
 		"설치된 커뮤니티 플러그인 중 새 버전이 있는 플러그인을 확인하고 업데이트합니다. 플러그인 목록의 고정 버전도 함께 바뀝니다.",
 	"settings.updatesButton": "확인",
-	"settings.updatesLongButton": "업데이트 확인",
 	"settings.undoName": "마지막 변경 실행 취소",
 	"settings.undoDesc":
 		"설정 파일과 구성 파일을 마지막 가져오기, 설정 업데이트 또는 내보내기 이전 상태로 되돌립니다. 설치된 플러그인은 그대로 유지됩니다.",

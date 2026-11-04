@@ -343,9 +343,6 @@ export const fr: LocaleMessages = {
 	"settings.warningPrefix": "Avertissement de sécurité : ",
 	"settings.warningDesc":
 		"Ce plugin peut télécharger et installer des plugins communautaires. Ne l’utilisez qu’avec des coffres de confiance, et vérifiez votre liste de plugins avant d’activer l’installation automatique.",
-	"settings.actionsName": "Export / Import",
-	"settings.actionsDesc":
-		"Gérer la liste des plugins et les fichiers de paramètres dans {dir}.",
 	"settings.previewName": "Aperçu de l’import",
 	"settings.previewDesc":
 		"Voir quels plugins seraient installés, ignorés ou mis à jour, et quels paramètres changeraient, sans modifier votre coffre.",
@@ -366,12 +363,10 @@ export const fr: LocaleMessages = {
 	"settings.importPackDesc":
 		"Ajouter le pack de configuration de quelqu’un d’autre au vôtre depuis un lien. Vous voyez son contenu avant toute installation.",
 	"settings.importPackButton": "Importer depuis un lien",
-	"settings.importPackShortButton": "Importer un pack",
 	"settings.updatesName": "Rechercher des mises à jour",
 	"settings.updatesDesc":
 		"Voir quels plugins communautaires installés ont des versions plus récentes, et les mettre à jour. Les épinglages de votre liste de plugins suivent.",
 	"settings.updatesButton": "Vérifier",
-	"settings.updatesLongButton": "Rechercher des mises à jour",
 	"settings.undoName": "Annuler la dernière modification",
 	"settings.undoDesc":
 		"Remettre les fichiers de paramètres et de configuration dans leur état d’avant le dernier import, la dernière mise à jour des paramètres ou le dernier export. Les plugins installés restent installés.",
@@ -403,7 +398,7 @@ export const fr: LocaleMessages = {
 	"settings.extraSecretsName": "Noms de paramètres secrets supplémentaires",
 	"settings.extraSecretsDesc":
 		"Noms de paramètres à omettre également, séparés par des virgules, par exemple : licenseCode, endpoint",
-	"settings.extraSecretsPlaceholder": "Code de licence, point de terminaison",
+	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
 		"Synchroniser le thème, les extraits, les raccourcis clavier et les plugins principaux",
 	"settings.syncVaultSetupDesc":

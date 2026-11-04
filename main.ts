@@ -954,6 +954,13 @@ type BooleanSetting = {
 
 type LogLevelName = NonNullable<InstallCommunityPluginsSettings["logLevel"]>;
 
+interface Action {
+	name: MessageKey;
+	desc: string;
+	button: MessageKey;
+	run: () => Promise<void> | void;
+}
+
 class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 	plugin: InstallCommunityPlugins;
 
@@ -962,14 +969,8 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// The action buttons, in the order they appear.
-	private actions(): Array<{
-		name: MessageKey;
-		desc: string;
-		button: MessageKey;
-		shortButton: MessageKey;
-		run: () => Promise<void> | void;
-	}> {
+	// The actions, one setting each, in the order they appear.
+	private actions(): Action[] {
 		const dir = this.app.vault.configDir;
 		const openPackLink = () => {
 			new PackLinkModal(this.app, (input) => {
@@ -981,59 +982,64 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				name: "settings.previewName",
 				desc: t("settings.previewDesc"),
 				button: "settings.previewButton",
-				shortButton: "settings.previewButton",
 				run: () => this.plugin.previewPluginSetup(),
 			},
 			{
 				name: "settings.exportName",
 				desc: t("settings.exportDesc", { dir }),
 				button: "settings.exportButton",
-				shortButton: "settings.exportButton",
 				run: () => this.plugin.exportPluginSetup(),
 			},
 			{
 				name: "settings.importName",
 				desc: t("settings.importDesc"),
 				button: "settings.importButton",
-				shortButton: "settings.importButton",
 				run: () => this.plugin.runImportPipeline(),
 			},
 			{
 				name: "settings.applyName",
 				desc: t("settings.applyDesc"),
 				button: "settings.applyButton",
-				shortButton: "settings.applyName",
 				run: () => this.plugin.applySettingsToInstalledPlugins(),
 			},
 			{
 				name: "settings.updatesName",
 				desc: t("settings.updatesDesc"),
 				button: "settings.updatesButton",
-				shortButton: "settings.updatesLongButton",
 				run: () => this.plugin.checkForUpdates(),
 			},
 			{
 				name: "settings.shareName",
 				desc: t("settings.shareDesc"),
 				button: "settings.shareButton",
-				shortButton: "settings.shareButton",
 				run: () => this.plugin.exportSetupPack(),
 			},
 			{
 				name: "settings.importPackName",
 				desc: t("settings.importPackDesc"),
 				button: "settings.importPackButton",
-				shortButton: "settings.importPackShortButton",
 				run: openPackLink,
 			},
 			{
 				name: "settings.undoName",
 				desc: t("settings.undoDesc"),
 				button: "settings.undoButton",
-				shortButton: "settings.undoButton",
 				run: () => this.plugin.undoLastChange(),
 			},
 		];
+	}
+
+	private addActionButton(setting: Setting, action: Action): void {
+		setting.addButton((button) =>
+			button.setButtonText(t(action.button)).onClick(async () => {
+				button.setDisabled(true);
+				try {
+					await action.run();
+				} finally {
+					button.setDisabled(false);
+				}
+			}),
+		);
 	}
 
 	private toggles(): Array<{
@@ -1152,19 +1158,11 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 				name: t("settings.warningName"),
 				desc: t("settings.warningDesc"),
 			},
-			{
-				name: t("settings.actionsName"),
-				desc: t("settings.actionsDesc", { dir: this.app.vault.configDir }),
-				render: (setting: Setting) => {
-					for (const action of this.actions()) {
-						setting.addButton((button) =>
-							button.setButtonText(t(action.shortButton)).onClick(async () => {
-								await action.run();
-							}),
-						);
-					}
-				},
-			},
+			...this.actions().map((action) => ({
+				name: t(action.name),
+				desc: action.desc,
+				render: (setting: Setting) => this.addActionButton(setting, action),
+			})),
 			...this.toggles().map((toggle) => ({
 				name: t(toggle.name),
 				desc: t(toggle.desc),
@@ -1186,19 +1184,10 @@ class InstallCommunityPluginsSettingTab extends PluginSettingTab {
 		warningDiv.appendText(t("settings.warningDesc"));
 
 		for (const action of this.actions()) {
-			new Setting(containerEl)
-				.setName(t(action.name))
-				.setDesc(action.desc)
-				.addButton((button) =>
-					button.setButtonText(t(action.button)).onClick(async () => {
-						button.setDisabled(true);
-						try {
-							await action.run();
-						} finally {
-							button.setDisabled(false);
-						}
-					}),
-				);
+			this.addActionButton(
+				new Setting(containerEl).setName(t(action.name)).setDesc(action.desc),
+				action,
+			);
 		}
 
 		for (const toggle of this.toggles()) {

@@ -31,6 +31,10 @@ if (env.CI) {
 	console.log("obsidian-cache-key:", JSON.stringify(versions));
 }
 
+// Restarting Obsidian once per language is slow on an emulator; every
+// language is already checked in the emulated mobile layout on desktop.
+env.LAYOUT_LANGUAGES ??= "en de uk ja";
+
 export const config: WebdriverIO.Config = {
 	runner: "local",
 	framework: "mocha",

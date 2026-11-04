@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The plugin shows one notice at a time instead of a notice for every plugin. Import and Apply settings update it in place with a progress bar; Export and Undo use it for their result; a new one replaces the previous one. Plugins that fail to install are listed with the reason in the final summary
 - Release workflow runs tests and uses Node 22
 - Updated esbuild to 0.27 and `@types/node` to 22
+- In Obsidian 1.13+ every action in the settings tab has its own setting with a description, as in older versions, instead of one row of buttons that ran off narrow screens; settings search finds each action
+- Buttons and long texts in the plugin's windows wrap on narrow screens, and on phones the windows scroll instead of squeezing their text together
 
 ## [1.2.0] - 2026-08-15
 

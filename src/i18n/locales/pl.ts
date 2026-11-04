@@ -360,8 +360,6 @@ export const pl: LocaleMessages = {
 	"settings.warningPrefix": "Ostrzeżenie dotyczące bezpieczeństwa: ",
 	"settings.warningDesc":
 		"Ta wtyczka może pobierać i instalować wtyczki społeczności. Używaj jej tylko w zaufanych sejfach i przejrzyj listę wtyczek, zanim włączysz automatyczną instalację.",
-	"settings.actionsName": "Eksport / import",
-	"settings.actionsDesc": "Zarządzaj listą wtyczek i plikami ustawień w {dir}.",
 	"settings.previewName": "Podgląd importu",
 	"settings.previewDesc":
 		"Zobacz, które wtyczki zostaną zainstalowane, pominięte lub zaktualizowane i które ustawienia się zmienią — bez zmieniania sejfu.",
@@ -382,12 +380,10 @@ export const pl: LocaleMessages = {
 	"settings.importPackDesc":
 		"Dodaj cudzy pakiet konfiguracji do swojej z linku. Zobaczysz jego zawartość, zanim cokolwiek zostanie zainstalowane.",
 	"settings.importPackButton": "Importuj z linku",
-	"settings.importPackShortButton": "Importuj pakiet",
 	"settings.updatesName": "Sprawdź aktualizacje",
 	"settings.updatesDesc":
 		"Zobacz, które zainstalowane wtyczki społeczności mają nowsze wersje, i zaktualizuj je. Przypięte wersje na liście wtyczek też zostaną zaktualizowane.",
 	"settings.updatesButton": "Sprawdź",
-	"settings.updatesLongButton": "Sprawdź aktualizacje",
 	"settings.undoName": "Cofnij ostatnią zmianę",
 	"settings.undoDesc":
 		"Przywróć ustawienia i pliki konfiguracji do stanu sprzed ostatniego importu, aktualizacji ustawień lub eksportu. Zainstalowane wtyczki pozostaną zainstalowane.",

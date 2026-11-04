@@ -323,9 +323,6 @@ export const tr: LocaleMessages = {
 	"settings.warningPrefix": "Güvenlik uyarısı: ",
 	"settings.warningDesc":
 		"Bu eklenti topluluk eklentilerini indirip kurabilir. Yalnızca güvendiğiniz kasalarda kullanın ve otomatik kurulumu etkinleştirmeden önce eklenti listenizi gözden geçirin.",
-	"settings.actionsName": "Dışa aktar / İçe aktar",
-	"settings.actionsDesc":
-		"Eklenti listesini ve ayar dosyalarını yönetin. Konum: {dir}",
 	"settings.previewName": "İçe aktarmayı önizle",
 	"settings.previewDesc":
 		"Kasanızı değiştirmeden hangi eklentilerin kurulacağını, atlanacağını veya güncelleneceğini ve hangi ayarların değişeceğini görün.",
@@ -346,12 +343,10 @@ export const tr: LocaleMessages = {
 	"settings.importPackDesc":
 		"Başka birinin kurulum paketini bir bağlantıdan kendi kurulumunuza ekleyin. Herhangi bir şey kurulmadan önce paketin içeriğini görürsünüz.",
 	"settings.importPackButton": "Bağlantıdan içe aktar",
-	"settings.importPackShortButton": "Paketi içe aktar",
 	"settings.updatesName": "Güncellemeleri denetle",
 	"settings.updatesDesc":
 		"Kurulu topluluk eklentilerinden hangilerinin daha yeni sürümü olduğunu görün ve onları güncelleyin. Eklenti listenizdeki sabitlenmiş sürümler de buna göre güncellenir.",
 	"settings.updatesButton": "Denetle",
-	"settings.updatesLongButton": "Güncellemeleri denetle",
 	"settings.undoName": "Son değişikliği geri al",
 	"settings.undoDesc":
 		"Ayarları ve kurulum dosyalarını son içe aktarma, ayar güncellemesi veya dışa aktarmadan önceki hâline getirin. Kurulu eklentiler kurulu kalır.",

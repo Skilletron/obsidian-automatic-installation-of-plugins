@@ -353,9 +353,6 @@ export const es: LocaleMessages = {
 	"settings.warningPrefix": "Advertencia de seguridad: ",
 	"settings.warningDesc":
 		"Esto puede descargar e instalar complementos de la comunidad. Úsalo solo con bóvedas de confianza y revisa tu lista de complementos antes de activar la instalación automática.",
-	"settings.actionsName": "Exportar / Importar",
-	"settings.actionsDesc":
-		"Gestiona la lista de complementos y los archivos de ajustes en {dir}.",
 	"settings.previewName": "Previsualizar importación",
 	"settings.previewDesc":
 		"Mira qué complementos se instalarían, omitirían o actualizarían y qué ajustes cambiarían, sin modificar tu bóveda.",
@@ -376,12 +373,10 @@ export const es: LocaleMessages = {
 	"settings.importPackDesc":
 		"Añade a tu configuración el paquete de otra persona desde un enlace. Verás lo que contiene antes de que se instale nada.",
 	"settings.importPackButton": "Importar desde enlace",
-	"settings.importPackShortButton": "Importar paquete",
 	"settings.updatesName": "Buscar actualizaciones",
 	"settings.updatesDesc":
 		"Mira qué complementos de la comunidad instalados tienen versiones más recientes y actualízalos. Las versiones fijadas en tu lista de complementos se actualizan con ellos.",
 	"settings.updatesButton": "Buscar",
-	"settings.updatesLongButton": "Buscar actualizaciones",
 	"settings.undoName": "Deshacer el último cambio",
 	"settings.undoDesc":
 		"Restaura los ajustes y los archivos de configuración tal como estaban antes de la última importación, actualización de ajustes o exportación. Los complementos instalados siguen instalados.",
@@ -414,7 +409,7 @@ export const es: LocaleMessages = {
 	"settings.extraSecretsName": "Nombres adicionales de ajustes secretos",
 	"settings.extraSecretsDesc":
 		"Nombres de ajustes separados por comas que también se omitirán, por ejemplo: licenseCode, endpoint",
-	"settings.extraSecretsPlaceholder": "Código de licencia, endpoint",
+	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
 		"Sincronizar tema, fragmentos, atajos de teclado y complementos principales",
 	"settings.syncVaultSetupDesc":

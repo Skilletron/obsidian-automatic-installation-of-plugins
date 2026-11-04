@@ -354,9 +354,6 @@ export const ptBR: LocaleMessages = {
 	"settings.warningPrefix": "Aviso de segurança: ",
 	"settings.warningDesc":
 		"Isto pode baixar e instalar plugins da comunidade. Use apenas com cofres confiáveis e revise sua lista de plugins antes de ativar a instalação automática.",
-	"settings.actionsName": "Exportar / Importar",
-	"settings.actionsDesc":
-		"Gerencie a lista de plugins e os arquivos de configurações em {dir}.",
 	"settings.previewName": "Pré-visualizar importação",
 	"settings.previewDesc":
 		"Veja quais plugins seriam instalados, ignorados ou atualizados e quais configurações mudariam — sem alterar seu cofre.",
@@ -377,12 +374,10 @@ export const ptBR: LocaleMessages = {
 	"settings.importPackDesc":
 		"Adicione o pacote de configuração de outra pessoa ao seu a partir de um link. Você vê o que ele contém antes de qualquer instalação.",
 	"settings.importPackButton": "Importar de um link",
-	"settings.importPackShortButton": "Importar pacote",
 	"settings.updatesName": "Verificar atualizações",
 	"settings.updatesDesc":
 		"Veja quais plugins da comunidade instalados têm versões mais novas e atualize-os. As versões fixadas na sua lista de plugins são atualizadas junto.",
 	"settings.updatesButton": "Verificar",
-	"settings.updatesLongButton": "Verificar atualizações",
 	"settings.undoName": "Desfazer a última alteração",
 	"settings.undoDesc":
 		"Restaura as configurações e os arquivos de configuração como estavam antes da última importação, atualização de configurações ou exportação. Os plugins instalados continuam instalados.",
@@ -414,7 +409,7 @@ export const ptBR: LocaleMessages = {
 	"settings.extraSecretsName": "Nomes extras de configurações secretas",
 	"settings.extraSecretsDesc":
 		"Nomes de configurações separados por vírgula que também devem ser omitidos, por exemplo: licenseCode, endpoint",
-	"settings.extraSecretsPlaceholder": "Código de licença, endpoint",
+	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
 		"Sincronizar tema, trechos CSS, atalhos e plugins principais",
 	"settings.syncVaultSetupDesc":

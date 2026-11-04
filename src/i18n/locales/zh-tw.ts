@@ -278,8 +278,6 @@ export const zhTW: LocaleMessages = {
 	"settings.warningPrefix": "安全性警告：",
 	"settings.warningDesc":
 		"此功能可以下載並安裝社群外掛。請僅在受信任的儲存庫中使用，並在啟用自動安裝前檢查你的外掛清單。",
-	"settings.actionsName": "匯出 / 匯入",
-	"settings.actionsDesc": "管理 {dir} 中的外掛清單和設定檔。",
 	"settings.previewName": "預覽匯入",
 	"settings.previewDesc":
 		"查看哪些外掛將被安裝、略過或更新，以及哪些設定將會變更，不會更動你的儲存庫。",
@@ -300,12 +298,10 @@ export const zhTW: LocaleMessages = {
 	"settings.importPackDesc":
 		"透過連結將他人的配置包加入你的配置。在安裝任何項目之前，你都可以查看其中包含的內容。",
 	"settings.importPackButton": "從連結匯入",
-	"settings.importPackShortButton": "匯入配置包",
 	"settings.updatesName": "檢查更新",
 	"settings.updatesDesc":
 		"查看哪些已安裝的社群外掛有新版本，並進行更新。外掛清單中的固定版本會隨之更新。",
 	"settings.updatesButton": "檢查",
-	"settings.updatesLongButton": "檢查更新",
 	"settings.undoName": "復原上次變更",
 	"settings.undoDesc":
 		"將設定檔和配置檔還原至上次匯入、設定更新或匯出之前的狀態。已安裝的外掛會保留。",

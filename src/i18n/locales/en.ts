@@ -299,8 +299,6 @@ export const en = {
 	"settings.warningPrefix": "Security warning: ",
 	"settings.warningDesc":
 		"This can download and install community plugins. Only use it with trusted vaults, and review your plugin list before enabling auto-install.",
-	"settings.actionsName": "Export / Import",
-	"settings.actionsDesc": "Manage the plugin list and settings files in {dir}.",
 	"settings.previewName": "Preview import",
 	"settings.previewDesc":
 		"See which plugins would be installed, skipped, or updated, and which settings would change — without changing your vault.",
@@ -321,12 +319,10 @@ export const en = {
 	"settings.importPackDesc":
 		"Add someone else's setup pack to yours from a link. You see what it contains before anything is installed.",
 	"settings.importPackButton": "Import from link",
-	"settings.importPackShortButton": "Import pack",
 	"settings.updatesName": "Check for updates",
 	"settings.updatesDesc":
 		"See which installed community plugins have newer versions, and update them. Pins in your plugin list move along.",
 	"settings.updatesButton": "Check",
-	"settings.updatesLongButton": "Check for updates",
 	"settings.undoName": "Undo last change",
 	"settings.undoDesc":
 		"Put back the settings and setup files as they were before the last import, settings update or export. Installed plugins stay installed.",

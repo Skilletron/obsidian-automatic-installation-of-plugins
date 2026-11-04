@@ -278,8 +278,6 @@ export const ja: LocaleMessages = {
 	"settings.warningPrefix": "セキュリティ警告: ",
 	"settings.warningDesc":
 		"この機能はコミュニティプラグインをダウンロードしてインストールできます。信頼できる保管庫でのみ使用し、自動インストールを有効にする前にプラグインリストを確認してください。",
-	"settings.actionsName": "エクスポート / インポート",
-	"settings.actionsDesc": "{dir}内のプラグインリストと設定ファイルを管理します。",
 	"settings.previewName": "インポートをプレビュー",
 	"settings.previewDesc":
 		"保管庫を変更せずに、どのプラグインがインストール、スキップ、更新されるか、どの設定が変わるかを確認します。",
@@ -300,12 +298,10 @@ export const ja: LocaleMessages = {
 	"settings.importPackDesc":
 		"他の人のセットアップパックをリンクから自分の構成に追加します。インストールする前に内容を確認できます。",
 	"settings.importPackButton": "リンクからインポート",
-	"settings.importPackShortButton": "パックをインポート",
 	"settings.updatesName": "アップデートを確認",
 	"settings.updatesDesc":
 		"インストール済みのコミュニティプラグインに新しいバージョンがあるか確認し、更新します。プラグインリスト内の固定バージョンも合わせて更新されます。",
 	"settings.updatesButton": "確認",
-	"settings.updatesLongButton": "アップデートを確認",
 	"settings.undoName": "直前の変更を元に戻す",
 	"settings.undoDesc":
 		"設定ファイルと構成ファイルを、直前のインポート、設定の更新、エクスポートの前の状態に戻します。インストール済みのプラグインはそのまま残ります。",

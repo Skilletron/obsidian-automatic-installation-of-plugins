@@ -315,8 +315,6 @@ export const de: LocaleMessages = {
 	"settings.warningPrefix": "Sicherheitshinweis: ",
 	"settings.warningDesc":
 		"Hiermit können Community-Plugins heruntergeladen und installiert werden. Verwende es nur mit vertrauenswürdigen Tresoren und prüfe deine Plugin-Liste, bevor du die automatische Installation aktivierst.",
-	"settings.actionsName": "Export / Import",
-	"settings.actionsDesc": "Plugin-Liste und Einstellungsdateien in {dir} verwalten.",
 	"settings.previewName": "Importvorschau",
 	"settings.previewDesc":
 		"Zeigt, welche Plugins installiert, übersprungen oder aktualisiert würden und welche Einstellungen sich ändern würden – ohne deinen Tresor zu verändern.",
@@ -337,12 +335,10 @@ export const de: LocaleMessages = {
 	"settings.importPackDesc":
 		"Füge das Setup-Paket einer anderen Person über einen Link zu deinem hinzu. Du siehst den Inhalt, bevor etwas installiert wird.",
 	"settings.importPackButton": "Über Link importieren",
-	"settings.importPackShortButton": "Paket importieren",
 	"settings.updatesName": "Nach Updates suchen",
 	"settings.updatesDesc":
 		"Zeigt, für welche installierten Community-Plugins neuere Versionen verfügbar sind, und aktualisiert sie. Fixierungen in deiner Plugin-Liste werden mit angepasst.",
 	"settings.updatesButton": "Prüfen",
-	"settings.updatesLongButton": "Nach Updates suchen",
 	"settings.undoName": "Letzte Änderung rückgängig machen",
 	"settings.undoDesc":
 		"Stellt die Einstellungs- und Setup-Dateien so wieder her, wie sie vor dem letzten Import, der letzten Einstellungsaktualisierung oder dem letzten Export waren. Installierte Plugins bleiben installiert.",

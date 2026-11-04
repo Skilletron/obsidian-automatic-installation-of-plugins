@@ -176,7 +176,7 @@ Every part is optional. Export writes all four for you when **Sync theme, snippe
 
 | Setting | Default (new install) | Description |
 |---|---|---|
-| Preview / Export / Import / Apply | — | Buttons for the actions above |
+| Preview, Export, Import, Apply settings, Check for updates, Export pack, Import pack, Undo | — | One setting with a button for each action above |
 | Auto-install plugins on startup | Off | When Obsidian starts, install any missing plugins from the list |
 | Auto-enable plugins after installation | On | Turn plugins on after they are installed via Import |
 | Apply settings on installation | On | After each install, apply that plugin’s settings from the settings file |

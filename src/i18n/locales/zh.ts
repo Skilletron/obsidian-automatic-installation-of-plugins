@@ -278,8 +278,6 @@ export const zh: LocaleMessages = {
 	"settings.warningPrefix": "安全警告：",
 	"settings.warningDesc":
 		"此功能可以下载并安装第三方插件。请仅在受信任的仓库中使用，并在启用自动安装前检查你的插件列表。",
-	"settings.actionsName": "导出 / 导入",
-	"settings.actionsDesc": "管理 {dir} 中的插件列表和设置文件。",
 	"settings.previewName": "预览导入",
 	"settings.previewDesc":
 		"查看哪些插件将被安装、跳过或更新，以及哪些设置将发生变化，不会更改你的仓库。",
@@ -300,12 +298,10 @@ export const zh: LocaleMessages = {
 	"settings.importPackDesc":
 		"通过链接将他人的配置包添加到你的配置中。在安装任何内容之前，你都可以查看其中包含的内容。",
 	"settings.importPackButton": "从链接导入",
-	"settings.importPackShortButton": "导入配置包",
 	"settings.updatesName": "检查更新",
 	"settings.updatesDesc":
 		"查看哪些已安装的第三方插件有新版本，并进行更新。插件列表中的固定版本会随之更新。",
 	"settings.updatesButton": "检查",
-	"settings.updatesLongButton": "检查更新",
 	"settings.undoName": "撤销上次更改",
 	"settings.undoDesc":
 		"将设置文件和配置文件恢复到上次导入、设置更新或导出之前的状态。已安装的插件会保留。",
