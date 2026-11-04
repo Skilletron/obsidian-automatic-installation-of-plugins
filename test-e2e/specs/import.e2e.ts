@@ -8,6 +8,7 @@ import {
 	readConfigJson,
 	runPluginMethod,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 // These tests run against a real Obsidian and download real plugins from
@@ -16,7 +17,7 @@ import {
 
 describe("Community Install Manager in Obsidian", () => {
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 	});
 
 	it("registers its commands", async () => {

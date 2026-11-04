@@ -118,3 +118,20 @@ export async function updateOwnSettings(
 export async function isMobile(): Promise<boolean> {
 	return browser.executeObsidian(({ obsidian }) => obsidian.Platform.isMobile);
 }
+
+// Opens a fresh copy of the empty test vault. Obsidian follows the system
+// language unless one is picked, and the plugin follows Obsidian; the tests
+// check English texts, so pin English.
+export async function openEmptyVault(language = "en"): Promise<void> {
+	await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+	const current = await browser.executeObsidian(() =>
+		window.localStorage.getItem("language"),
+	);
+	if (current !== language) {
+		await browser.executeObsidian(
+			(_obsidian, language) => window.localStorage.setItem("language", language),
+			language,
+		);
+		await browser.reloadObsidian();
+	}
+}

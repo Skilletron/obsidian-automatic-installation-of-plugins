@@ -7,6 +7,7 @@ import {
 	readConfigJson,
 	runPluginMethod,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 interface Update {
@@ -31,7 +32,7 @@ describe("Checking for and installing plugin updates", () => {
 	let hider: Update | undefined;
 
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		await writeConfigJson("community-plugins-list.json", [
 			{ id: HIDER, version: "1.7.0" },
 		]);

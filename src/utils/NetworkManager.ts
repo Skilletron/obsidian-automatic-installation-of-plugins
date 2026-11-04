@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../types";
 import { logger } from "./Logger";
+import { t } from "../i18n";
 
 export class NetworkError extends Error {
 	constructor(
@@ -71,7 +72,7 @@ export class NetworkManager {
 		if (err instanceof NetworkError) {
 			if (err.status === 403 || err.status === 429) {
 				logger.warn("GitHub rate limit or forbidden:", err.url);
-				return "GitHub rate limit or access denied. Wait a few minutes and try again.";
+				return t("net.rateLimit");
 			}
 			return `HTTP ${err.status}`;
 		}

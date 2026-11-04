@@ -42,6 +42,10 @@ This plugin can download and install other community plugins.
 - Auto-enable after install and apply settings on install (**on** by default for new installs)
 - Merge plugin settings into existing ones (on by default for new installs)
 
+## Languages
+
+The plugin follows Obsidian's language: English, Russian, Ukrainian, German, French, Spanish, Italian, Portuguese (Brazil), Polish, Turkish, Japanese, Korean, Chinese (Simplified) and Chinese (Traditional). Anything not translated falls back to English. Translations live in `src/i18n/locales/`; to add a language, copy `en.ts`, translate the texts and register it in `index.ts`. The tests check that every language has every text, the same `{placeholders}` and the plural forms its language needs.
+
 ## Network use
 
 | Remote service | Purpose |
@@ -172,7 +176,7 @@ Every part is optional. Export writes all four for you when **Sync theme, snippe
 
 | Setting | Default (new install) | Description |
 |---|---|---|
-| Preview / Export / Import / Apply | — | Buttons for the actions above |
+| Preview, Export, Import, Apply settings, Check for updates, Export pack, Import pack, Undo | — | One setting with a button for each action above |
 | Auto-install plugins on startup | Off | When Obsidian starts, install any missing plugins from the list |
 | Auto-enable plugins after installation | On | Turn plugins on after they are installed via Import |
 | Apply settings on installation | On | After each install, apply that plugin’s settings from the settings file |

@@ -13,6 +13,7 @@ import { parseDevices } from "../utils/parsePluginList";
 import { LiveVaultState, readVaultSetup } from "./VaultSetup";
 import { VAULT_SETUP_FILE } from "../types";
 import { logger } from "../utils/Logger";
+import { t } from "../i18n";
 
 export interface SecretOptions {
 	redact: boolean;
@@ -123,7 +124,7 @@ export class SetupExporter {
 		);
 
 		if (!listWritten || !settingsWritten) {
-			throw new Error("could not write the setup JSON files");
+			throw new Error(t("export.writeFailed"));
 		}
 
 		let setupNote = "";
@@ -140,24 +141,37 @@ export class SetupExporter {
 					`${JSON.stringify(vaultSetup, null, 2)}\n`,
 				)
 			) {
-				const count = Object.keys(vaultSetup.snippets).length;
-				const hotkeys = Object.keys(vaultSetup.hotkeys ?? {}).length;
-				const theme = vaultSetup.theme?.name || "the default theme";
-				setupNote = ` Also saved ${theme}, ${count} CSS snippet${count === 1 ? "" : "s"}, ${hotkeys} custom hotkey${hotkeys === 1 ? "" : "s"} and your core plugins to ${VAULT_SETUP_FILE}.`;
+				setupNote = t("export.vaultSetup", {
+					theme:
+						vaultSetup.theme?.name || t("vaultSetup.defaultThemeLabel"),
+					snippets: t("export.snippets", {
+						count: Object.keys(vaultSetup.snippets).length,
+					}),
+					hotkeys: t("export.hotkeys", {
+						count: Object.keys(vaultSetup.hotkeys ?? {}).length,
+					}),
+					file: VAULT_SETUP_FILE,
+				});
 			}
 		}
 
 		const settingsCount = Object.keys(settings).length;
 		const pinnedCount = installed.filter((p) => p.version).length;
 		const keptNote =
-			keptCount > 0
-				? ` Kept ${keptCount} entr${keptCount === 1 ? "y" : "ies"} for plugins not installed on this device.`
-				: "";
+			keptCount > 0 ? t("export.kept", { count: keptCount }) : "";
 		const redactedNote =
-			redactedCount > 0
-				? ` Left out ${redactedCount} secret value${redactedCount === 1 ? "" : "s"} (tokens, passwords).`
-				: "";
-		const message = `Saved ${installed.length} plugin${installed.length === 1 ? "" : "s"} (${pinnedCount} pinned, ${settingsCount} with settings) to ${PLUGINS_LIST_FILE} and ${PLUGINS_SETTINGS_FILE}.${keptNote}${redactedNote}${setupNote}`;
+			redactedCount > 0 ? t("export.redacted", { count: redactedCount }) : "";
+		const message =
+			t("export.saved", {
+				count: installed.length,
+				pinned: pinnedCount,
+				withSettings: settingsCount,
+				listFile: PLUGINS_LIST_FILE,
+				settingsFile: PLUGINS_SETTINGS_FILE,
+			}) +
+			keptNote +
+			redactedNote +
+			setupNote;
 		logger.info(
 			`Exported ${listEntries.length} plugins (${pinnedCount} pinned), ${settingsCount} with settings.`,
 		);

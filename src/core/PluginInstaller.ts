@@ -9,6 +9,7 @@ import {
 } from "../types";
 import { isSafePluginId, normalizeVersion } from "../utils/parsePluginList";
 import { logger } from "../utils/Logger";
+import { t } from "../i18n";
 
 interface PluginsAPI {
 	manifests?: Record<string, PluginManifest>;
@@ -115,7 +116,7 @@ export class PluginInstaller {
 	}
 
 	private fail(message: string): void {
-		this.lastFailure = message.replace(/^\[Installer\] /, "");
+		this.lastFailure = message;
 		logger.warn(this.lastFailure);
 	}
 
@@ -131,13 +132,13 @@ export class PluginInstaller {
 			typeof entry.id !== "string" ||
 			entry.id.trim() === ""
 		) {
-			this.fail("Invalid plugin ID provided.");
+			this.fail(t("install.invalidId"));
 			return "failed";
 		}
 
 		const normalizedId = entry.id.trim();
 		if (!isSafePluginId(normalizedId)) {
-			this.fail(`Invalid plugin ID: "${normalizedId}".`);
+			this.fail(t("install.invalidIdNamed", { id: normalizedId }));
 			return "failed";
 		}
 
@@ -168,9 +169,7 @@ export class PluginInstaller {
 		}
 
 		if (!pluginsApi?.installPlugin) {
-			this.fail(
-				"[Installer] Obsidian installPlugin API is unavailable. Update Obsidian and try again.",
-			);
+			this.fail(t("install.noApi"));
 			return "failed";
 		}
 
@@ -185,23 +184,19 @@ export class PluginInstaller {
 			);
 
 			if (!pluginMeta) {
-				this.fail(
-					`Plugin "${normalizedId}" not found in Obsidian Community Plugins registry.`,
-				);
+				this.fail(t("install.notInRegistry", { id: normalizedId }));
 				return "failed";
 			}
 
 			if (!pluginMeta.repo || typeof pluginMeta.repo !== "string") {
-				this.fail(
-					`Plugin "${normalizedId}" has invalid repository information in registry.`,
-				);
+				this.fail(t("install.badRepoInfo", { id: normalizedId }));
 				return "failed";
 			}
 
 			const repoParts = pluginMeta.repo.split("/");
 			if (repoParts.length !== 2) {
 				this.fail(
-					`Plugin "${normalizedId}" has invalid repository format: ${pluginMeta.repo}`,
+					t("install.badRepoFormat", { id: normalizedId, repo: pluginMeta.repo }),
 				);
 				return "failed";
 			}
@@ -216,21 +211,20 @@ export class PluginInstaller {
 			if (!resolved) {
 				if (pinnedVersion) {
 					this.fail(
-						`[Installer] Could not fetch manifest for "${normalizedId}" ${pinnedVersion}. GitHub may be rate-limiting requests.`,
+						t("install.noPinnedManifest", {
+							id: normalizedId,
+							version: pinnedVersion,
+						}),
 					);
 				} else {
-					this.fail(
-						`No suitable release found for plugin "${normalizedId}".`,
-					);
+					this.fail(t("install.noRelease", { id: normalizedId }));
 				}
 				return "failed";
 			}
 
 			const { manifest, version } = resolved;
 			if (!manifest?.id || !version) {
-				this.fail(
-					`[Installer] Invalid manifest.json for "${normalizedId}".`,
-				);
+				this.fail(t("install.badManifest", { id: normalizedId }));
 				return "failed";
 			}
 
@@ -298,7 +292,7 @@ export class PluginInstaller {
 		} catch (err: unknown) {
 			const errorMessage = NetworkManager.describeError(err);
 			this.fail(
-				`[Installer] Failed to install plugin "${normalizedId}": ${errorMessage}`,
+				t("install.failed", { id: normalizedId, error: errorMessage }),
 			);
 			logger.error(`Installation error for ${normalizedId}:`, err);
 			if (

@@ -8,6 +8,7 @@ import {
 	readConfigJson,
 	runPluginMethod,
 	writeConfigJson,
+	openEmptyVault,
 } from "../helpers";
 
 describe("Device profiles and enabled in the plugin list", () => {
@@ -15,7 +16,7 @@ describe("Device profiles and enabled in the plugin list", () => {
 	let otherDevice: "desktop" | "mobile" = "mobile";
 
 	before(async () => {
-		await browser.reloadObsidian({ vault: "test-e2e/vaults/empty" });
+		await openEmptyVault();
 		if (await isMobile()) {
 			thisDevice = "mobile";
 			otherDevice = "desktop";

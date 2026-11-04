@@ -1,6 +1,7 @@
 import { App, Notice, normalizePath } from "obsidian";
 import { logger } from "./Logger";
 import { isSafePathSegment } from "./parsePluginList";
+import { t } from "../i18n";
 
 export class FileManager {
 	constructor(private app: App) {}
@@ -77,7 +78,7 @@ export class FileManager {
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
-			new Notice(`[Installer] Failed to read file: ${errorMessage}`);
+			new Notice(t("file.readFailed", { error: errorMessage }));
 			logger.error(`[Installer] File read error for ${vaultPath}:`, err);
 			return null;
 		}
@@ -95,7 +96,7 @@ export class FileManager {
 		} catch (err: unknown) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
-			new Notice(`[Installer] Failed to write file: ${errorMessage}`);
+			new Notice(t("file.writeFailed", { error: errorMessage }));
 			logger.error(`[Installer] File write error for ${vaultPath}:`, err);
 			return false;
 		}
@@ -183,9 +184,7 @@ export class FileManager {
 
 	parseJsonWithValidation<T>(content: string, fileName: string): T | null {
 		if (!content || content.trim() === "") {
-			new Notice(
-				`[Installer] ${fileName} is empty. Please add content or the file will be recreated.`,
-			);
+			new Notice(t("file.empty", { file: fileName }));
 			return null;
 		}
 
@@ -195,7 +194,7 @@ export class FileManager {
 			const errorMessage =
 				err instanceof Error ? err.message : "Unknown error";
 			new Notice(
-				`[Installer] Invalid JSON in ${fileName}: ${errorMessage}. Please check the file format.`,
+				t("file.invalidJson", { file: fileName, error: errorMessage }),
 			);
 			logger.error(`JSON parse error in ${fileName}:`, err);
 			return null;

@@ -317,3 +317,61 @@
 .community-install-manager-preview-changes li.is-removed {
   color: var(--text-error, var(--color-red));
 }
+
+/* Translations can be much longer than English: buttons in the plugin's
+   windows wrap instead of running off narrow screens. */
+.community-install-manager-pack-modal .setting-item-control,
+.community-install-manager-pack-link-modal .setting-item-control,
+.community-install-manager-updates-modal .setting-item-control,
+.community-install-manager-preview-modal .setting-item-control {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.community-install-manager-pack-modal button,
+.community-install-manager-pack-link-modal button,
+.community-install-manager-updates-modal button,
+.community-install-manager-preview-modal button {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--input-height, 30px);
+  white-space: normal;
+}
+
+.community-install-manager-pack-modal,
+.community-install-manager-updates-modal,
+.community-install-manager-preview-row-meta {
+  overflow-wrap: anywhere;
+}
+
+/* The link field sits under its label, full width. Older mobile versions
+   do not wrap the setting row, so stack it instead. */
+.community-install-manager-pack-link {
+  display: block;
+}
+
+.community-install-manager-pack-link .setting-item-control {
+  margin-top: var(--size-4-2, 8px);
+  width: 100%;
+}
+
+.community-install-manager-pack-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* On phones the window's content is a flex column of fixed height; without
+   this its blocks shrink and their text runs into each other. */
+.community-install-manager-pack-modal > *,
+.community-install-manager-pack-link-modal > *,
+.community-install-manager-updates-modal > *,
+.community-install-manager-preview-modal > * {
+  flex-shrink: 0;
+}
+
+/* The preview's plugin list scrolls on its own, so it is the one block
+   that may give up height and keep the Close button in view. */
+.community-install-manager-preview-modal > .community-install-manager-preview-list {
+  flex-shrink: 1;
+  min-height: 8em;
+}

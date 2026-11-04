@@ -9,6 +9,7 @@ import {
 } from "../utils/parsePluginList";
 import { COMMUNITY_THEMES_URL } from "../types";
 import { SettingsBackup } from "./SettingsBackup";
+import { t } from "../i18n";
 
 export interface SnippetSetup {
 	css: string;
@@ -317,13 +318,17 @@ export function describeVaultSetupChanges(
 	const parts: string[] = [];
 	if (wanted.theme) {
 		const { name, version } = wanted.theme;
-		const label = name || "the default theme";
+		const label = name || t("vaultSetup.defaultThemeLabel");
 		const currentTheme = current.theme ?? { name: "" };
 		const sameVersion = !version || currentTheme.version === version;
 		if (currentTheme.name === name && sameVersion) {
-			parts.push(`Theme: already using ${label}`);
+			parts.push(t("vaultSetup.describeThemeSame", { label }));
 		} else {
-			parts.push(`Theme: would switch to ${label}${version ? ` ${version}` : ""}`);
+			parts.push(
+				t("vaultSetup.describeThemeSwitch", {
+					label: version ? `${label} ${version}` : label,
+				}),
+			);
 		}
 	}
 	const names = Object.keys(wanted.snippets);
@@ -333,14 +338,21 @@ export function describeVaultSetupChanges(
 			(n) => n in current.snippets && current.snippets[n].css !== wanted.snippets[n].css,
 		).length;
 		parts.push(
-			`Snippets: ${names.length} (${added} new, ${changed} changed, ${names.length - added - changed} unchanged)`,
+			t("vaultSetup.describeSnippets", {
+				total: names.length,
+				added,
+				changed,
+				unchanged: names.length - added - changed,
+			}),
 		);
 	}
 	if (wanted.hotkeys) {
 		const ids = Object.keys(wanted.hotkeys);
 		const changed = changedHotkeys(wanted.hotkeys, current.hotkeys ?? {}).length;
 		if (ids.length > 0) {
-			parts.push(`Hotkeys: ${ids.length} commands (${changed} would change)`);
+			parts.push(
+				t("vaultSetup.describeHotkeys", { total: ids.length, changed }),
+			);
 		}
 	}
 	if (wanted.corePlugins) {
@@ -350,10 +362,10 @@ export function describeVaultSetupChanges(
 		);
 		if (on.length > 0 || off.length > 0) {
 			parts.push(
-				`Core plugins: would turn on ${on.length}, turn off ${off.length}`,
+				t("vaultSetup.describeCore", { on: on.length, off: off.length }),
 			);
 		} else if (Object.keys(wanted.corePlugins).length > 0) {
-			parts.push("Core plugins: already as listed");
+			parts.push(t("vaultSetup.describeCoreSame"));
 		}
 	}
 	return parts.join(" · ");
@@ -457,7 +469,7 @@ export class VaultSetupApplier {
 		const manager = (this.app as App & { hotkeyManager?: HotkeyManager })
 			.hotkeyManager;
 		if (!manager?.setHotkeys || !manager.save) {
-			result.problems.push("Obsidian's hotkey manager is not available.");
+			result.problems.push(t("vaultSetup.noHotkeyManager"));
 			return;
 		}
 		for (const id of changed) {
@@ -477,7 +489,7 @@ export class VaultSetupApplier {
 			.internalPlugins;
 		const plugins = internal?.plugins;
 		if (!plugins) {
-			result.problems.push("Obsidian's core plugin manager is not available.");
+			result.problems.push(t("vaultSetup.noCoreManager"));
 			return;
 		}
 		const current = Object.fromEntries(
@@ -529,7 +541,7 @@ export class VaultSetupApplier {
 					created.push(name);
 				}
 			} else {
-				result.problems.push(`Could not write snippet "${name}".`);
+				result.problems.push(t("vaultSetup.snippetFailed", { name }));
 			}
 		}
 
@@ -549,13 +561,13 @@ export class VaultSetupApplier {
 	): Promise<void> {
 		const css = this.customCss;
 		if (!css?.setTheme) {
-			result.problems.push("Obsidian's theme manager is not available.");
+			result.problems.push(t("vaultSetup.noThemeManager"));
 			return;
 		}
 		if (!theme.name) {
 			if (css.theme) {
 				css.setTheme("");
-				result.theme = "Switched to the default theme";
+				result.theme = t("vaultSetup.themeDefault");
 			}
 			return;
 		}
@@ -568,14 +580,14 @@ export class VaultSetupApplier {
 		if (needsInstall) {
 			const version = await this.installTheme(theme.name, theme.version);
 			if (!version) {
-				result.problems.push(`Could not install theme "${theme.name}".`);
+				result.problems.push(t("vaultSetup.themeFailed", { name: theme.name }));
 				return;
 			}
-			result.theme = `Installed theme ${theme.name} ${version}`;
+			result.theme = t("vaultSetup.themeInstalled", { name: theme.name, version });
 		}
 		if (css.theme !== theme.name) {
 			css.setTheme(theme.name);
-			result.theme ??= `Switched to theme ${theme.name}`;
+			result.theme ??= t("vaultSetup.themeSwitched", { name: theme.name });
 		}
 	}
 
