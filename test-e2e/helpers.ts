@@ -79,18 +79,33 @@ export interface PluginState {
 	settings: Record<string, unknown> | null;
 }
 
+// Obsidian writes manifest.json itself while installing, and on Android the
+// file can read back empty for a while. That counts as not installed yet, so
+// that tests waiting for an install keep waiting instead of crashing.
+function parseInstalledVersion(id: string, manifest: string | null): string | null {
+	if (manifest === null) {
+		return null;
+	}
+	try {
+		return (JSON.parse(manifest) as { version: string }).version;
+	} catch {
+		console.warn(`${id}: manifest.json is not readable yet (${manifest.length} chars)`);
+		return null;
+	}
+}
+
 export async function pluginState(id: string): Promise<PluginState> {
-	return browser.executeObsidian(async ({ app }, id) => {
+	const { manifest, ...state } = await browser.executeObsidian(async ({ app }, id) => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const plugins = (app as any).plugins;
 		const dir = `${app.vault.configDir}/plugins/${id}`;
 		const manifestPath = `${dir}/manifest.json`;
-		const installedVersion = (await app.vault.adapter.exists(manifestPath))
-			? JSON.parse(await app.vault.adapter.read(manifestPath)).version
+		const manifest = (await app.vault.adapter.exists(manifestPath))
+			? await app.vault.adapter.read(manifestPath)
 			: null;
 		const loaded = plugins.plugins[id];
 		return {
-			installedVersion,
+			manifest,
 			enabled: plugins.enabledPlugins.has(id),
 			loaded: Boolean(loaded),
 			settings: loaded?.settings
@@ -98,6 +113,7 @@ export async function pluginState(id: string): Promise<PluginState> {
 				: null,
 		};
 	}, id);
+	return { ...state, installedVersion: parseInstalledVersion(id, manifest) };
 }
 
 export async function updateOwnSettings(
