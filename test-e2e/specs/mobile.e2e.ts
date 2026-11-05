@@ -6,6 +6,7 @@ import {
 	pluginState,
 	runPluginMethod,
 	updateOwnSettings,
+	waitUntilPluginIdle,
 	writeConfigJson,
 	openEmptyVault,
 } from "../helpers";
@@ -77,5 +78,28 @@ describe("Automatic actions and desktop-only plugins on mobile", () => {
 
 		expect(await isInstalled(DESKTOP_ONLY)).toBe(false);
 		expect(await isInstalled(URL_INTO_SELECTION)).toBe(true);
+	});
+
+	it("repairs a plugin whose main.js was left empty", async () => {
+		await updateOwnSettings({ autoInstallPlugins: false });
+		await writeConfigJson("community-plugins-list.json", [URL_INTO_SELECTION]);
+		const mainSize = (empty: boolean) =>
+			browser.executeObsidian(
+				async ({ app }, id, empty) => {
+					const path = `${app.vault.configDir}/plugins/${id}/main.js`;
+					if (empty) {
+						await app.vault.adapter.write(path, "");
+					}
+					return (await app.vault.adapter.read(path)).length;
+				},
+				URL_INTO_SELECTION,
+				empty,
+			);
+		await waitUntilPluginIdle();
+		expect(await mainSize(true)).toBe(0);
+
+		await runPluginMethod("runImportPipeline");
+
+		expect(await mainSize(false)).toBeGreaterThan(0);
 	});
 });

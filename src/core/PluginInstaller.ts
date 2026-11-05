@@ -111,7 +111,21 @@ export class PluginInstaller {
 		const mainPath = this.fileManager.pluginsPath(pluginId, "main.js");
 		return (
 			(await this.fileManager.exists(manifestPath)) &&
-			(await this.fileManager.exists(mainPath))
+			(await this.fileManager.exists(mainPath)) &&
+			!(await this.hasEmptyFiles(pluginId))
+		);
+	}
+
+	// Obsidian writes the plugin's files itself, and on Android version 1.5.8
+	// a new file can end up with 0 bytes even though the write succeeded.
+	private async hasEmptyFiles(pluginId: string): Promise<boolean> {
+		return (
+			(await this.fileManager.isEmptyFile(
+				this.fileManager.pluginsPath(pluginId, "manifest.json"),
+			)) ||
+			(await this.fileManager.isEmptyFile(
+				this.fileManager.pluginsPath(pluginId, "main.js"),
+			))
 		);
 	}
 
@@ -239,21 +253,31 @@ export class PluginInstaller {
 				`Installing "${normalizedId}" via Obsidian installPlugin (${pluginMeta.repo}@${version})`,
 			);
 
-			try {
-				await pluginsApi.installPlugin(
-					pluginMeta.repo,
-					version,
-					manifest,
-				);
-			} catch (firstErr: unknown) {
-				const alt = version.startsWith("v")
-					? version.slice(1)
-					: `v${version}`;
-				logger.debug(
-					`installPlugin(${version}) failed, retrying with ${alt}`,
-					firstErr,
-				);
-				await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
+			// A second round only if the first left empty files behind.
+			for (let round = 1; ; round++) {
+				try {
+					await pluginsApi.installPlugin(
+						pluginMeta.repo,
+						version,
+						manifest,
+					);
+				} catch (firstErr: unknown) {
+					const alt = version.startsWith("v")
+						? version.slice(1)
+						: `v${version}`;
+					logger.debug(
+						`installPlugin(${version}) failed, retrying with ${alt}`,
+						firstErr,
+					);
+					await pluginsApi.installPlugin(pluginMeta.repo, alt, manifest);
+				}
+				if (!(await this.hasEmptyFiles(manifest.id))) {
+					break;
+				}
+				if (round === 2) {
+					throw new Error("the plugin's files stayed empty");
+				}
+				logger.warn(`"${normalizedId}" was left with empty files; installing again.`);
 			}
 
 			if (typeof pluginsApi.loadManifests === "function") {

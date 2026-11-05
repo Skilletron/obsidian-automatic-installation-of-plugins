@@ -8,6 +8,7 @@ import {
 	openEmptyVault,
 	updateOwnSettings,
 	writeConfigJson,
+	writeVaultFile,
 } from "../helpers";
 
 // Every language the plugin ships, as Obsidian names them. LAYOUT_LANGUAGES
@@ -153,20 +154,6 @@ async function closeModals(): Promise<void> {
 		}
 		return open === 0;
 	}, { timeoutMsg: "a window did not close" });
-}
-
-async function writeVaultFile(path: string, text: string): Promise<void> {
-	await browser.executeObsidian(
-		async ({ app }, path, text) => {
-			const dir = path.split("/").slice(0, -1).join("/");
-			if (dir && !(await app.vault.adapter.exists(dir))) {
-				await app.vault.adapter.mkdir(dir);
-			}
-			await app.vault.adapter.write(path, text);
-		},
-		path,
-		text,
-	);
 }
 
 // Installed-looking plugins, so the preview shows every kind of row
