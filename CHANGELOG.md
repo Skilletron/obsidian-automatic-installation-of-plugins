@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- On Android with older Obsidian (seen on 1.5.8), a new file could silently end up empty: such files are now written again, and a plugin left with an empty `manifest.json` or `main.js` is installed again, including on the next import if it was damaged earlier
 - Network requests no longer reject on HTTP 4xx/5xx before the plugin can handle them: a missing release tag now falls back to the `v`-prefixed tag, and GitHub rate limits show the rate-limit hint
 - Plugins that fail to enable are no longer marked as enabled or counted as enabled
 - Import enables only plugins it installed or changed in that run, not every plugin in the list (failed installs and plugins you turned off stay off)

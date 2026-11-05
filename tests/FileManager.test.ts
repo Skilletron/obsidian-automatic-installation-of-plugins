@@ -130,4 +130,62 @@ describe("FileManager.writeFile on slow storage", () => {
 		expect(staleReads).toBeLessThan(0);
 		expect(await fileManager.readFile(".obsidian/a.json")).toBe("{}");
 	});
+
+	it("writes a file again when the write left it empty", async () => {
+		const { fileManager, adapter } = createTestVault();
+		const write = adapter.write.bind(adapter);
+		let lostWrites = 1;
+		adapter.write = async (path: string, content: string) =>
+			write(path, lostWrites-- > 0 ? "" : content);
+
+		expect(await fileManager.writeFile(".obsidian/a.css", "a {}")).toBe(true);
+		expect(await fileManager.readFile(".obsidian/a.css")).toBe("a {}");
+	});
+
+	it("reports a failure when the file stays empty", async () => {
+		const { fileManager, adapter } = createTestVault();
+		const write = adapter.write.bind(adapter);
+		adapter.write = async (path: string) => write(path, "");
+
+		expect(await fileManager.writeFile(".obsidian/a.css", "a {}")).toBe(false);
+		expect(Notice.messages).toEqual([expect.stringContaining("stayed empty")]);
+	});
+
+	it("does not overwrite different content saved by someone else", async () => {
+		const { fileManager, adapter } = createTestVault();
+		const write = adapter.write.bind(adapter);
+		let writes = 0;
+		adapter.write = async (path: string) => {
+			writes++;
+			await write(path, "saved by another plugin");
+		};
+
+		expect(await fileManager.writeFile(".obsidian/a.json", "{}")).toBe(true);
+		expect(writes).toBe(1);
+	});
+
+	it("writes an empty file without treating it as lost", async () => {
+		const { fileManager, adapter } = createTestVault();
+		const write = adapter.write.bind(adapter);
+		let writes = 0;
+		adapter.write = async (path: string, content: string) => {
+			writes++;
+			await write(path, content);
+		};
+
+		expect(await fileManager.writeFile(".obsidian/a.css", "")).toBe(true);
+		expect(writes).toBe(1);
+	});
+});
+
+describe("FileManager.isEmptyFile", () => {
+	it("is true only for an existing file with 0 bytes", async () => {
+		const { fileManager } = createTestVault({
+			".obsidian/empty.css": "",
+			".obsidian/full.css": "a {}",
+		});
+		expect(await fileManager.isEmptyFile(".obsidian/empty.css")).toBe(true);
+		expect(await fileManager.isEmptyFile(".obsidian/full.css")).toBe(false);
+		expect(await fileManager.isEmptyFile(".obsidian/missing.css")).toBe(false);
+	});
 });

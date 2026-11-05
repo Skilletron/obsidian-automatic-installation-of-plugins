@@ -52,6 +52,11 @@ export class FileSystemAdapter {
 		return this.files.has(path) || this.folders.has(path);
 	}
 
+	async stat(path: string): Promise<{ size: number } | null> {
+		const content = this.files.get(path);
+		return content === undefined ? null : { size: content.length };
+	}
+
 	async read(path: string): Promise<string> {
 		const content = this.files.get(path);
 		if (content === undefined) {

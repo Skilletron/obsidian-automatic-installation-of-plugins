@@ -7,7 +7,9 @@ import {
 	readConfigJson,
 	runPluginMethod,
 	updateOwnSettings,
+	waitUntilPluginIdle,
 	writeConfigJson,
+	writeVaultFile,
 	openEmptyVault,
 } from "../helpers";
 
@@ -74,10 +76,7 @@ describe("Setup packs", () => {
 		await browser.executeObsidian(({ app }) =>
 			app.vault.adapter.mkdir("shared"),
 		);
-		await browser.executeObsidian(
-			({ app }, text) => app.vault.adapter.write("shared/pack.json", text),
-			packText,
-		);
+		await writeVaultFile("shared/pack.json", packText);
 
 		await callPlugin("loadSetupPack", "shared/pack.json");
 		const modal = browser.$(".community-install-manager-pack-modal");
@@ -110,11 +109,7 @@ describe("Setup packs", () => {
 	it("applies a confirmed pack's snippets even when syncing them is off", async () => {
 		// Let the import from the previous test finish first; a second one
 		// would be turned away while it runs.
-		await browser.waitUntil(() =>
-			browser.executeObsidian(({ app }, id) =>
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				!(app as any).plugins.plugins[id].busy, PLUGIN_ID),
-		);
+		await waitUntilPluginIdle();
 		await updateOwnSettings({ syncVaultSetup: false });
 		const pack = {
 			format: "community-install-manager/setup-pack",
@@ -125,10 +120,7 @@ describe("Setup packs", () => {
 				snippets: { "from-pack": { css: "body { --pack-marker: 1; }" } },
 			},
 		};
-		await browser.executeObsidian(
-			({ app }, text) => app.vault.adapter.write("shared/snippet-pack.json", text),
-			JSON.stringify(pack),
-		);
+		await writeVaultFile("shared/snippet-pack.json", JSON.stringify(pack));
 		await callPlugin("loadSetupPack", "shared/snippet-pack.json");
 		await browser.$(".community-install-manager-pack-modal").waitForExist();
 		await browser.executeObsidian(() => {

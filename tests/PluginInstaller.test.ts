@@ -57,7 +57,7 @@ function setup(
 			const base = `.obsidian/plugins/${m.id}`;
 			await vault.adapter.mkdir(base);
 			await vault.adapter.write(`${base}/manifest.json`, JSON.stringify(m));
-			await vault.adapter.write(`${base}/main.js`, "");
+			await vault.adapter.write(`${base}/main.js`, "module.exports = {};");
 		},
 	);
 	const plugins =
@@ -100,6 +100,57 @@ describe("PluginInstaller.installPlugin", () => {
 			await installer.installPlugin({ id: "dataview", version: "1.0.0" }),
 		).toBe("unchanged");
 		expect(installPlugin).not.toHaveBeenCalled();
+	});
+
+	it("installs again when Obsidian leaves the plugin's files empty", async () => {
+		const { vault, installer, installPlugin } = setup();
+		serve({
+			[PLUGIN_REGISTRY_URL]: registry,
+			[RAW_HEAD]: manifest("1.0.0"),
+			[release("1.0.0")]: manifest("1.0.0"),
+		});
+		const realInstall = installPlugin.getMockImplementation()!;
+		installPlugin.mockImplementationOnce(async (repo, version, m) => {
+			await realInstall(repo, version, m);
+			await vault.adapter.write(".obsidian/plugins/dataview/main.js", "");
+		});
+
+		expect(await installer.installPlugin({ id: "dataview" })).toBe("installed");
+		expect(installPlugin).toHaveBeenCalledTimes(2);
+		expect(vault.read(".obsidian/plugins/dataview/main.js")).not.toBe("");
+	});
+
+	it("fails when the plugin's files stay empty", async () => {
+		const { vault, installer, installPlugin } = setup();
+		serve({
+			[PLUGIN_REGISTRY_URL]: registry,
+			[RAW_HEAD]: manifest("1.0.0"),
+			[release("1.0.0")]: manifest("1.0.0"),
+		});
+		const realInstall = installPlugin.getMockImplementation()!;
+		installPlugin.mockImplementation(async (repo, version, m) => {
+			await realInstall(repo, version, m);
+			await vault.adapter.write(".obsidian/plugins/dataview/manifest.json", "");
+		});
+
+		expect(await installer.installPlugin({ id: "dataview" })).toBe("failed");
+		expect(installer.lastFailure).toContain("stayed empty");
+		expect(installPlugin).toHaveBeenCalledTimes(2);
+	});
+
+	it("repairs an installed plugin whose main.js is empty", async () => {
+		const files = installedPlugin("dataview", manifest("1.0.0"));
+		files[".obsidian/plugins/dataview/main.js"] = "";
+		const { vault, installer, installPlugin } = setup({ files });
+		serve({
+			[PLUGIN_REGISTRY_URL]: registry,
+			[RAW_HEAD]: manifest("1.0.0"),
+			[release("1.0.0")]: manifest("1.0.0"),
+		});
+
+		expect(await installer.installPlugin({ id: "dataview" })).toBe("installed");
+		expect(installPlugin).toHaveBeenCalledTimes(1);
+		expect(vault.read(".obsidian/plugins/dataview/main.js")).not.toBe("");
 	});
 
 	it("fails when Obsidian's installPlugin API is unavailable", async () => {

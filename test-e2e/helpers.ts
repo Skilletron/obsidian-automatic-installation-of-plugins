@@ -8,21 +8,36 @@ export async function writeConfigJson(
 	name: string,
 	data: unknown,
 ): Promise<void> {
-	const text = JSON.stringify(data, null, 2);
+	const path = await browser.executeObsidian(
+		({ app }, name) => `${app.vault.configDir}/${name}`,
+		name,
+	);
+	await writeVaultFile(path, JSON.stringify(data, null, 2));
+}
+
+export async function writeVaultFile(path: string, text: string): Promise<void> {
 	await browser.executeObsidian(
-		async ({ app }, name, text) => {
-			const path = `${app.vault.configDir}/${name}`;
+		async ({ app }, path, text) => {
+			const dir = path.split("/").slice(0, -1).join("/");
+			if (dir && !(await app.vault.adapter.exists(dir))) {
+				await app.vault.adapter.mkdir(dir);
+			}
 			await app.vault.adapter.write(path, text);
 			// On slow Android emulators a read right after the write can
-			// still see the old content; wait until the file reads back.
+			// still see the old content, and Obsidian 1.5.8 can lose the
+			// write to a new file altogether, leaving it empty.
 			for (let i = 0; i < 50; i++) {
-				if ((await app.vault.adapter.read(path)) === text) {
+				const current = await app.vault.adapter.read(path);
+				if (current === text) {
 					return;
+				}
+				if (current === "") {
+					await app.vault.adapter.write(path, text);
 				}
 				await new Promise((resolve) => window.setTimeout(resolve, 100));
 			}
 		},
-		name,
+		path,
 		text,
 	);
 }
@@ -49,6 +64,20 @@ export async function readConfigJson<T>(name: string): Promise<T | null> {
 			await browser.pause(250);
 		}
 	}
+}
+
+// A new import is turned away while another one runs.
+export async function waitUntilPluginIdle(): Promise<void> {
+	await browser.waitUntil(
+		() =>
+			browser.executeObsidian(
+				({ app }, id) =>
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					!(app as any).plugins.plugins[id].busy,
+				PLUGIN_ID,
+			),
+		{ timeout: 60 * 1000, timeoutMsg: "the plugin stayed busy" },
+	);
 }
 
 // Calls a plugin method and waits for it, unlike executeObsidianCommand,
@@ -79,18 +108,34 @@ export interface PluginState {
 	settings: Record<string, unknown> | null;
 }
 
+// Obsidian writes manifest.json itself while installing, and on Android 1.5.8
+// it can stay empty until the plugin notices and installs again. That counts
+// as not installed yet, so that tests waiting for an install keep waiting
+// instead of crashing.
+function parseInstalledVersion(id: string, manifest: string | null): string | null {
+	if (manifest === null) {
+		return null;
+	}
+	try {
+		return (JSON.parse(manifest) as { version: string }).version;
+	} catch {
+		console.warn(`${id}: manifest.json is not readable yet (${manifest.length} chars)`);
+		return null;
+	}
+}
+
 export async function pluginState(id: string): Promise<PluginState> {
-	return browser.executeObsidian(async ({ app }, id) => {
+	const { manifest, ...state } = await browser.executeObsidian(async ({ app }, id) => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const plugins = (app as any).plugins;
 		const dir = `${app.vault.configDir}/plugins/${id}`;
 		const manifestPath = `${dir}/manifest.json`;
-		const installedVersion = (await app.vault.adapter.exists(manifestPath))
-			? JSON.parse(await app.vault.adapter.read(manifestPath)).version
+		const manifest = (await app.vault.adapter.exists(manifestPath))
+			? await app.vault.adapter.read(manifestPath)
 			: null;
 		const loaded = plugins.plugins[id];
 		return {
-			installedVersion,
+			manifest,
 			enabled: plugins.enabledPlugins.has(id),
 			loaded: Boolean(loaded),
 			settings: loaded?.settings
@@ -98,6 +143,7 @@ export async function pluginState(id: string): Promise<PluginState> {
 				: null,
 		};
 	}, id);
+	return { ...state, installedVersion: parseInstalledVersion(id, manifest) };
 }
 
 export async function updateOwnSettings(

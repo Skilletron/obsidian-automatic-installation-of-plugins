@@ -91,7 +91,7 @@ export class FileManager {
 				return false;
 			}
 			await this.app.vault.adapter.write(normalized, content);
-			await this.waitUntilReadable(normalized, content);
+			await this.confirmWritten(normalized, content);
 			return true;
 		} catch (err: unknown) {
 			const errorMessage =
@@ -117,18 +117,43 @@ export class FileManager {
 	// the old content. Callers often hand the file to something that reads
 	// it straight away (a plugin loading its settings), so wait briefly
 	// until the new content reads back.
-	private async waitUntilReadable(path: string, content: string): Promise<void> {
+	//
+	// Obsidian 1.5.8 on Android can also leave a new file with 0 bytes while
+	// reporting success, and it stays that way; writing it again fixes it.
+	// Only an empty file is written again: different content may come from
+	// someone else saving the same file, and that must not be overwritten.
+	private async confirmWritten(path: string, content: string): Promise<void> {
+		let empty = false;
 		for (let attempt = 0; attempt < 20; attempt++) {
 			try {
-				if ((await this.app.vault.adapter.read(path)) === content) {
+				const current = await this.app.vault.adapter.read(path);
+				if (current === content) {
 					return;
+				}
+				empty = current === "";
+				if (empty) {
+					await this.app.vault.adapter.write(path, content);
 				}
 			} catch {
 				// Not readable yet.
 			}
 			await new Promise((resolve) => window.setTimeout(resolve, 100));
 		}
+		if (empty) {
+			throw new Error(`${path} stayed empty after writing it`);
+		}
 		logger.warn(`${path} did not read back as written.`);
+	}
+
+	// True only for a file that exists and has 0 bytes.
+	async isEmptyFile(vaultPath: string): Promise<boolean> {
+		try {
+			const stat = await this.app.vault.adapter.stat(normalizePath(vaultPath));
+			return stat?.size === 0;
+		} catch (err: unknown) {
+			logger.debug(`stat failed for ${vaultPath}:`, err);
+			return false;
+		}
 	}
 
 	// Deletes a file; true if it is gone afterwards.
