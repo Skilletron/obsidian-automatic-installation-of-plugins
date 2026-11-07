@@ -921,7 +921,13 @@ export class VaultSetupApplier {
 		for (const id of [...CORE_SETTINGS_IDS, "bookmarks"]) {
 			const plugin = plugins?.[id];
 			if (plugin && paths.includes(configPath(`${id}.json`))) {
-				await this.reloadCorePlugin(plugin, {});
+				// Older Obsidian can't reread the file, so its values get copied in.
+				// A key the file doesn't have stays until Obsidian is reopened: the
+				// plugin's defaults live only in memory and must not be wiped.
+				await this.reloadCorePlugin(
+					plugin,
+					await readJsonObject(this.fileManager, configPath(`${id}.json`)),
+				);
 				// With no file left, the bookmarks plugin keeps what it has.
 				if (
 					id === "bookmarks" &&

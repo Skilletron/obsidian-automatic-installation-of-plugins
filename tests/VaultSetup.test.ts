@@ -647,6 +647,17 @@ describe("Obsidian's own settings", () => {
 		expect(onExternalSettingsChange).toHaveBeenCalled();
 	});
 
+	it("copies restored values in when Obsidian can't reread the file", async () => {
+		const instance = { options: { folder: "Daily", keepDays: 7 } };
+		const { applier } = applierVault(
+			{ ".obsidian/daily-notes.json": JSON.stringify({ folder: "Before" }) },
+			{},
+			{ "daily-notes": { enabled: true, instance } },
+		);
+		await applier.reloadRestored([".obsidian/daily-notes.json"]);
+		expect(instance.options).toEqual({ folder: "Before", keepDays: 7 });
+	});
+
 	it("empties the bookmarks on undo when there was no file before", async () => {
 		const onItemsChanged = vi.fn();
 		const instance = { items: [{ type: "file" }], onExternalSettingsChange: vi.fn(), onItemsChanged };

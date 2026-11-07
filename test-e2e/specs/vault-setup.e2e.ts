@@ -121,6 +121,7 @@ describe("Obsidian's own settings", () => {
 		startedDark = (await state()).dark;
 		otherTheme = startedDark ? "moonstone" : "obsidian";
 		await writeConfigJson("community-plugins-list.json", []);
+		await writeConfigJson("daily-notes.json", { folder: "Before" });
 		await writeConfigJson(VAULT_SETUP, {
 			appSettings: {
 				readableLineLength: false,
@@ -184,7 +185,7 @@ describe("Obsidian's own settings", () => {
 		expect(s.readableLength).not.toBe(false);
 		expect(s.newLinkFormat).not.toBe("absolute");
 		expect(s.dark).toBe(startedDark);
-		expect(s.dailyFolder).not.toBe("Daily");
+		expect(s.dailyFolder).toBe("Before");
 		expect(s.bookmarks).toEqual([]);
 		// And they stay that way once Obsidian saves its settings again.
 		await browser.executeObsidian(({ app }) =>
