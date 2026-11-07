@@ -321,6 +321,7 @@
 /* Translations can be much longer than English: buttons in the plugin's
    windows wrap instead of running off narrow screens. */
 .community-install-manager-pack-modal .setting-item-control,
+.community-install-manager-pack-export-modal .setting-item-control,
 .community-install-manager-pack-link-modal .setting-item-control,
 .community-install-manager-updates-modal .setting-item-control,
 .community-install-manager-preview-modal .setting-item-control {
@@ -329,6 +330,7 @@
 }
 
 .community-install-manager-pack-modal button,
+.community-install-manager-pack-export-modal button,
 .community-install-manager-pack-link-modal button,
 .community-install-manager-updates-modal button,
 .community-install-manager-preview-modal button {
@@ -339,6 +341,7 @@
 }
 
 .community-install-manager-pack-modal,
+.community-install-manager-pack-export-modal,
 .community-install-manager-updates-modal,
 .community-install-manager-preview-row-meta {
   overflow-wrap: anywhere;
@@ -363,10 +366,18 @@
 /* On phones the window's content is a flex column of fixed height; without
    this its blocks shrink and their text runs into each other. */
 .community-install-manager-pack-modal > *,
+.community-install-manager-pack-export-modal > *,
 .community-install-manager-pack-link-modal > *,
 .community-install-manager-updates-modal > *,
 .community-install-manager-preview-modal > * {
   flex-shrink: 0;
+}
+
+/* A long plugin list scrolls by itself, so the buttons stay in view. */
+.community-install-manager-pack-export-modal > .community-install-manager-pack-export-list {
+  flex-shrink: 1;
+  min-height: 8em;
+  overflow-y: auto;
 }
 
 /* The preview's plugin list scrolls on its own, so it is the one block

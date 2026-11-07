@@ -253,6 +253,16 @@ async function checkLanguage(language: string): Promise<string[]> {
 	await note("preview", await overflow(".modal"));
 	await closeModals();
 
+	// Picking what goes into a pack
+	await browser.executeObsidian(async ({ app }, id) => {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		await (app as any).plugins.plugins[id].exportSetupPack();
+	}, PLUGIN_ID);
+	await browser.$(".community-install-manager-pack-export-modal").waitForExist();
+	await browser.pause(300);
+	await note("pack export", await overflow(".modal"));
+	await closeModals();
+
 	// Pack link and pack confirmation
 	await browser.executeObsidian(({ app }, id) => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any

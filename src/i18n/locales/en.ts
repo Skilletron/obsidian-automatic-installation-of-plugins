@@ -153,6 +153,14 @@ export const en = {
 	"pack.explain":
 		"The pack is added to your own plugin list and settings files (it wins where both have something), then the import runs. Undo last change puts the files back.",
 	"pack.confirm": "Add to my setup and import",
+	"pack.pickTitle": "Choose plugins for the pack",
+	"pack.pickDesc":
+		"Turn off anything you don't want to share. The settings of the other plugins go with them, with secrets left out.",
+	"pack.pickAll": "Select all",
+	"pack.pickNone": "Select none",
+	"pack.pickOff": "turned off",
+	"pack.pickSave": "Save pack ({count})",
+	"pack.pickEmpty": "No community plugins are installed.",
 
 	// Updates
 	"updates.checking": "Checking for plugin updates",
@@ -313,7 +321,7 @@ export const en = {
 	"settings.importButton": "Import",
 	"settings.shareName": "Share your setup",
 	"settings.shareDesc":
-		"Save everything you have installed as setup-pack.json in your vault, with secrets left out, to share with others.",
+		"Choose which installed plugins to share and save them as setup-pack.json in your vault, with secrets left out.",
 	"settings.shareButton": "Export pack",
 	"settings.importPackName": "Import a setup pack",
 	"settings.importPackDesc":

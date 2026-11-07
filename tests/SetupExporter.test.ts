@@ -69,6 +69,40 @@ describe("SetupExporter", () => {
 		]);
 	});
 
+	it("lists what can go into a pack, with names and on/off state", async () => {
+		const vault = createTestVault({
+			...installedPlugin("dataview", {
+				id: "dataview",
+				name: "Dataview",
+				version: "0.5.68",
+			}),
+			...installedPlugin("no-name", { id: "no-name" }),
+			".obsidian/community-plugins.json": '["dataview"]',
+		});
+
+		expect(await new SetupExporter(vault.fileManager).listPackChoices()).toEqual([
+			{ id: "dataview", name: "Dataview", version: "0.5.68", off: false },
+			{ id: "no-name", name: "no-name", off: true },
+		]);
+	});
+
+	it("collects only the chosen plugins, counting only their secrets", async () => {
+		const vault = createTestVault({
+			...installedPlugin("kept", { id: "kept" }, { apiToken: "a", size: 1 }),
+			...installedPlugin("left", { id: "left" }, { apiToken: "b", password: "c" }),
+		});
+
+		const { installed, listEntries, settings, redactedCount } =
+			await new SetupExporter(vault.fileManager).collect(true, new Set(["kept"]));
+
+		expect(installed.map((p) => p.pluginId)).toEqual(["kept"]);
+		expect(listEntries).toEqual([{ id: "kept" }]);
+		expect(settings).toEqual({
+			kept: { apiToken: SECRET_PLACEHOLDER, size: 1 },
+		});
+		expect(redactedCount).toBe(1);
+	});
+
 	it("writes the plugin list and settings files", async () => {
 		const vault = createTestVault({
 			...installedPlugin(

@@ -167,7 +167,7 @@ Every part is optional. Export writes all four for you when **Sync theme, snippe
 | Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
 | Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
 | Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |
-| Export shareable setup pack | Saves everything you have installed as `setup-pack.json` in your vault, with secrets always left out, ready to share |
+| Export shareable setup pack | Lets you pick which installed plugins to share and saves them as `setup-pack.json` in your vault, with secrets always left out |
 | Import setup pack from a link | Loads a setup pack from a link or a vault path, shows what it contains, and adds it to your setup only after you confirm |
 | Check for plugin updates | Lists installed community plugins that have newer versions and updates the ones you pick |
 | Undo last import, export or settings change | Puts the files the last Import, Apply settings or Export changed back the way they were |
@@ -192,7 +192,7 @@ Auto-install and sync-on-startup stay off so a fresh vault does not download plu
 
 ### Sharing your setup
 
-**Export shareable setup pack** writes `setup-pack.json` to your vault: your plugins (with versions), their settings, and, when syncing it is on, your theme, snippets, hotkeys and core plugins. Secrets are always left out of it, whatever the export setting says. Put it somewhere public, such as a GitHub gist, and share the link.
+**Export shareable setup pack** first shows your installed plugins, all turned on: turn off the ones you don't want to share. It then writes `setup-pack.json` to your vault: the plugins you kept (with versions), their settings, and, when syncing it is on, your theme, snippets, hotkeys and core plugins. Plugins you turned off leave no trace: neither their settings nor their hotkeys go in. Secrets are always left out of it, whatever the export setting says. Put it somewhere public, such as a GitHub gist, and share the link.
 
 **Import setup pack from a link** takes that link (an https link; GitHub gist and file pages work too) or the path of a pack file in your vault. It shows the pack's name, where it came from, every plugin in it and what would change in your theme and snippets. Nothing happens until you click **Add to my setup and import**. Then the pack is added to your own files (it wins where both have something) and Import runs. Undo last change puts your files back.
 

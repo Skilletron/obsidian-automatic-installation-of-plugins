@@ -181,6 +181,14 @@ export const es: LocaleMessages = {
 	"pack.explain":
 		"El paquete se añade a tu propia lista de complementos y a tus archivos de ajustes (tiene prioridad donde ambos definen algo) y luego se ejecuta la importación. Deshacer el último cambio restaura los archivos.",
 	"pack.confirm": "Añadir a mi configuración e importar",
+	"pack.pickTitle": "Elegir los plugins del paquete",
+	"pack.pickDesc":
+		"Desactiva lo que no quieras compartir. Los ajustes de los demás plugins se incluyen sin los secretos.",
+	"pack.pickAll": "Seleccionar todos",
+	"pack.pickNone": "No seleccionar ninguno",
+	"pack.pickOff": "desactivado",
+	"pack.pickSave": "Guardar paquete ({count})",
+	"pack.pickEmpty": "No hay plugins de la comunidad instalados.",
 
 	// Updates
 	"updates.checking": "Buscando actualizaciones de complementos",
@@ -367,7 +375,7 @@ export const es: LocaleMessages = {
 	"settings.importButton": "Importar",
 	"settings.shareName": "Compartir tu configuración",
 	"settings.shareDesc":
-		"Guarda todo lo que tienes instalado como setup-pack.json en tu bóveda, sin los secretos, para compartirlo con otros.",
+		"Elige plugins instalados y guárdalos como setup-pack.json en tu bóveda, sin los secretos, para compartirlos con otros.",
 	"settings.shareButton": "Exportar paquete",
 	"settings.importPackName": "Importar un paquete de configuración",
 	"settings.importPackDesc":

@@ -32,6 +32,30 @@ async function callPlugin(method: string, ...args: string[]): Promise<void> {
 	);
 }
 
+async function clickInPicker(text: string): Promise<void> {
+	await browser.executeObsidian((_, text) => {
+		[
+			...document.querySelectorAll<HTMLButtonElement>(
+				".community-install-manager-pack-export-modal button",
+			),
+		]
+			.find((b) => b.textContent?.startsWith(text))
+			?.click();
+	}, text);
+}
+
+async function readPack(): Promise<{
+	plugins: Array<{ id?: string }>;
+	settings: Record<string, Record<string, unknown>>;
+	vaultSetup?: { hotkeys?: Record<string, unknown> };
+}> {
+	return JSON.parse(
+		await browser.executeObsidian(({ app }) =>
+			app.vault.adapter.read("setup-pack.json"),
+		),
+	);
+}
+
 async function noticeText(): Promise<string> {
 	return browser.executeObsidian(() =>
 		[...document.querySelectorAll(".notice")]
@@ -59,6 +83,24 @@ describe("Setup packs", () => {
 		});
 
 		await callPlugin("exportSetupPack");
+		const picker = browser.$(".community-install-manager-pack-export-modal");
+		await picker.waitForExist();
+		await expect(picker).toHaveText(expect.stringContaining(HIDER));
+		// Nothing is written until the button is pressed.
+		expect(
+			await browser.executeObsidian(({ app }) =>
+				app.vault.adapter.exists("setup-pack.json"),
+			),
+		).toBe(false);
+
+		await clickInPicker("Save pack");
+		await browser.waitUntil(
+			() =>
+				browser.executeObsidian(({ app }) =>
+					app.vault.adapter.exists("setup-pack.json"),
+				),
+			{ timeoutMsg: "the pack was not saved" },
+		);
 		packText = await browser.executeObsidian(({ app }) =>
 			app.vault.adapter.read("setup-pack.json"),
 		);
@@ -69,6 +111,64 @@ describe("Setup packs", () => {
 			hideStatus: true,
 			apiToken: PLACEHOLDER,
 		});
+	});
+
+	it("leaves out plugins that are turned off in the picker", async () => {
+		await writeConfigJson("hotkeys.json", {
+			[`${HIDER}:toggle-tab-containers`]: [{ modifiers: ["Mod"], key: "J" }],
+			"editor:toggle-bold": [{ modifiers: ["Mod"], key: "B" }],
+		});
+		await updateOwnSettings({ syncVaultSetup: true });
+		await callPlugin("exportSetupPack");
+		await browser
+			.$(".community-install-manager-pack-export-modal")
+			.waitForExist();
+		await browser.executeObsidian((_, name) => {
+			const row = [
+				...document.querySelectorAll<HTMLElement>(
+					".community-install-manager-pack-export-list .setting-item",
+				),
+			].find((item) => item.textContent?.includes(name));
+			row?.querySelector<HTMLElement>(".checkbox-container")?.click();
+		}, HIDER);
+		const before = await browser.executeObsidian(({ app }) =>
+			app.vault.adapter.read("setup-pack.json"),
+		);
+		await clickInPicker("Save pack");
+		await browser.waitUntil(
+			async () =>
+				(await browser.executeObsidian(({ app }) =>
+					app.vault.adapter.read("setup-pack.json"),
+				)) !== before,
+			{ timeoutMsg: "the pack was not saved" },
+		);
+
+		const pack = await readPack();
+		expect(pack.plugins.map((p) => p.id)).not.toContain(HIDER);
+		expect(pack.settings[HIDER]).toBeUndefined();
+		expect(JSON.stringify(pack)).not.toContain("real-token");
+		expect(Object.keys(pack.vaultSetup?.hotkeys ?? {})).toEqual([
+			"editor:toggle-bold",
+		]);
+	});
+
+	it("does not save a pack when the picker is cancelled", async () => {
+		const before = await browser.executeObsidian(({ app }) =>
+			app.vault.adapter.read("setup-pack.json"),
+		);
+		await callPlugin("exportSetupPack");
+		await browser
+			.$(".community-install-manager-pack-export-modal")
+			.waitForExist();
+		await clickInPicker("Cancel");
+		await browser
+			.$(".community-install-manager-pack-export-modal")
+			.waitForExist({ reverse: true });
+		expect(
+			await browser.executeObsidian(({ app }) =>
+				app.vault.adapter.read("setup-pack.json"),
+			),
+		).toBe(before);
 	});
 
 	it("imports a pack only after confirmation", async () => {

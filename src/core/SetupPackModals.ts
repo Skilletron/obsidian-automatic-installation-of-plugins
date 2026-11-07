@@ -1,6 +1,120 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Setting, ToggleComponent } from "obsidian";
+import { PackPluginChoice } from "./SetupExporter";
 import { ParsedPack } from "./SetupPack";
 import { t } from "../i18n";
+
+// Lets the user pick which installed plugins go into a pack. Everything
+// starts ticked, and nothing is saved until they press the button.
+export class PackExportModal extends Modal {
+	private chosen: Set<string>;
+	private toggles = new Map<string, ToggleComponent>();
+	private saveButton: ButtonComponent | null = null;
+
+	constructor(
+		app: App,
+		private plugins: PackPluginChoice[],
+		// A pack without plugins is still useful if it carries a theme or snippets.
+		private allowNoPlugins: boolean,
+		private onSave: (ids: string[]) => Promise<void>,
+	) {
+		super(app);
+		this.chosen = new Set(plugins.map((plugin) => plugin.id));
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass("community-install-manager-pack-export-modal");
+		contentEl.createEl("h2", { text: t("pack.pickTitle") });
+		contentEl.createEl("p", {
+			cls: "setting-item-description",
+			text: this.plugins.length > 0 ? t("pack.pickDesc") : t("pack.pickEmpty"),
+		});
+
+		if (this.plugins.length > 1) {
+			new Setting(contentEl)
+				.addButton((button) =>
+					button
+						.setButtonText(t("pack.pickAll"))
+						.onClick(() => this.setAll(true)),
+				)
+				.addButton((button) =>
+					button
+						.setButtonText(t("pack.pickNone"))
+						.onClick(() => this.setAll(false)),
+				);
+		}
+
+		const list = contentEl.createDiv({
+			cls: "community-install-manager-pack-export-list",
+		});
+		for (const plugin of this.plugins) {
+			new Setting(list)
+				.setName(plugin.name)
+				.setDesc(describeChoice(plugin))
+				.addToggle((toggle) => {
+					this.toggles.set(plugin.id, toggle);
+					toggle.setValue(true).onChange((value) => {
+						this.setChosen(plugin.id, value);
+						this.refreshSaveButton();
+					});
+				});
+		}
+
+		new Setting(contentEl)
+			.addButton((button) => {
+				this.saveButton = button;
+				button.setCta().onClick(async () => {
+					const ids = this.plugins
+						.map((plugin) => plugin.id)
+						.filter((id) => this.chosen.has(id));
+					this.close();
+					await this.onSave(ids);
+				});
+			})
+			.addButton((button) =>
+				button.setButtonText(t("common.cancel")).onClick(() => this.close()),
+			);
+		this.refreshSaveButton();
+	}
+
+	private setChosen(id: string, value: boolean): void {
+		if (value) {
+			this.chosen.add(id);
+		} else {
+			this.chosen.delete(id);
+		}
+	}
+
+	private setAll(value: boolean): void {
+		for (const plugin of this.plugins) {
+			this.setChosen(plugin.id, value);
+			this.toggles.get(plugin.id)?.setValue(value);
+		}
+		this.refreshSaveButton();
+	}
+
+	private refreshSaveButton(): void {
+		this.saveButton
+			?.setButtonText(t("pack.pickSave", { count: this.chosen.size }))
+			.setDisabled(this.chosen.size === 0 && !this.allowNoPlugins);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+function describeChoice(plugin: PackPluginChoice): string {
+	const parts = [plugin.id];
+	if (plugin.version) {
+		parts.push(plugin.version);
+	}
+	if (plugin.off) {
+		parts.push(t("pack.pickOff"));
+	}
+	return parts.join(" · ");
+}
 
 // Asks for a link to a setup pack (or a path to one in the vault).
 export class PackLinkModal extends Modal {

@@ -176,6 +176,14 @@ export const fr: LocaleMessages = {
 	"pack.explain":
 		"Le pack est ajouté à votre propre liste de plugins et à vos fichiers de paramètres (il l’emporte en cas de conflit), puis l’import est lancé. « Annuler la dernière modification » restaure les fichiers.",
 	"pack.confirm": "Ajouter à ma configuration et importer",
+	"pack.pickTitle": "Choisir les plugins du pack",
+	"pack.pickDesc":
+		"Désactivez ce que vous ne voulez pas partager. Les paramètres des autres plugins sont inclus, sans les secrets.",
+	"pack.pickAll": "Tout sélectionner",
+	"pack.pickNone": "Tout désélectionner",
+	"pack.pickOff": "désactivé",
+	"pack.pickSave": "Enregistrer le pack ({count})",
+	"pack.pickEmpty": "Aucun plugin communautaire n’est installé.",
 
 	// Updates
 	"updates.checking": "Recherche de mises à jour des plugins",
@@ -357,7 +365,7 @@ export const fr: LocaleMessages = {
 	"settings.importButton": "Importer",
 	"settings.shareName": "Partager votre configuration",
 	"settings.shareDesc":
-		"Enregistrer tout ce que vous avez installé dans setup-pack.json dans votre coffre, sans les secrets, pour le partager avec d’autres.",
+		"Choisir des plugins installés et les enregistrer dans setup-pack.json dans votre coffre, sans les secrets, pour les partager avec d’autres.",
 	"settings.shareButton": "Exporter le pack",
 	"settings.importPackName": "Importer un pack de configuration",
 	"settings.importPackDesc":

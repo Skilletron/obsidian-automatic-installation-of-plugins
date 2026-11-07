@@ -160,6 +160,14 @@ export const de: LocaleMessages = {
 	"pack.explain":
 		"Das Paket wird zu deiner eigenen Plugin-Liste und deinen Einstellungsdateien hinzugefügt (bei Überschneidungen hat das Paket Vorrang), danach läuft der Import. „Letzte Änderung rückgängig machen“ stellt die Dateien wieder her.",
 	"pack.confirm": "Zu meinem Setup hinzufügen und importieren",
+	"pack.pickTitle": "Plugins für das Paket auswählen",
+	"pack.pickDesc":
+		"Deaktiviere, was du nicht teilen möchtest. Die Einstellungen der übrigen Plugins kommen ohne Geheimnisse ins Paket.",
+	"pack.pickAll": "Alle auswählen",
+	"pack.pickNone": "Keine auswählen",
+	"pack.pickOff": "deaktiviert",
+	"pack.pickSave": "Paket speichern ({count})",
+	"pack.pickEmpty": "Es sind keine Community-Plugins installiert.",
 
 	// Updates
 	"updates.checking": "Suche nach Plugin-Updates",
@@ -329,7 +337,7 @@ export const de: LocaleMessages = {
 	"settings.importButton": "Importieren",
 	"settings.shareName": "Setup teilen",
 	"settings.shareDesc":
-		"Speichert alles, was du installiert hast, als setup-pack.json in deinem Tresor – ohne Geheimnisse –, um es mit anderen zu teilen.",
+		"Wähle installierte Plugins aus und speichere sie als setup-pack.json in deinem Tresor – ohne Geheimnisse –, um sie mit anderen zu teilen.",
 	"settings.shareButton": "Paket exportieren",
 	"settings.importPackName": "Setup-Paket importieren",
 	"settings.importPackDesc":
