@@ -111,14 +111,21 @@ describe("Obsidian's own settings", () => {
 		});
 	}
 
+	// Which theme a new vault starts with depends on the Obsidian version, so
+	// switch to the other one to see the change both ways.
+	let startedDark = false;
+	let otherTheme = "";
+
 	before(async () => {
 		await openEmptyVault();
+		startedDark = (await state()).dark;
+		otherTheme = startedDark ? "moonstone" : "obsidian";
 		await writeConfigJson("community-plugins-list.json", []);
 		await writeConfigJson(VAULT_SETUP, {
 			appSettings: {
 				readableLineLength: false,
 				newLinkFormat: "absolute",
-				theme: "obsidian",
+				theme: otherTheme,
 			},
 			coreSettings: {
 				"daily-notes": { folder: "Daily" },
@@ -134,14 +141,14 @@ describe("Obsidian's own settings", () => {
 		const s = await state();
 		expect(s.readableLength).toBe(false);
 		expect(s.newLinkFormat).toBe("absolute");
-		expect(s.dark).toBe(true);
+		expect(s.dark).toBe(!startedDark);
 		expect(s.dailyFolder).toBe("Daily");
 		expect(await readConfigJson("app.json")).toMatchObject({
 			readableLineLength: false,
 			newLinkFormat: "absolute",
 		});
 		expect(await readConfigJson("appearance.json")).toMatchObject({
-			theme: "obsidian",
+			theme: otherTheme,
 		});
 		expect(await readConfigJson("daily-notes.json")).toMatchObject({
 			folder: "Daily",
@@ -163,7 +170,7 @@ describe("Obsidian's own settings", () => {
 		expect(setup.appSettings).toMatchObject({
 			readableLineLength: false,
 			newLinkFormat: "absolute",
-			theme: "obsidian",
+			theme: otherTheme,
 		});
 		expect(setup.appSettings.cssTheme).toBeUndefined();
 		expect(setup.appSettings.enabledCssSnippets).toBeUndefined();
@@ -176,7 +183,7 @@ describe("Obsidian's own settings", () => {
 		const s = await state();
 		expect(s.readableLength).not.toBe(false);
 		expect(s.newLinkFormat).not.toBe("absolute");
-		expect(s.dark).toBe(false);
+		expect(s.dark).toBe(startedDark);
 		expect(s.dailyFolder).not.toBe("Daily");
 		expect(s.bookmarks).toEqual([]);
 		// And they stay that way once Obsidian saves its settings again.
