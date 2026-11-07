@@ -64,6 +64,47 @@ describe("parseSetupPack", () => {
 	});
 });
 
+describe("Obsidian's settings in packs", () => {
+	it("ignores bookmarks in a pack", () => {
+		const parsed = parseSetupPack(
+			pack({
+				vaultSetup: {
+					appSettings: { vimMode: true },
+					bookmarks: [{ type: "search", query: "a" }],
+				},
+			}),
+		);
+		expect(parsed?.vaultSetup?.appSettings).toEqual({ vimMode: true });
+		expect(parsed?.vaultSetup?.bookmarks).toBeUndefined();
+	});
+
+	it("adds them to the vault's setup file, the pack winning", async () => {
+		const vault = createTestVault({
+			[SETUP]: JSON.stringify({
+				appSettings: { vimMode: false, tabSize: 2 },
+				coreSettings: { graph: { showTags: false, showArrow: true } },
+				bookmarks: [{ type: "search", query: "mine" }],
+			}),
+		});
+		await mergePackIntoSetup(
+			vault.fileManager,
+			parseSetupPack(
+				pack({
+					vaultSetup: {
+						appSettings: { vimMode: true },
+						coreSettings: { graph: { showTags: true } },
+					},
+				}),
+			)!,
+		);
+		expect(vault.readJson(SETUP)).toMatchObject({
+			appSettings: { vimMode: true, tabSize: 2 },
+			coreSettings: { graph: { showTags: true, showArrow: true } },
+			bookmarks: [{ type: "search", query: "mine" }],
+		});
+	});
+});
+
 describe("withoutHotkeysOf", () => {
 	const key = [{ modifiers: ["Mod"], key: "K" }];
 

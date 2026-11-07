@@ -69,7 +69,7 @@ export const ru: LocaleMessages = {
 	// Vault setup
 	"vaultSetup.invalid": "{file} некорректен, поэтому пропущен.",
 	"vaultSetup.applying":
-		"Применение темы, CSS-фрагментов, сочетаний клавиш и встроенных плагинов",
+		"Применение настроек Obsidian, темы, CSS-фрагментов, сочетаний клавиш и встроенных плагинов",
 	"vaultSetup.snippetsWritten": {
 		one: "Добавлен или обновлён {count} CSS-фрагмент.",
 		few: "Добавлено или обновлено {count} CSS-фрагмента.",
@@ -102,6 +102,20 @@ export const ru: LocaleMessages = {
 	"vaultSetup.describeCore":
 		"Встроенные плагины: будет включено {on}, выключено {off}",
 	"vaultSetup.describeCoreSame": "Встроенные плагины: уже как в списке",
+	"vaultSetup.appSettingsSet":
+		"Изменено настроек Obsidian: {count}. Некоторые заработают после перезапуска Obsidian.",
+	"vaultSetup.coreSettingsSet": "Изменено настроек встроенных плагинов: {count}.",
+	"vaultSetup.bookmarksAdded": "Добавлено закладок: {count}.",
+	"vaultSetup.noConfigManager": "Менеджер настроек Obsidian недоступен.",
+	"vaultSetup.coreSettingsFailed":
+		"Не удалось записать настройки встроенного плагина «{id}».",
+	"vaultSetup.bookmarksFailed": "Не удалось записать закладки.",
+	"vaultSetup.describeApp":
+		"Настройки Obsidian: в списке {total} (изменится {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Настройки встроенных плагинов: плагинов {total} (изменится {changed})",
+	"vaultSetup.describeBookmarks":
+		"Закладки: в списке {total} (добавится {added})",
 
 	// Export
 	"export.finished": "Экспорт завершён",
@@ -137,7 +151,7 @@ export const ru: LocaleMessages = {
 		other: "{count} сочетания клавиш",
 	},
 	"export.vaultSetup":
-		" Также сохранены {theme}, {snippets}, {hotkeys} и встроенные плагины в {file}.",
+		" Также сохранены {theme}, {snippets}, {hotkeys}, встроенные плагины, настройки Obsidian и закладки в {file}.",
 	"export.writeFailed": "не удалось записать JSON-файлы набора",
 
 	// Setup packs
@@ -424,9 +438,9 @@ export const ru: LocaleMessages = {
 		"Названия настроек через запятую, которые тоже нужно убирать, например: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "License code, endpoint",
 	"settings.syncVaultSetupName":
-		"Синхронизировать тему, CSS-фрагменты, сочетания клавиш и встроенные плагины",
+		"Синхронизировать настройки Obsidian, тему, CSS-фрагменты, сочетания клавиш и встроенные плагины",
 	"settings.syncVaultSetupDesc":
-		"Экспорт сохраняет вашу тему, CSS-фрагменты, свои сочетания клавиш и включённые встроенные плагины в vault-setup.json. Импорт применяет их на другом устройстве.",
+		"Экспорт сохраняет настройки Obsidian, вашу тему, CSS-фрагменты, свои сочетания клавиш, встроенные плагины с их настройками и закладки в vault-setup.json. Импорт применяет их на другом устройстве.",
 	"settings.logLevelName": "Уровень журнала",
 	"settings.logLevelDesc":
 		"Сколько подробностей выводить в консоль, если что-то пошло не так. Оставьте «Ошибки», если не ищете проблему.",

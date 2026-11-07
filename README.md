@@ -8,11 +8,11 @@ Works on desktop and mobile. Tested automatically on Windows, Linux and Android;
 
 ## What it does
 
-The plugin reads two files in your vault’s `.obsidian` folder:
+The plugin reads these files in your vault’s `.obsidian` folder:
 
 - `community-plugins-list.json` — which community plugins to install (optionally with pinned versions)
 - `community-plugins-settings.json` — settings to apply to those plugins
-- `vault-setup.json` — your theme, CSS snippets, custom hotkeys and core plugins (optional)
+- `vault-setup.json` — your Obsidian settings, theme, CSS snippets, custom hotkeys, core plugins with their settings, and bookmarks (optional)
 
 You can **export** your current vault setup into those files, **preview** what an import would do, then **import** on another machine.
 
@@ -140,7 +140,10 @@ Maps plugin IDs to settings objects applied to each plugin:
   "hotkeys": {
     "editor:toggle-bold": [{ "modifiers": ["Mod", "Shift"], "key": "B" }]
   },
-  "corePlugins": { "daily-notes": true, "graph": false }
+  "corePlugins": { "daily-notes": true, "graph": false },
+  "appSettings": { "vimMode": true, "attachmentFolderPath": "files" },
+  "coreSettings": { "daily-notes": { "folder": "Daily" }, "graph": { "showTags": true } },
+  "bookmarks": [{ "type": "file", "ctime": 1760000000000, "path": "Home.md" }]
 }
 ```
 
@@ -149,8 +152,11 @@ Maps plugin IDs to settings objects applied to each plugin:
 
 - `hotkeys`: custom hotkeys by command id, in the same format as Obsidian's `hotkeys.json` (`Mod` is Ctrl on Windows and Linux, Cmd on macOS). Import sets them for the listed commands; other commands keep their hotkeys. An empty list removes a command's default hotkey.
 - `corePlugins`: core plugins by id, `true` for on and `false` for off. Import turns them on or off to match. Core plugins that this Obsidian version or device doesn't have are skipped.
+- `appSettings`: Obsidian's own settings, as in `app.json` and `appearance.json` (editor, files and links, fonts, light or dark mode and so on). Import sets the listed ones and leaves the rest alone. Export only writes settings you have changed from the default, so a setting at its default won't overwrite a different value on the other device. Some of them only take effect after you reopen Obsidian.
+- `coreSettings`: settings of core plugins by id (daily notes, templates, graph and others), merged over what each one has. Sync, Publish and Workspaces are never included: they belong to an account or to one vault.
+- `bookmarks`: bookmarks as in `bookmarks.json`. Import adds the missing ones and never removes any, so a bookmark deleted on one device stays on the others.
 
-Every part is optional. Export writes all four for you when **Sync theme, snippets, hotkeys and core plugins** is on. Undo puts snippet files back, but it doesn't switch the theme back or undo hotkey and core plugin changes.
+Every part is optional. Export writes them for you when **Sync Obsidian settings, theme, snippets, hotkeys and core plugins** is on, leaving out secrets like it does for plugin settings. Undo puts back snippet files, Obsidian settings, core plugin settings and bookmarks, but it doesn't switch the theme back or undo hotkeys and which core plugins are on.
 
 ## Quick start
 
@@ -185,14 +191,14 @@ Every part is optional. Export writes all four for you when **Sync theme, snippe
 | Run automatic actions on mobile | Off | Let auto-install and sync on startup run on phones and tablets too |
 | Leave out secrets on export | On (off if you used the plugin before 1.3.0) | Replace tokens, passwords and API keys with a placeholder in the exported settings |
 | Extra secret setting names | — | More setting names to leave out, comma-separated |
-| Sync theme, snippets, hotkeys and core plugins | On (off if you used the plugin before 1.3.0) | Export and import them through `vault-setup.json` |
+| Sync Obsidian settings, theme, snippets, hotkeys and core plugins | On (off if you used the plugin before 1.3.0) | Export and import them, and bookmarks, through `vault-setup.json` |
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
 
 ### Sharing your setup
 
-**Export shareable setup pack** first shows your installed plugins, all turned on: turn off the ones you don't want to share. It then writes `setup-pack.json` to your vault: the plugins you kept (with versions), their settings, and, when syncing it is on, your theme, snippets, hotkeys and core plugins. Plugins you turned off leave no trace: neither their settings nor their hotkeys go in. Secrets are always left out of it, whatever the export setting says. Put it somewhere public, such as a GitHub gist, and share the link.
+**Export shareable setup pack** first shows your installed plugins, all turned on: turn off the ones you don't want to share. It then writes `setup-pack.json` to your vault: the plugins you kept (with versions), their settings, and, when syncing it is on, your Obsidian settings, theme, snippets, hotkeys and core plugins with their settings. Bookmarks never go in, since they name your notes. Plugins you turned off leave no trace: neither their settings nor their hotkeys go in. Secrets are always left out of it, whatever the export setting says. Put it somewhere public, such as a GitHub gist, and share the link.
 
 **Import setup pack from a link** takes that link (an https link; GitHub gist and file pages work too) or the path of a pack file in your vault. It shows the pack's name, where it came from, every plugin in it and what would change in your theme and snippets. Nothing happens until you click **Add to my setup and import**. Then the pack is added to your own files (it wins where both have something) and Import runs. Undo last change puts your files back.
 

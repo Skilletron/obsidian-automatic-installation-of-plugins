@@ -10,7 +10,12 @@ import { scanInstalledPlugins } from "./InstalledPlugins";
 import { SettingsBackup } from "./SettingsBackup";
 import { redactSecrets } from "../utils/secrets";
 import { parseDevices } from "../utils/parsePluginList";
-import { LiveVaultState, readVaultSetup } from "./VaultSetup";
+import {
+	LiveVaultState,
+	VaultSetup,
+	readVaultSetup,
+	redactVaultSetup,
+} from "./VaultSetup";
 import { VAULT_SETUP_FILE } from "../types";
 import { logger } from "../utils/Logger";
 import { t } from "../i18n";
@@ -113,8 +118,9 @@ export class SetupExporter {
 		redactedCount: number;
 		message: string;
 	}> {
-		const { installed, listEntries, settings, redactedCount } =
+		const { installed, listEntries, settings, redactedCount: pluginSecrets } =
 			await this.collect();
+		let redactedCount = pluginSecrets;
 
 		const listPath = this.fileManager.configPath(PLUGINS_LIST_FILE);
 		const settingsPath = this.fileManager.configPath(PLUGINS_SETTINGS_FILE);
@@ -158,10 +164,10 @@ export class SetupExporter {
 
 		let setupNote = "";
 		if (this.includeVaultSetup()) {
-			const vaultSetup = await readVaultSetup(
-				this.fileManager,
-				this.liveVaultState(),
+			const { setup: vaultSetup, redacted } = this.leaveOutSecrets(
+				await readVaultSetup(this.fileManager, this.liveVaultState()),
 			);
+			redactedCount += redacted;
 			const setupPath = this.fileManager.configPath(VAULT_SETUP_FILE);
 			await this.backup?.capture(setupPath);
 			if (
@@ -211,6 +217,17 @@ export class SetupExporter {
 			redactedCount,
 			message,
 		};
+	}
+
+	// force leaves secrets out whatever the setting says.
+	leaveOutSecrets(
+		setup: VaultSetup,
+		force = false,
+	): { setup: VaultSetup; redacted: number } {
+		const { redact, extraKeys } = this.secretOptions();
+		return redact || force
+			? redactVaultSetup(setup, extraKeys)
+			: { setup, redacted: 0 };
 	}
 
 	// The plugin list entries and settings for what is installed now.

@@ -72,7 +72,7 @@ export const pl: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "Plik {file} jest nieprawidłowy, więc został pominięty.",
 	"vaultSetup.applying":
-		"Stosowanie motywu, fragmentów CSS, skrótów klawiszowych i wtyczek głównych",
+		"Stosowanie ustawień Obsidiana, motywu, fragmentów CSS, skrótów klawiszowych i wtyczek głównych",
 	"vaultSetup.snippetsWritten": {
 		one: "Dodano lub zaktualizowano {count} fragment CSS.",
 		few: "Dodano lub zaktualizowano {count} fragmenty CSS.",
@@ -103,6 +103,20 @@ export const pl: LocaleMessages = {
 		"Skróty klawiszowe: liczba poleceń {total} (do zmiany: {changed})",
 	"vaultSetup.describeCore": "Wtyczki główne: do włączenia {on}, do wyłączenia {off}",
 	"vaultSetup.describeCoreSame": "Wtyczki główne: już zgodne z listą",
+	"vaultSetup.appSettingsSet":
+		"Zmienione ustawienia Obsidiana: {count}. Niektóre zadziałają po ponownym otwarciu Obsidiana.",
+	"vaultSetup.coreSettingsSet": "Zmienione ustawienia wtyczek głównych: {count}.",
+	"vaultSetup.bookmarksAdded": "Dodane zakładki: {count}.",
+	"vaultSetup.noConfigManager": "Menedżer ustawień Obsidiana jest niedostępny.",
+	"vaultSetup.coreSettingsFailed":
+		"Nie udało się zapisać ustawień wtyczki głównej „{id}”.",
+	"vaultSetup.bookmarksFailed": "Nie udało się zapisać zakładek.",
+	"vaultSetup.describeApp":
+		"Ustawienia Obsidiana: na liście {total} (do zmiany {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Ustawienia wtyczek głównych: wtyczek {total} (do zmiany {changed})",
+	"vaultSetup.describeBookmarks":
+		"Zakładki: na liście {total} (do dodania {added})",
 
 	// Export
 	"export.finished": "Eksport zakończony",
@@ -138,7 +152,7 @@ export const pl: LocaleMessages = {
 		other: "{count} własnego skrótu klawiszowego",
 	},
 	"export.vaultSetup":
-		" W {file} zapisano też: {theme}, {snippets}, {hotkeys} oraz wtyczki główne.",
+		" W {file} zapisano też: {theme}, {snippets}, {hotkeys}, wtyczki główne, ustawienia Obsidiana i zakładki.",
 	"export.writeFailed": "nie udało się zapisać plików JSON z konfiguracją",
 
 	// Setup packs
@@ -425,9 +439,9 @@ export const pl: LocaleMessages = {
 		"Nazwy ustawień oddzielone przecinkami, które również mają być pomijane, na przykład: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Synchronizuj motyw, fragmenty CSS, skróty klawiszowe i wtyczki główne",
+		"Synchronizuj ustawienia Obsidiana, motyw, fragmenty CSS, skróty klawiszowe i wtyczki główne",
 	"settings.syncVaultSetupDesc":
-		"Eksport zapisuje motyw społeczności, fragmenty CSS, własne skróty klawiszowe i listę włączonych wtyczek głównych w vault-setup.json. Import stosuje je na drugim urządzeniu.",
+		"Eksport zapisuje ustawienia Obsidiana, motyw społeczności, fragmenty CSS, własne skróty klawiszowe, wtyczki główne z ich ustawieniami i zakładki w vault-setup.json. Import stosuje je na drugim urządzeniu.",
 	"settings.logLevelName": "Poziom logowania",
 	"settings.logLevelDesc":
 		"Ile szczegółów pokazywać w konsoli, gdy coś pójdzie nie tak. Zostaw „Błędy”, chyba że szukasz przyczyny problemu.",

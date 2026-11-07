@@ -57,7 +57,8 @@ export const zh: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} 无效，已跳过。",
-	"vaultSetup.applying": "正在应用主题、代码片段、快捷键和核心插件",
+	"vaultSetup.applying":
+		"正在应用 Obsidian 设置、主题、代码片段、快捷键和核心插件",
 	"vaultSetup.snippetsWritten": {
 		other: "已添加或更新 {count} 个 CSS 代码片段。",
 	},
@@ -81,6 +82,20 @@ export const zh: LocaleMessages = {
 	"vaultSetup.describeHotkeys": "快捷键：{total} 个命令（{changed} 个将更改）",
 	"vaultSetup.describeCore": "核心插件：将启用 {on}，禁用 {off}",
 	"vaultSetup.describeCoreSame": "核心插件：已与列表一致",
+	"vaultSetup.appSettingsSet":
+		"已更改的 Obsidian 设置：{count}。部分设置需重新打开 Obsidian 后生效。",
+	"vaultSetup.coreSettingsSet": "已更改的核心插件设置：{count}。",
+	"vaultSetup.bookmarksAdded": "已添加的书签：{count}。",
+	"vaultSetup.noConfigManager": "Obsidian 的设置管理器不可用。",
+	"vaultSetup.coreSettingsFailed":
+		"无法写入核心插件“{id}”的设置。",
+	"vaultSetup.bookmarksFailed": "无法写入书签。",
+	"vaultSetup.describeApp":
+		"Obsidian 设置：列表中有 {total} 项（将更改 {changed} 项）",
+	"vaultSetup.describeCoreSettings":
+		"核心插件设置：{total} 个插件（将更改 {changed} 个）",
+	"vaultSetup.describeBookmarks":
+		"书签：列表中有 {total} 个（将添加 {added} 个）",
 
 	// Export
 	"export.finished": "导出完成",
@@ -99,7 +114,7 @@ export const zh: LocaleMessages = {
 		other: "{count} 个自定义快捷键",
 	},
 	"export.vaultSetup":
-		"同时已将 {theme}、{snippets}、{hotkeys} 和核心插件状态保存到 {file}。",
+		"同时已将 {theme}、{snippets}、{hotkeys}、核心插件状态、Obsidian 设置和书签保存到 {file}。",
 	"export.writeFailed": "无法写入配置 JSON 文件",
 
 	// Setup packs
@@ -342,9 +357,10 @@ export const zh: LocaleMessages = {
 	"settings.extraSecretsDesc":
 		"同样需要省略的设置名称，以逗号分隔，例如：licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
-	"settings.syncVaultSetupName": "同步主题、代码片段、快捷键和核心插件",
+	"settings.syncVaultSetupName":
+		"同步 Obsidian 设置、主题、代码片段、快捷键和核心插件",
 	"settings.syncVaultSetupDesc":
-		"导出时将你的第三方主题、CSS 代码片段、自定义快捷键以及已启用的核心插件保存到 vault-setup.json。导入时在另一台设备上应用它们。",
+		"导出时将你的 Obsidian 设置、第三方主题、CSS 代码片段、自定义快捷键、核心插件及其设置和书签保存到 vault-setup.json。导入时在另一台设备上应用它们。",
 	"settings.logLevelName": "日志级别",
 	"settings.logLevelDesc":
 		"出现问题时在控制台中显示的详细程度。除非正在排查问题，否则请保持为“错误”。",

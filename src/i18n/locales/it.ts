@@ -68,7 +68,7 @@ export const it: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} non è valido ed è stato saltato.",
 	"vaultSetup.applying":
-		"Applicazione di tema, snippet, tasti di scelta rapida e plugin principali",
+		"Applicazione di impostazioni di Obsidian, tema, snippet, tasti di scelta rapida e plugin principali",
 	"vaultSetup.snippetsWritten": {
 		one: "Aggiunto o aggiornato {count} snippet CSS.",
 		many: "Aggiunti o aggiornati {count} snippet CSS.",
@@ -99,6 +99,20 @@ export const it: LocaleMessages = {
 		"Tasti di scelta rapida: {total} comandi ({changed} cambierebbero)",
 	"vaultSetup.describeCore": "Plugin principali: attiverebbe {on}, disattiverebbe {off}",
 	"vaultSetup.describeCoreSame": "Plugin principali: già come nell’elenco",
+	"vaultSetup.appSettingsSet":
+		"Impostazioni di Obsidian modificate: {count}. Alcune hanno effetto dopo aver riaperto Obsidian.",
+	"vaultSetup.coreSettingsSet": "Impostazioni dei plugin principali modificate: {count}.",
+	"vaultSetup.bookmarksAdded": "Segnalibri aggiunti: {count}.",
+	"vaultSetup.noConfigManager": "Il gestore delle impostazioni di Obsidian non è disponibile.",
+	"vaultSetup.coreSettingsFailed":
+		"Impossibile scrivere le impostazioni del plugin principale “{id}”.",
+	"vaultSetup.bookmarksFailed": "Impossibile scrivere i segnalibri.",
+	"vaultSetup.describeApp":
+		"Impostazioni di Obsidian: {total} in elenco (ne cambierebbero {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Impostazioni dei plugin principali: {total} plugin (ne cambierebbero {changed})",
+	"vaultSetup.describeBookmarks":
+		"Segnalibri: {total} in elenco (ne verrebbero aggiunti {added})",
 
 	// Export
 	"export.finished": "Esportazione completata",
@@ -129,7 +143,7 @@ export const it: LocaleMessages = {
 		other: "{count} tasti di scelta rapida personalizzati",
 	},
 	"export.vaultSetup":
-		" Salvati anche {theme}, {snippets}, {hotkeys} e i tuoi plugin principali in {file}.",
+		" Salvati anche {theme}, {snippets}, {hotkeys}, i tuoi plugin principali, le impostazioni di Obsidian e i segnalibri in {file}.",
 	"export.writeFailed": "impossibile scrivere i file JSON della configurazione",
 
 	// Setup packs
@@ -409,9 +423,9 @@ export const it: LocaleMessages = {
 		"Nomi di impostazioni separati da virgole da escludere anch’essi, ad esempio: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Sincronizza tema, snippet, tasti di scelta rapida e plugin principali",
+		"Sincronizza impostazioni di Obsidian, tema, snippet, tasti di scelta rapida e plugin principali",
 	"settings.syncVaultSetupDesc":
-		"L’esportazione salva in vault-setup.json il tema della community, gli snippet CSS, i tasti di scelta rapida personalizzati e quali plugin principali sono attivi. L’importazione li applica sull’altro dispositivo.",
+		"L’esportazione salva in vault-setup.json le impostazioni di Obsidian, il tema della community, gli snippet CSS, i tasti di scelta rapida personalizzati, i plugin principali con le loro impostazioni e i segnalibri. L’importazione li applica sull’altro dispositivo.",
 	"settings.logLevelName": "Livello di log",
 	"settings.logLevelDesc":
 		"Quanti dettagli mostrare nella console in caso di problemi. Lascia su “Errore” a meno che tu non stia risolvendo un problema.",

@@ -83,6 +83,8 @@ export function parseSetupPack(raw: unknown): ParsedPack | null {
 	};
 	const vaultSetup = obj.vaultSetup ? parseVaultSetup(obj.vaultSetup) : null;
 	if (vaultSetup) {
+		// Someone else's bookmarks point at someone else's notes.
+		delete vaultSetup.bookmarks;
 		pack.vaultSetup = vaultSetup;
 	}
 	return pack;
@@ -237,6 +239,18 @@ export async function mergePackIntoSetup(
 				...current.corePlugins,
 				...pack.vaultSetup.corePlugins,
 			};
+		}
+		if (pack.vaultSetup.appSettings) {
+			merged.appSettings = {
+				...current.appSettings,
+				...pack.vaultSetup.appSettings,
+			};
+		}
+		if (pack.vaultSetup.coreSettings) {
+			merged.coreSettings = { ...current.coreSettings };
+			for (const [id, value] of Object.entries(pack.vaultSetup.coreSettings)) {
+				merged.coreSettings[id] = { ...merged.coreSettings[id], ...value };
+			}
 		}
 		await backup?.capture(setupPath);
 		if (!(await fileManager.writeFile(setupPath, `${JSON.stringify(merged, null, 2)}\n`))) {

@@ -57,7 +57,8 @@ export const ja: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file}が無効なため、スキップしました。",
-	"vaultSetup.applying": "テーマ、スニペット、ホットキー、コアプラグインを適用中",
+	"vaultSetup.applying":
+		"Obsidianの設定、テーマ、スニペット、ホットキー、コアプラグインを適用中",
 	"vaultSetup.snippetsWritten": {
 		other: "{count}個のCSSスニペットを追加または更新しました。",
 	},
@@ -81,6 +82,20 @@ export const ja: LocaleMessages = {
 	"vaultSetup.describeHotkeys": "ホットキー: {total}個のコマンド（{changed}個が変更予定）",
 	"vaultSetup.describeCore": "コアプラグイン: 有効化予定 {on}、無効化予定 {off}",
 	"vaultSetup.describeCoreSame": "コアプラグイン: すでにリストどおり",
+	"vaultSetup.appSettingsSet":
+		"変更したObsidianの設定: {count}。一部はObsidianを開き直すと有効になります。",
+	"vaultSetup.coreSettingsSet": "変更したコアプラグインの設定: {count}。",
+	"vaultSetup.bookmarksAdded": "追加したブックマーク: {count}。",
+	"vaultSetup.noConfigManager": "Obsidianの設定マネージャーを利用できません。",
+	"vaultSetup.coreSettingsFailed":
+		"コアプラグイン「{id}」の設定を書き込めませんでした。",
+	"vaultSetup.bookmarksFailed": "ブックマークを書き込めませんでした。",
+	"vaultSetup.describeApp":
+		"Obsidianの設定: リストに{total}件（変更予定 {changed}）",
+	"vaultSetup.describeCoreSettings":
+		"コアプラグインの設定: {total}個のプラグイン（変更予定 {changed}）",
+	"vaultSetup.describeBookmarks":
+		"ブックマーク: リストに{total}件（追加予定 {added}）",
 
 	// Export
 	"export.finished": "エクスポートが完了しました",
@@ -99,7 +114,7 @@ export const ja: LocaleMessages = {
 		other: "{count}個のカスタムホットキー",
 	},
 	"export.vaultSetup":
-		"{theme}、{snippets}、{hotkeys}、コアプラグインの状態も{file}に保存しました。",
+		"{theme}、{snippets}、{hotkeys}、コアプラグインの状態、Obsidianの設定、ブックマークも{file}に保存しました。",
 	"export.writeFailed": "構成のJSONファイルを書き込めませんでした",
 
 	// Setup packs
@@ -342,9 +357,10 @@ export const ja: LocaleMessages = {
 	"settings.extraSecretsDesc":
 		"同様に除外する設定名をカンマ区切りで指定します。例: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
-	"settings.syncVaultSetupName": "テーマ、スニペット、ホットキー、コアプラグインを同期",
+	"settings.syncVaultSetupName":
+		"Obsidianの設定、テーマ、スニペット、ホットキー、コアプラグインを同期",
 	"settings.syncVaultSetupDesc":
-		"エクスポート時に、コミュニティテーマ、CSSスニペット、カスタムホットキー、有効なコアプラグインをvault-setup.jsonに保存します。インポート時に、それらを別のデバイスに適用します。",
+		"エクスポート時に、Obsidianの設定、コミュニティテーマ、CSSスニペット、カスタムホットキー、コアプラグインとその設定、ブックマークをvault-setup.jsonに保存します。インポート時に、それらを別のデバイスに適用します。",
 	"settings.logLevelName": "ログレベル",
 	"settings.logLevelDesc":
 		"問題が発生したときにコンソールに表示する情報の詳しさです。トラブルシューティング中でなければ「エラー」のままにしてください。",

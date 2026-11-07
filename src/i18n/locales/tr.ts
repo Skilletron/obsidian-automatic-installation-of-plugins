@@ -68,7 +68,7 @@ export const tr: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} geçerli değil, bu yüzden atlandı.",
 	"vaultSetup.applying":
-		"Tema, CSS parçacıkları, kısayol tuşları ve çekirdek eklentiler uygulanıyor",
+		"Obsidian ayarları, tema, CSS parçacıkları, kısayol tuşları ve çekirdek eklentiler uygulanıyor",
 	"vaultSetup.snippetsWritten": {
 		one: "{count} CSS parçacığı eklendi veya güncellendi.",
 		other: "{count} CSS parçacığı eklendi veya güncellendi.",
@@ -98,6 +98,20 @@ export const tr: LocaleMessages = {
 	"vaultSetup.describeCore":
 		"Çekirdek eklentiler: {on} etkinleştirilecek, {off} devre dışı bırakılacak",
 	"vaultSetup.describeCoreSame": "Çekirdek eklentiler: zaten listedeki gibi",
+	"vaultSetup.appSettingsSet":
+		"Değiştirilen Obsidian ayarları: {count}. Bazıları Obsidian yeniden açıldığında geçerli olur.",
+	"vaultSetup.coreSettingsSet": "Değiştirilen çekirdek eklenti ayarları: {count}.",
+	"vaultSetup.bookmarksAdded": "Eklenen yer imleri: {count}.",
+	"vaultSetup.noConfigManager": "Obsidian'ın ayar yöneticisi kullanılamıyor.",
+	"vaultSetup.coreSettingsFailed":
+		"\"{id}\" çekirdek eklentisinin ayarları yazılamadı.",
+	"vaultSetup.bookmarksFailed": "Yer imleri yazılamadı.",
+	"vaultSetup.describeApp":
+		"Obsidian ayarları: listede {total} (değişecek {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Çekirdek eklenti ayarları: {total} eklenti (değişecek {changed})",
+	"vaultSetup.describeBookmarks":
+		"Yer imleri: listede {total} (eklenecek {added})",
 
 	// Export
 	"export.finished": "Dışa aktarma tamamlandı",
@@ -123,7 +137,7 @@ export const tr: LocaleMessages = {
 		other: "{count} özel kısayol tuşu",
 	},
 	"export.vaultSetup":
-		" Ayrıca {theme}, {snippets}, {hotkeys} ve çekirdek eklentileriniz de kaydedildi: {file}.",
+		" Ayrıca {theme}, {snippets}, {hotkeys}, çekirdek eklentileriniz, Obsidian ayarları ve yer imleri de kaydedildi: {file}.",
 	"export.writeFailed": "kurulum JSON dosyaları yazılamadı",
 
 	// Setup packs
@@ -388,9 +402,9 @@ export const tr: LocaleMessages = {
 		"Ayrıca dışarıda bırakılacak, virgülle ayrılmış ayar adları; örneğin: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "Lisans kodu, endpoint",
 	"settings.syncVaultSetupName":
-		"Temayı, CSS parçacıklarını, kısayol tuşlarını ve çekirdek eklentileri eşitle",
+		"Obsidian ayarlarını, temayı, CSS parçacıklarını, kısayol tuşlarını ve çekirdek eklentileri eşitle",
 	"settings.syncVaultSetupDesc":
-		"Dışa aktarma; topluluk temanızı, CSS parçacıklarınızı, özel kısayol tuşlarınızı ve hangi çekirdek eklentilerin açık olduğunu vault-setup.json dosyasına kaydeder. İçe aktarma bunları diğer cihazda uygular.",
+		"Dışa aktarma; Obsidian ayarlarınızı, topluluk temanızı, CSS parçacıklarınızı, özel kısayol tuşlarınızı, çekirdek eklentileri ayarlarıyla birlikte ve yer imlerinizi vault-setup.json dosyasına kaydeder. İçe aktarma bunları diğer cihazda uygular.",
 	"settings.logLevelName": "Günlük düzeyi",
 	"settings.logLevelDesc":
 		"Bir sorun çıkarsa konsolda ne kadar ayrıntı gösterileceği. Sorun gidermiyorsanız Hata seçeneğinde bırakın.",

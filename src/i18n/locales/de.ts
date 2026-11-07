@@ -67,7 +67,7 @@ export const de: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} ist ungültig und wurde übersprungen.",
 	"vaultSetup.applying":
-		"Theme, Snippets, Tastenkürzel und Kern-Plugins werden angewendet",
+		"Obsidian-Einstellungen, Theme, Snippets, Tastenkürzel und Kern-Plugins werden angewendet",
 	"vaultSetup.snippetsWritten": {
 		one: "{count} CSS-Snippet hinzugefügt oder aktualisiert.",
 		other: "{count} CSS-Snippets hinzugefügt oder aktualisiert.",
@@ -95,6 +95,20 @@ export const de: LocaleMessages = {
 		"Tastenkürzel: {total} Befehle ({changed} würden sich ändern)",
 	"vaultSetup.describeCore": "Kern-Plugins: würde {on} aktivieren, {off} deaktivieren",
 	"vaultSetup.describeCoreSame": "Kern-Plugins: bereits wie in der Liste",
+	"vaultSetup.appSettingsSet":
+		"Geänderte Obsidian-Einstellungen: {count}. Manche wirken erst, wenn du Obsidian neu öffnest.",
+	"vaultSetup.coreSettingsSet": "Geänderte Einstellungen von Kern-Plugins: {count}.",
+	"vaultSetup.bookmarksAdded": "Hinzugefügte Lesezeichen: {count}.",
+	"vaultSetup.noConfigManager": "Die Einstellungsverwaltung von Obsidian ist nicht verfügbar.",
+	"vaultSetup.coreSettingsFailed":
+		"Die Einstellungen des Kern-Plugins „{id}“ konnten nicht geschrieben werden.",
+	"vaultSetup.bookmarksFailed": "Die Lesezeichen konnten nicht geschrieben werden.",
+	"vaultSetup.describeApp":
+		"Obsidian-Einstellungen: {total} aufgeführt ({changed} würden sich ändern)",
+	"vaultSetup.describeCoreSettings":
+		"Einstellungen von Kern-Plugins: {total} Plugins ({changed} würden sich ändern)",
+	"vaultSetup.describeBookmarks":
+		"Lesezeichen: {total} aufgeführt ({added} würden hinzugefügt)",
 
 	// Export
 	"export.finished": "Export abgeschlossen",
@@ -117,7 +131,7 @@ export const de: LocaleMessages = {
 		other: "{count} eigene Tastenkürzel",
 	},
 	"export.vaultSetup":
-		" Außerdem wurden {theme}, {snippets}, {hotkeys} und deine Kern-Plugins in {file} gespeichert.",
+		" Außerdem wurden {theme}, {snippets}, {hotkeys}, deine Kern-Plugins, Obsidian-Einstellungen und Lesezeichen in {file} gespeichert.",
 	"export.writeFailed": "die Setup-JSON-Dateien konnten nicht geschrieben werden",
 
 	// Setup packs
@@ -379,9 +393,10 @@ export const de: LocaleMessages = {
 	"settings.extraSecretsDesc":
 		"Kommagetrennte Namen von Einstellungen, die ebenfalls ausgelassen werden, zum Beispiel: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "Lizenzcode, Endpunkt",
-	"settings.syncVaultSetupName": "Theme, Snippets, Tastenkürzel und Kern-Plugins synchronisieren",
+	"settings.syncVaultSetupName":
+		"Obsidian-Einstellungen, Theme, Snippets, Tastenkürzel und Kern-Plugins synchronisieren",
 	"settings.syncVaultSetupDesc":
-		"Der Export speichert dein Community-Theme, deine CSS-Snippets, eigenen Tastenkürzel und welche Kern-Plugins aktiv sind in vault-setup.json. Der Import wendet sie auf dem anderen Gerät an.",
+		"Der Export speichert deine Obsidian-Einstellungen, dein Community-Theme, deine CSS-Snippets, eigenen Tastenkürzel, Kern-Plugins mit ihren Einstellungen und Lesezeichen in vault-setup.json. Der Import wendet sie auf dem anderen Gerät an.",
 	"settings.logLevelName": "Protokollierungsstufe",
 	"settings.logLevelDesc":
 		"Wie viele Details in der Konsole angezeigt werden, wenn etwas schiefgeht. Belasse die Einstellung auf „Fehler“, außer du suchst nach einem Problem.",

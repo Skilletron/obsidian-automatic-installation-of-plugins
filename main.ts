@@ -23,6 +23,7 @@ import {
 } from "./src/core/UpdateChecker";
 import { UpdatesModal } from "./src/core/UpdatesModal";
 import {
+	VaultSetup,
 	VaultSetupApplier,
 	describeVaultSetupChanges,
 	liveVaultState,
@@ -292,12 +293,21 @@ export default class InstallCommunityPlugins extends Plugin {
 			const leftOut = (await this.setupExporter.listInstalledPlugins())
 				.map((plugin) => plugin.pluginId)
 				.filter((id) => !chosen.has(id));
-			const vaultSetup = this.settings.syncVaultSetup
-				? withoutHotkeysOf(
+			let setupSecrets = 0;
+			let vaultSetup: VaultSetup | null = null;
+			if (this.settings.syncVaultSetup) {
+				const clean = this.setupExporter.leaveOutSecrets(
+					withoutHotkeysOf(
 						await readVaultSetup(this.fileManager, liveVaultState(this.app)),
 						leftOut,
-					)
-				: null;
+					),
+					true,
+				);
+				setupSecrets = clean.redacted;
+				vaultSetup = clean.setup;
+				// They name your notes, and mean nothing in someone else's vault.
+				delete vaultSetup.bookmarks;
+			}
 			const pack = buildSetupPack(
 				listEntries,
 				settings,
@@ -313,10 +323,9 @@ export default class InstallCommunityPlugins extends Plugin {
 			) {
 				throw new Error(t("pack.writeFailed", { file: PACK_FILE }));
 			}
+			const secretCount = redactedCount + setupSecrets;
 			const secrets =
-				redactedCount > 0
-					? t("pack.savedSecrets", { count: redactedCount })
-					: "";
+				secretCount > 0 ? t("pack.savedSecrets", { count: secretCount }) : "";
 			ProgressNotice.show(
 				t("pack.savedTitle"),
 				t("pack.savedBody", {
@@ -457,6 +466,19 @@ export default class InstallCommunityPlugins extends Plugin {
 					off: result.corePluginsOff,
 				}),
 			);
+		}
+		if (result.appSettingsChanged > 0) {
+			notes.push(
+				t("vaultSetup.appSettingsSet", { count: result.appSettingsChanged }),
+			);
+		}
+		if (result.coreSettingsChanged > 0) {
+			notes.push(
+				t("vaultSetup.coreSettingsSet", { count: result.coreSettingsChanged }),
+			);
+		}
+		if (result.bookmarksAdded > 0) {
+			notes.push(t("vaultSetup.bookmarksAdded", { count: result.bookmarksAdded }));
 		}
 		return [...notes, ...result.problems];
 	}
@@ -647,6 +669,7 @@ export default class InstallCommunityPlugins extends Plugin {
 								await this.settingsBackup.restore(snapshot);
 						},
 					);
+				await this.vaultSetupApplier.reloadRestored(restored);
 				await this.pluginEnabler.refreshPluginsUI();
 
 				if (restored.length < snapshot.entries.length) {
