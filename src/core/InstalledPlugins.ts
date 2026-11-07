@@ -6,6 +6,8 @@ export interface InstalledPlugin {
 	folderName: string;
 	pluginId: string;
 	version?: string;
+	// The name from the manifest, when it has one.
+	name?: string;
 	// true when main.js is present next to manifest.json
 	complete: boolean;
 	// Set only when the manifest says so.
@@ -32,12 +34,14 @@ export async function scanInstalledPlugins(
 
 		let pluginId = folderName;
 		let version: string | undefined;
+		let name: string | undefined;
 		let isDesktopOnly: true | undefined;
 		const raw = await fileManager.readFile(manifestPath);
 		if (raw) {
 			try {
 				const manifest = JSON.parse(raw) as {
 					id?: unknown;
+					name?: unknown;
 					version?: unknown;
 					isDesktopOnly?: unknown;
 				};
@@ -46,6 +50,9 @@ export async function scanInstalledPlugins(
 				}
 				if (typeof manifest.id === "string" && manifest.id.trim()) {
 					pluginId = manifest.id.trim();
+				}
+				if (typeof manifest.name === "string" && manifest.name.trim()) {
+					name = manifest.name.trim();
 				}
 				if (
 					typeof manifest.version === "string" &&
@@ -67,6 +74,9 @@ export async function scanInstalledPlugins(
 		installed.push({ folderName, pluginId, version, complete });
 		if (isDesktopOnly) {
 			installed[installed.length - 1].isDesktopOnly = true;
+		}
+		if (name) {
+			installed[installed.length - 1].name = name;
 		}
 	}
 

@@ -187,6 +187,14 @@ export const pl: LocaleMessages = {
 	"pack.explain":
 		"Pakiet zostanie dodany do twojej listy wtyczek i plików ustawień (gdy oba zawierają tę samą pozycję, wygrywa pakiet), a następnie uruchomi się import. „Cofnij ostatnią zmianę” przywróci poprzednie pliki.",
 	"pack.confirm": "Dodaj do mojej konfiguracji i importuj",
+	"pack.pickTitle": "Wybierz wtyczki do pakietu",
+	"pack.pickDesc":
+		"Wyłącz to, czego nie chcesz udostępniać. Ustawienia pozostałych wtyczek trafią do pakietu bez tajnych danych.",
+	"pack.pickAll": "Zaznacz wszystkie",
+	"pack.pickNone": "Odznacz wszystkie",
+	"pack.pickOff": "wyłączona",
+	"pack.pickSave": "Zapisz pakiet ({count})",
+	"pack.pickEmpty": "Nie zainstalowano żadnych wtyczek społeczności.",
 
 	// Updates
 	"updates.checking": "Sprawdzanie aktualizacji wtyczek",
@@ -374,7 +382,7 @@ export const pl: LocaleMessages = {
 	"settings.importButton": "Importuj",
 	"settings.shareName": "Udostępnij swoją konfigurację",
 	"settings.shareDesc":
-		"Zapisz wszystko, co masz zainstalowane, jako setup-pack.json w swoim sejfie, bez tajnych danych, aby udostępnić to innym.",
+		"Wybierz zainstalowane wtyczki i zapisz je jako setup-pack.json w swoim sejfie, bez tajnych danych, aby udostępnić je innym.",
 	"settings.shareButton": "Eksportuj pakiet",
 	"settings.importPackName": "Importuj pakiet konfiguracji",
 	"settings.importPackDesc":

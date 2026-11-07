@@ -5,6 +5,7 @@ import {
 	mergePackIntoSetup,
 	packUrl,
 	parseSetupPack,
+	withoutHotkeysOf,
 } from "../src/core/SetupPack";
 import { SetupExporter } from "../src/core/SetupExporter";
 import { SettingsBackup } from "../src/core/SettingsBackup";
@@ -60,6 +61,30 @@ describe("parseSetupPack", () => {
 		expect(parseSetupPack(JSON.parse(JSON.stringify(built)))?.plugins).toEqual([
 			{ id: "dataview" },
 		]);
+	});
+});
+
+describe("withoutHotkeysOf", () => {
+	const key = [{ modifiers: ["Mod"], key: "K" }];
+
+	it("drops only the hotkeys of the given plugins", () => {
+		const setup = {
+			snippets: {},
+			hotkeys: {
+				"dataview:refresh": key,
+				"dataview-extra:run": key,
+				"editor:toggle-bold": key,
+			},
+		};
+		expect(withoutHotkeysOf(setup, ["dataview"]).hotkeys).toEqual({
+			"dataview-extra:run": key,
+			"editor:toggle-bold": key,
+		});
+	});
+
+	it("leaves a setup without hotkeys alone", () => {
+		const setup = { snippets: {} };
+		expect(withoutHotkeysOf(setup, ["dataview"])).toBe(setup);
 	});
 });
 

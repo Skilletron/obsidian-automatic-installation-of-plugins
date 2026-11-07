@@ -175,6 +175,14 @@ export const it: LocaleMessages = {
 	"pack.explain":
 		"Il pacchetto viene aggiunto al tuo elenco di plugin e ai tuoi file di impostazioni (in caso di sovrapposizione prevale il pacchetto), poi viene eseguita l’importazione. “Annulla l’ultima modifica” ripristina i file.",
 	"pack.confirm": "Aggiungi alla mia configurazione e importa",
+	"pack.pickTitle": "Scegli i plugin del pacchetto",
+	"pack.pickDesc":
+		"Disattiva ciò che non vuoi condividere. Le impostazioni degli altri plugin vengono incluse senza i dati segreti.",
+	"pack.pickAll": "Seleziona tutti",
+	"pack.pickNone": "Deseleziona tutti",
+	"pack.pickOff": "disattivato",
+	"pack.pickSave": "Salva pacchetto ({count})",
+	"pack.pickEmpty": "Nessun plugin della community installato.",
 
 	// Updates
 	"updates.checking": "Controllo degli aggiornamenti dei plugin",
@@ -358,7 +366,7 @@ export const it: LocaleMessages = {
 	"settings.importButton": "Importa",
 	"settings.shareName": "Condividi la tua configurazione",
 	"settings.shareDesc":
-		"Salva tutto ciò che hai installato come setup-pack.json nel tuo vault, senza i dati segreti, per condividerlo con altri.",
+		"Scegli i plugin installati e salvali come setup-pack.json nel tuo vault, senza i dati segreti, per condividerli con altri.",
 	"settings.shareButton": "Esporta pacchetto",
 	"settings.importPackName": "Importa un pacchetto di configurazione",
 	"settings.importPackDesc":

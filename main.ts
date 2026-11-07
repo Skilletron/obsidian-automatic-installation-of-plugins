@@ -36,8 +36,13 @@ import {
 	mergePackIntoSetup,
 	packUrl,
 	parseSetupPack,
+	withoutHotkeysOf,
 } from "./src/core/SetupPack";
-import { PackConfirmModal, PackLinkModal } from "./src/core/SetupPackModals";
+import {
+	PackConfirmModal,
+	PackExportModal,
+	PackLinkModal,
+} from "./src/core/SetupPackModals";
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
@@ -259,14 +264,39 @@ export default class InstallCommunityPlugins extends Plugin {
 		);
 	}
 
-	// Writes setup-pack.json to the vault root: everything installed, with
-	// secrets always left out, ready to share.
+	// Asks which installed plugins to share, then saves them as a pack.
 	async exportSetupPack(): Promise<void> {
 		try {
+			const choices = await this.setupExporter.listPackChoices();
+			new PackExportModal(
+				this.app,
+				choices,
+				this.settings.syncVaultSetup,
+				(ids) => this.saveSetupPack(ids),
+			).open();
+		} catch (err: unknown) {
+			const errorMessage =
+				err instanceof Error ? err.message : t("common.unknownError");
+			logger.error("Setup pack export failed:", err);
+			ProgressNotice.show(t("pack.notSavedTitle"), errorMessage, 12000);
+		}
+	}
+
+	// Writes setup-pack.json to the vault root: the given plugins, with
+	// secrets always left out, ready to share.
+	async saveSetupPack(pluginIds: string[]): Promise<void> {
+		try {
+			const chosen = new Set(pluginIds);
 			const { listEntries, settings, redactedCount } =
-				await this.setupExporter.collect(true);
+				await this.setupExporter.collect(true, chosen);
+			const leftOut = (await this.setupExporter.listInstalledPlugins())
+				.map((plugin) => plugin.pluginId)
+				.filter((id) => !chosen.has(id));
 			const vaultSetup = this.settings.syncVaultSetup
-				? await readVaultSetup(this.fileManager, liveVaultState(this.app))
+				? withoutHotkeysOf(
+						await readVaultSetup(this.fileManager, liveVaultState(this.app)),
+						leftOut,
+					)
 				: null;
 			const pack = buildSetupPack(
 				listEntries,

@@ -180,6 +180,14 @@ export const ptBR: LocaleMessages = {
 	"pack.explain":
 		"O pacote é adicionado à sua própria lista de plugins e aos seus arquivos de configurações (ele prevalece onde ambos definem algo) e, em seguida, a importação é executada. Desfazer a última alteração restaura os arquivos.",
 	"pack.confirm": "Adicionar à minha configuração e importar",
+	"pack.pickTitle": "Escolher os plugins do pacote",
+	"pack.pickDesc":
+		"Desative o que não quiser compartilhar. As configurações dos outros plugins são incluídas, sem os segredos.",
+	"pack.pickAll": "Selecionar todos",
+	"pack.pickNone": "Desmarcar todos",
+	"pack.pickOff": "desativado",
+	"pack.pickSave": "Salvar pacote ({count})",
+	"pack.pickEmpty": "Nenhum plugin da comunidade instalado.",
 
 	// Updates
 	"updates.checking": "Verificando atualizações de plugins",
@@ -368,7 +376,7 @@ export const ptBR: LocaleMessages = {
 	"settings.importButton": "Importar",
 	"settings.shareName": "Compartilhar sua configuração",
 	"settings.shareDesc":
-		"Salve tudo o que você tem instalado como setup-pack.json no seu cofre, sem os segredos, para compartilhar com outras pessoas.",
+		"Escolha plugins instalados e salve-os como setup-pack.json no seu cofre, sem os segredos, para compartilhar com outras pessoas.",
 	"settings.shareButton": "Exportar pacote",
 	"settings.importPackName": "Importar um pacote de configuração",
 	"settings.importPackDesc":

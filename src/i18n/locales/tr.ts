@@ -166,6 +166,14 @@ export const tr: LocaleMessages = {
 	"pack.explain":
 		"Paket, kendi eklenti listenize ve ayar dosyalarınıza eklenir (ikisinde de bir değer varsa paketteki geçerli olur), ardından içe aktarma çalışır. Son değişikliği geri al ile dosyalar eski hâline döner.",
 	"pack.confirm": "Kurulumuma ekle ve içe aktar",
+	"pack.pickTitle": "Paket için eklentileri seçin",
+	"pack.pickDesc":
+		"Paylaşmak istemediklerinizi kapatın. Diğer eklentilerin ayarları gizli değerler hariç pakete eklenir.",
+	"pack.pickAll": "Tümünü seç",
+	"pack.pickNone": "Hiçbirini seçme",
+	"pack.pickOff": "kapalı",
+	"pack.pickSave": "Paketi kaydet ({count})",
+	"pack.pickEmpty": "Yüklü topluluk eklentisi yok.",
 
 	// Updates
 	"updates.checking": "Eklenti güncellemeleri denetleniyor",
@@ -337,7 +345,7 @@ export const tr: LocaleMessages = {
 	"settings.importButton": "İçe aktar",
 	"settings.shareName": "Kurulumunuzu paylaşın",
 	"settings.shareDesc":
-		"Kurulu olan her şeyi, gizli değerler hariç, başkalarıyla paylaşmak için kasanıza setup-pack.json olarak kaydedin.",
+		"Kurulu eklentileri seçin ve başkalarıyla paylaşmak için gizli değerler hariç kasanıza setup-pack.json olarak kaydedin.",
 	"settings.shareButton": "Paketi dışa aktar",
 	"settings.importPackName": "Kurulum paketi içe aktar",
 	"settings.importPackDesc":

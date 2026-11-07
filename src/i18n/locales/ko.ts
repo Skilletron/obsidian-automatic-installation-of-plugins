@@ -139,6 +139,14 @@ export const ko: LocaleMessages = {
 	"pack.explain":
 		"팩은 내 플러그인 목록과 설정 파일에 추가되며(양쪽에 같은 항목이 있으면 팩이 우선), 그다음 가져오기가 실행됩니다. ‘마지막 변경 실행 취소’로 파일을 되돌릴 수 있습니다.",
 	"pack.confirm": "내 구성에 추가하고 가져오기",
+	"pack.pickTitle": "팩에 넣을 플러그인 선택",
+	"pack.pickDesc":
+		"공유하지 않을 항목은 끄세요. 나머지 플러그인의 설정은 비밀 값을 제외하고 팩에 포함됩니다.",
+	"pack.pickAll": "모두 선택",
+	"pack.pickNone": "모두 해제",
+	"pack.pickOff": "꺼짐",
+	"pack.pickSave": "팩 저장 ({count})",
+	"pack.pickEmpty": "설치된 커뮤니티 플러그인이 없습니다.",
 
 	// Updates
 	"updates.checking": "플러그인 업데이트 확인 중",
@@ -292,7 +300,7 @@ export const ko: LocaleMessages = {
 	"settings.importButton": "가져오기",
 	"settings.shareName": "내 구성 공유",
 	"settings.shareDesc":
-		"설치한 모든 항목을 비밀 값을 제외하고 보관소에 setup-pack.json으로 저장하여 다른 사람과 공유할 수 있게 합니다.",
+		"설치한 플러그인을 골라 비밀 값을 제외하고 보관소에 setup-pack.json으로 저장하여 다른 사람과 공유할 수 있게 합니다.",
 	"settings.shareButton": "팩 내보내기",
 	"settings.importPackName": "구성 팩 가져오기",
 	"settings.importPackDesc":

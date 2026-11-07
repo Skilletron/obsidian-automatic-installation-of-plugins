@@ -139,6 +139,14 @@ export const zhTW: LocaleMessages = {
 	"pack.explain":
 		"配置包會合併到你自己的外掛清單和設定檔中（兩者都有的項目以配置包為準），然後執行匯入。「復原上次變更」可將檔案還原。",
 	"pack.confirm": "加入我的配置並匯入",
+	"pack.pickTitle": "選擇要放入配置包的外掛",
+	"pack.pickDesc":
+		"關閉不想分享的外掛。其餘外掛的設定會放入配置包，但不含機密值。",
+	"pack.pickAll": "全選",
+	"pack.pickNone": "全不選",
+	"pack.pickOff": "已停用",
+	"pack.pickSave": "儲存配置包（{count}）",
+	"pack.pickEmpty": "未安裝社群外掛。",
 
 	// Updates
 	"updates.checking": "正在檢查外掛更新",
@@ -292,7 +300,7 @@ export const zhTW: LocaleMessages = {
 	"settings.importButton": "匯入",
 	"settings.shareName": "分享你的配置",
 	"settings.shareDesc":
-		"將你安裝的所有項目儲存為儲存庫中的 setup-pack.json（不含機密值），以便分享給他人。",
+		"選擇已安裝的外掛並儲存為儲存庫中的 setup-pack.json（不含機密值），以便分享給他人。",
 	"settings.shareButton": "匯出配置包",
 	"settings.importPackName": "匯入配置包",
 	"settings.importPackDesc":

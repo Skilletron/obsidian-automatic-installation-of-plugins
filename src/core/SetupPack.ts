@@ -108,6 +108,23 @@ export function buildSetupPack(
 	return pack;
 }
 
+// A command id starts with its plugin's id, so a hotkey for a plugin left
+// out of a pack would still give that plugin away.
+export function withoutHotkeysOf(
+	setup: VaultSetup,
+	pluginIds: readonly string[],
+): VaultSetup {
+	if (!setup.hotkeys) {
+		return setup;
+	}
+	const hotkeys = Object.fromEntries(
+		Object.entries(setup.hotkeys).filter(
+			([command]) => !pluginIds.some((id) => command.startsWith(`${id}:`)),
+		),
+	);
+	return { ...setup, hotkeys };
+}
+
 // Only https links are fetched, and GitHub gist and blob pages are turned
 // into their raw file URLs so people can paste the page they see.
 export function packUrl(input: string): string | null {

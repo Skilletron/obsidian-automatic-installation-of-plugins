@@ -25,7 +25,16 @@ interface ExportedPlugin {
 	folderName: string;
 	pluginId: string;
 	version?: string;
+	name?: string;
 	isDesktopOnly?: true;
+}
+
+// One row in the window that picks what goes into a setup pack.
+export interface PackPluginChoice {
+	id: string;
+	name: string;
+	version?: string;
+	off: boolean;
 }
 
 // Fields Export writes itself; any other field in an existing list entry
@@ -54,6 +63,7 @@ export class SetupExporter {
 			folderName,
 			pluginId,
 			version,
+			name,
 			complete,
 			isDesktopOnly,
 		} of scanned) {
@@ -67,6 +77,9 @@ export class SetupExporter {
 			}
 			seenIds.add(pluginId);
 			const plugin: ExportedPlugin = { folderName, pluginId, version };
+			if (name) {
+				plugin.name = name;
+			}
 			if (isDesktopOnly) {
 				plugin.isDesktopOnly = true;
 			}
@@ -76,6 +89,22 @@ export class SetupExporter {
 		installed.sort((a, b) => a.pluginId.localeCompare(b.pluginId));
 
 		return installed;
+	}
+
+	async listPackChoices(): Promise<PackPluginChoice[]> {
+		const installed = await this.listInstalledPlugins();
+		const enabledIds = await this.readEnabledIds();
+		return installed.map((plugin) => {
+			const choice: PackPluginChoice = {
+				id: plugin.pluginId,
+				name: plugin.name ?? plugin.pluginId,
+				off: enabledIds !== null && !enabledIds.has(plugin.pluginId),
+			};
+			if (plugin.version) {
+				choice.version = plugin.version;
+			}
+			return choice;
+		});
 	}
 
 	async exportSetup(): Promise<{
@@ -186,14 +215,20 @@ export class SetupExporter {
 
 	// The plugin list entries and settings for what is installed now.
 	// forceRedact leaves secrets out whatever the setting says (for packs
-	// meant to be shared).
-	async collect(forceRedact = false): Promise<{
+	// meant to be shared). With onlyIds, other plugins are skipped, and their
+	// settings are not even read.
+	async collect(
+		forceRedact = false,
+		onlyIds?: ReadonlySet<string>,
+	): Promise<{
 		installed: ExportedPlugin[];
 		listEntries: unknown[];
 		settings: Record<string, unknown>;
 		redactedCount: number;
 	}> {
-		const installed = await this.listInstalledPlugins();
+		const installed = (await this.listInstalledPlugins()).filter(
+			(plugin) => !onlyIds || onlyIds.has(plugin.pluginId),
+		);
 		const enabledIds = await this.readEnabledIds();
 		const existingEntries = await this.readExistingEntries();
 		const listEntries: unknown[] = installed.map((p) =>

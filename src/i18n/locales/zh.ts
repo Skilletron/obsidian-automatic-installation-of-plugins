@@ -139,6 +139,14 @@ export const zh: LocaleMessages = {
 	"pack.explain":
 		"配置包会合并到你自己的插件列表和设置文件中（两者都有的内容以配置包为准），然后执行导入。“撤销上次更改”可将文件恢复原样。",
 	"pack.confirm": "添加到我的配置并导入",
+	"pack.pickTitle": "选择要放入配置包的插件",
+	"pack.pickDesc":
+		"关闭不想分享的插件。其余插件的设置会放入配置包，但不含机密值。",
+	"pack.pickAll": "全选",
+	"pack.pickNone": "全不选",
+	"pack.pickOff": "已禁用",
+	"pack.pickSave": "保存配置包（{count}）",
+	"pack.pickEmpty": "未安装社区插件。",
 
 	// Updates
 	"updates.checking": "正在检查插件更新",
@@ -292,7 +300,7 @@ export const zh: LocaleMessages = {
 	"settings.importButton": "导入",
 	"settings.shareName": "分享你的配置",
 	"settings.shareDesc":
-		"将你安装的所有内容保存为仓库中的 setup-pack.json（不含机密值），以便分享给他人。",
+		"选择已安装的插件并保存为仓库中的 setup-pack.json（不含机密值），以便分享给他人。",
 	"settings.shareButton": "导出配置包",
 	"settings.importPackName": "导入配置包",
 	"settings.importPackDesc":

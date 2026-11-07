@@ -139,6 +139,14 @@ export const ja: LocaleMessages = {
 	"pack.explain":
 		"パックはあなたのプラグインリストと設定ファイルに追加され（両方に項目がある場合はパックが優先されます）、その後インポートが実行されます。「直前の変更を元に戻す」でファイルを元に戻せます。",
 	"pack.confirm": "自分の構成に追加してインポート",
+	"pack.pickTitle": "パックに含めるプラグインを選択",
+	"pack.pickDesc":
+		"共有したくないものはオフにしてください。残りのプラグインの設定は、秘密の値を除いてパックに含まれます。",
+	"pack.pickAll": "すべて選択",
+	"pack.pickNone": "すべて解除",
+	"pack.pickOff": "無効",
+	"pack.pickSave": "パックを保存（{count}）",
+	"pack.pickEmpty": "コミュニティプラグインはインストールされていません。",
 
 	// Updates
 	"updates.checking": "プラグインのアップデートを確認中",
@@ -292,7 +300,7 @@ export const ja: LocaleMessages = {
 	"settings.importButton": "インポート",
 	"settings.shareName": "構成を共有",
 	"settings.shareDesc":
-		"インストール済みのものをすべて、秘密の値を除いてsetup-pack.jsonとして保管庫に保存し、他の人と共有できるようにします。",
+		"インストール済みのプラグインを選び、秘密の値を除いてsetup-pack.jsonとして保管庫に保存し、他の人と共有できるようにします。",
 	"settings.shareButton": "パックをエクスポート",
 	"settings.importPackName": "セットアップパックをインポート",
 	"settings.importPackDesc":
