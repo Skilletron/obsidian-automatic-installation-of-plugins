@@ -669,7 +669,9 @@ export default class InstallCommunityPlugins extends Plugin {
 								await this.settingsBackup.restore(snapshot);
 						},
 					);
-				await this.vaultSetupApplier.reloadRestored(restored);
+				await this.vaultSetupApplier.reloadRestored(
+					snapshot.entries.filter((entry) => restored.includes(entry.path)),
+				);
 				await this.pluginEnabler.refreshPluginsUI();
 
 				if (restored.length < snapshot.entries.length) {
