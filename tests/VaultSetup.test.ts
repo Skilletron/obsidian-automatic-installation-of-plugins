@@ -639,7 +639,10 @@ describe("Obsidian's own settings", () => {
 			{ vimMode: true, tabSize: 2, cssTheme: "New" },
 			{ graph: { enabled: true, instance: { onExternalSettingsChange } } },
 		);
-		await applier.reloadRestored([".obsidian/app.json", ".obsidian/graph.json"]);
+		await applier.reloadRestored([
+			{ path: ".obsidian/app.json", content: JSON.stringify({ vimMode: false }) },
+			{ path: ".obsidian/graph.json", content: null },
+		]);
 		expect(setConfig.mock.calls).toEqual([
 			["vimMode", false],
 			["tabSize", undefined],
@@ -654,7 +657,9 @@ describe("Obsidian's own settings", () => {
 			{},
 			{ "daily-notes": { enabled: true, instance } },
 		);
-		await applier.reloadRestored([".obsidian/daily-notes.json"]);
+		await applier.reloadRestored([
+			{ path: ".obsidian/daily-notes.json", content: JSON.stringify({ folder: "Before" }) },
+		]);
 		expect(instance.options).toEqual({ folder: "Before", keepDays: 7 });
 	});
 
@@ -662,9 +667,28 @@ describe("Obsidian's own settings", () => {
 		const onItemsChanged = vi.fn();
 		const instance = { items: [{ type: "file" }], onExternalSettingsChange: vi.fn(), onItemsChanged };
 		const { applier } = applierVault({}, {}, { bookmarks: { enabled: true, instance } });
-		await applier.reloadRestored([".obsidian/bookmarks.json"]);
+		await applier.reloadRestored([{ path: ".obsidian/bookmarks.json", content: null }]);
 		expect(instance.items).toEqual([]);
 		expect(onItemsChanged).toHaveBeenCalledWith(false);
+	});
+
+	// On Android a read right after a write can return the old content.
+	it("takes restored values from the backup, not from a stale file", async () => {
+		const instance = { options: { folder: "Daily" } };
+		const { applier, setConfig } = applierVault(
+			{
+				".obsidian/app.json": JSON.stringify({ vimMode: true }),
+				".obsidian/daily-notes.json": JSON.stringify({ folder: "Daily" }),
+			},
+			{ vimMode: true },
+			{ "daily-notes": { enabled: true, instance } },
+		);
+		await applier.reloadRestored([
+			{ path: ".obsidian/app.json", content: "{}" },
+			{ path: ".obsidian/daily-notes.json", content: JSON.stringify({ folder: "Before" }) },
+		]);
+		expect(setConfig.mock.calls).toEqual([["vimMode", undefined]]);
+		expect(instance.options).toEqual({ folder: "Before" });
 	});
 
 	it("leaves out secrets", () => {
