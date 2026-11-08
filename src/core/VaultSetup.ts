@@ -9,8 +9,11 @@ import {
 } from "../utils/parsePluginList";
 import { redactSecrets, restoreSecrets } from "../utils/secrets";
 import { COMMUNITY_THEMES_URL } from "../types";
-import { SettingsBackup } from "./SettingsBackup";
+import { BackupEntry, SettingsBackup } from "./SettingsBackup";
 import { t } from "../i18n";
+
+// A file Undo put back, with the content it now has (null: removed).
+export type RestoredFile = Pick<BackupEntry, "path" | "content">;
 
 export interface SnippetSetup {
 	css: string;
@@ -537,8 +540,13 @@ async function readJsonObject(
 	if (!(await fileManager.exists(path))) {
 		return {};
 	}
+	return jsonObject(await fileManager.readFile(path));
+}
+
+// A JSON object from a file's text; anything else, or no file, is empty.
+function jsonObject(text: string | null): Record<string, unknown> {
 	try {
-		const parsed: unknown = JSON.parse((await fileManager.readFile(path)) ?? "");
+		const parsed: unknown = JSON.parse(text ?? "");
 		return parsed && typeof parsed === "object" && !Array.isArray(parsed)
 			? (parsed as Record<string, unknown>)
 			: {};
@@ -908,32 +916,40 @@ export class VaultSetupApplier {
 		}
 	}
 
-	// After Undo put these files back: makes the open Obsidian use them.
-	async reloadRestored(paths: string[]): Promise<void> {
+	// After Undo put these files back: makes the open Obsidian use them. The
+	// values come from the backup itself, not from the files: on Android a
+	// file read right after writing it can still return the old content.
+	async reloadRestored(restored: RestoredFile[]): Promise<void> {
 		const configPath = (file: string) => this.fileManager.configPath(file);
+		const contents = new Map(restored.map((file) => [file.path, file.content]));
+		const settingsIn = async (path: string) =>
+			contents.has(path)
+				? jsonObject(contents.get(path) ?? null)
+				: readJsonObject(this.fileManager, path);
 		if (
-			paths.includes(configPath("app.json")) ||
-			paths.includes(configPath("appearance.json"))
+			contents.has(configPath("app.json")) ||
+			contents.has(configPath("appearance.json"))
 		) {
-			await this.reloadAppSettings();
+			await this.reloadAppSettings({
+				...(await settingsIn(configPath("appearance.json"))),
+				...(await settingsIn(configPath("app.json"))),
+			});
 		}
 		const plugins = this.corePlugins;
 		for (const id of [...CORE_SETTINGS_IDS, "bookmarks"]) {
 			const plugin = plugins?.[id];
-			if (plugin && paths.includes(configPath(`${id}.json`))) {
+			const path = configPath(`${id}.json`);
+			if (plugin && contents.has(path)) {
 				// Older Obsidian can't reread the file, so its values get copied in.
 				// A key the file doesn't have stays until Obsidian is reopened: the
 				// plugin's defaults live only in memory and must not be wiped.
-				await this.reloadCorePlugin(
-					plugin,
-					await readJsonObject(this.fileManager, configPath(`${id}.json`)),
-				);
+				await this.reloadCorePlugin(plugin, await settingsIn(path));
 				// With no file left, the bookmarks plugin keeps what it has.
 				if (
 					id === "bookmarks" &&
 					plugin.enabled &&
 					plugin.instance &&
-					!(await this.fileManager.exists(configPath("bookmarks.json")))
+					contents.get(path) === null
 				) {
 					plugin.instance.items = [];
 					plugin.instance.onItemsChanged?.(false);
@@ -944,22 +960,14 @@ export class VaultSetupApplier {
 
 	// The theme and snippets stay as they are in memory: Undo doesn't switch
 	// them back.
-	private async reloadAppSettings(): Promise<void> {
+	private async reloadAppSettings(
+		restored: Record<string, unknown>,
+	): Promise<void> {
 		const vault = this.vaultConfig;
 		if (!vault.config || !vault.setConfig) {
 			return;
 		}
-		const saved =
-			cleanAppSettings({
-				...(await readJsonObject(
-					this.fileManager,
-					this.fileManager.configPath("appearance.json"),
-				)),
-				...(await readJsonObject(
-					this.fileManager,
-					this.fileManager.configPath("app.json"),
-				)),
-			}) ?? {};
+		const saved = cleanAppSettings(restored) ?? {};
 		const live = cleanAppSettings(vault.config) ?? {};
 		for (const [key, value] of Object.entries(saved)) {
 			if (JSON.stringify(value) !== JSON.stringify(live[key])) {
