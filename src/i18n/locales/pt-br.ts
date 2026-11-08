@@ -70,7 +70,8 @@ export const ptBR: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} não é válido, então foi ignorado.",
-	"vaultSetup.applying": "Aplicando tema, trechos CSS, atalhos e plugins principais",
+	"vaultSetup.applying":
+		"Aplicando configurações do Obsidian, tema, trechos CSS, atalhos e plugins principais",
 	"vaultSetup.snippetsWritten": {
 		one: "{count} trecho CSS adicionado ou atualizado.",
 		many: "{count} trechos CSS adicionados ou atualizados.",
@@ -103,6 +104,20 @@ export const ptBR: LocaleMessages = {
 	"vaultSetup.describeCore":
 		"Plugins principais: ativaria {on}, desativaria {off}",
 	"vaultSetup.describeCoreSame": "Plugins principais: já estão conforme a lista",
+	"vaultSetup.appSettingsSet":
+		"Configurações do Obsidian alteradas: {count}. Algumas só valem depois de reabrir o Obsidian.",
+	"vaultSetup.coreSettingsSet": "Configurações de plugins principais alteradas: {count}.",
+	"vaultSetup.bookmarksAdded": "Favoritos adicionados: {count}.",
+	"vaultSetup.noConfigManager": "O gerenciador de configurações do Obsidian não está disponível.",
+	"vaultSetup.coreSettingsFailed":
+		"Não foi possível gravar as configurações do plugin principal “{id}”.",
+	"vaultSetup.bookmarksFailed": "Não foi possível gravar os favoritos.",
+	"vaultSetup.describeApp":
+		"Configurações do Obsidian: {total} na lista ({changed} mudariam)",
+	"vaultSetup.describeCoreSettings":
+		"Configurações de plugins principais: {total} plugins ({changed} mudariam)",
+	"vaultSetup.describeBookmarks":
+		"Favoritos: {total} na lista ({added} seriam adicionados)",
 
 	// Export
 	"export.finished": "Exportação concluída",
@@ -133,7 +148,7 @@ export const ptBR: LocaleMessages = {
 		other: "{count} atalhos personalizados",
 	},
 	"export.vaultSetup":
-		" Também foram salvos {theme}, {snippets}, {hotkeys} e seus plugins principais em {file}.",
+		" Também foram salvos {theme}, {snippets}, {hotkeys}, seus plugins principais, as configurações do Obsidian e os favoritos em {file}.",
 	"export.writeFailed":
 		"não foi possível gravar os arquivos JSON de configuração",
 
@@ -419,9 +434,9 @@ export const ptBR: LocaleMessages = {
 		"Nomes de configurações separados por vírgula que também devem ser omitidos, por exemplo: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Sincronizar tema, trechos CSS, atalhos e plugins principais",
+		"Sincronizar configurações do Obsidian, tema, trechos CSS, atalhos e plugins principais",
 	"settings.syncVaultSetupDesc":
-		"A exportação salva em vault-setup.json seu tema da comunidade, seus trechos CSS, seus atalhos personalizados e quais plugins principais estão ativados. A importação os aplica no outro dispositivo.",
+		"A exportação salva em vault-setup.json suas configurações do Obsidian, seu tema da comunidade, seus trechos CSS, seus atalhos personalizados, os plugins principais com suas configurações e seus favoritos. A importação os aplica no outro dispositivo.",
 	"settings.logLevelName": "Nível de log",
 	"settings.logLevelDesc":
 		"Quanto detalhe mostrar no console se algo der errado. Deixe em Erro, a menos que esteja investigando um problema.",

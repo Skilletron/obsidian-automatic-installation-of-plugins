@@ -69,7 +69,7 @@ export const fr: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} n’est pas valide, il a donc été ignoré.",
 	"vaultSetup.applying":
-		"Application du thème, des extraits, des raccourcis clavier et des plugins principaux",
+		"Application des paramètres d’Obsidian, du thème, des extraits, des raccourcis clavier et des plugins principaux",
 	"vaultSetup.snippetsWritten": {
 		one: "{count} extrait CSS ajouté ou mis à jour.",
 		many: "{count} extraits CSS ajoutés ou mis à jour.",
@@ -100,6 +100,20 @@ export const fr: LocaleMessages = {
 		"Raccourcis clavier : {total} commandes ({changed} seraient modifiées)",
 	"vaultSetup.describeCore": "Plugins principaux : activerait {on}, désactiverait {off}",
 	"vaultSetup.describeCoreSame": "Plugins principaux : déjà conformes à la liste",
+	"vaultSetup.appSettingsSet":
+		"Paramètres d’Obsidian modifiés : {count}. Certains ne s’appliquent qu’après la réouverture d’Obsidian.",
+	"vaultSetup.coreSettingsSet": "Paramètres de plugins principaux modifiés : {count}.",
+	"vaultSetup.bookmarksAdded": "Signets ajoutés : {count}.",
+	"vaultSetup.noConfigManager": "Le gestionnaire de paramètres d’Obsidian n’est pas disponible.",
+	"vaultSetup.coreSettingsFailed":
+		"Impossible d’écrire les paramètres du plugin principal « {id} ».",
+	"vaultSetup.bookmarksFailed": "Impossible d’écrire les signets.",
+	"vaultSetup.describeApp":
+		"Paramètres d’Obsidian : {total} listés ({changed} seraient modifiés)",
+	"vaultSetup.describeCoreSettings":
+		"Paramètres de plugins principaux : {total} plugins ({changed} seraient modifiés)",
+	"vaultSetup.describeBookmarks":
+		"Signets : {total} listés ({added} seraient ajoutés)",
 
 	// Export
 	"export.finished": "Export terminé",
@@ -130,7 +144,7 @@ export const fr: LocaleMessages = {
 		other: "{count} raccourcis clavier personnalisés",
 	},
 	"export.vaultSetup":
-		" Également enregistrés dans {file} : {theme}, {snippets}, {hotkeys} et vos plugins principaux.",
+		" Également enregistrés dans {file} : {theme}, {snippets}, {hotkeys}, vos plugins principaux, les paramètres d’Obsidian et les signets.",
 	"export.writeFailed": "impossible d’écrire les fichiers JSON de configuration",
 
 	// Setup packs
@@ -408,9 +422,9 @@ export const fr: LocaleMessages = {
 		"Noms de paramètres à omettre également, séparés par des virgules, par exemple : licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Synchroniser le thème, les extraits, les raccourcis clavier et les plugins principaux",
+		"Synchroniser les paramètres d’Obsidian, le thème, les extraits, les raccourcis clavier et les plugins principaux",
 	"settings.syncVaultSetupDesc":
-		"L’export enregistre votre thème communautaire, vos extraits CSS, vos raccourcis clavier personnalisés et les plugins principaux activés dans vault-setup.json. L’import les applique sur l’autre appareil.",
+		"L’export enregistre dans vault-setup.json vos paramètres d’Obsidian, votre thème communautaire, vos extraits CSS, vos raccourcis clavier personnalisés, les plugins principaux avec leurs paramètres et vos signets. L’import les applique sur l’autre appareil.",
 	"settings.logLevelName": "Niveau de journalisation",
 	"settings.logLevelDesc":
 		"Quantité de détails affichés dans la console en cas de problème. Laissez sur « Erreur », sauf pour un dépannage.",

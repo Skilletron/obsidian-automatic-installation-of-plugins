@@ -71,7 +71,7 @@ export const es: LocaleMessages = {
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} no es válido, así que se omitió.",
 	"vaultSetup.applying":
-		"Aplicando tema, fragmentos, atajos de teclado y complementos principales",
+		"Aplicando ajustes de Obsidian, tema, fragmentos, atajos de teclado y complementos principales",
 	"vaultSetup.snippetsWritten": {
 		one: "Se añadió o actualizó {count} fragmento CSS.",
 		many: "Se añadieron o actualizaron {count} fragmentos CSS.",
@@ -105,6 +105,20 @@ export const es: LocaleMessages = {
 		"Complementos principales: se activarían {on}, se desactivarían {off}",
 	"vaultSetup.describeCoreSame":
 		"Complementos principales: ya coinciden con la lista",
+	"vaultSetup.appSettingsSet":
+		"Ajustes de Obsidian cambiados: {count}. Algunos se aplican al volver a abrir Obsidian.",
+	"vaultSetup.coreSettingsSet": "Ajustes de complementos principales cambiados: {count}.",
+	"vaultSetup.bookmarksAdded": "Marcadores añadidos: {count}.",
+	"vaultSetup.noConfigManager": "El gestor de ajustes de Obsidian no está disponible.",
+	"vaultSetup.coreSettingsFailed":
+		"No se pudieron escribir los ajustes del complemento principal «{id}».",
+	"vaultSetup.bookmarksFailed": "No se pudieron escribir los marcadores.",
+	"vaultSetup.describeApp":
+		"Ajustes de Obsidian: {total} en la lista (cambiarían {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Ajustes de complementos principales: {total} complementos (cambiarían {changed})",
+	"vaultSetup.describeBookmarks":
+		"Marcadores: {total} en la lista (se añadirían {added})",
 
 	// Export
 	"export.finished": "Exportación completada",
@@ -135,7 +149,7 @@ export const es: LocaleMessages = {
 		other: "{count} atajos de teclado personalizados",
 	},
 	"export.vaultSetup":
-		" También se guardaron {theme}, {snippets}, {hotkeys} y tus complementos principales en {file}.",
+		" También se guardaron {theme}, {snippets}, {hotkeys}, tus complementos principales, los ajustes de Obsidian y los marcadores en {file}.",
 	"export.writeFailed": "no se pudieron escribir los archivos JSON de configuración",
 
 	// Setup packs
@@ -419,9 +433,9 @@ export const es: LocaleMessages = {
 		"Nombres de ajustes separados por comas que también se omitirán, por ejemplo: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Sincronizar tema, fragmentos, atajos de teclado y complementos principales",
+		"Sincronizar ajustes de Obsidian, tema, fragmentos, atajos de teclado y complementos principales",
 	"settings.syncVaultSetupDesc":
-		"Al exportar se guardan en vault-setup.json tu tema de la comunidad, tus fragmentos CSS, tus atajos de teclado personalizados y qué complementos principales están activados. Al importar se aplican en el otro dispositivo.",
+		"Al exportar se guardan en vault-setup.json tus ajustes de Obsidian, tu tema de la comunidad, tus fragmentos CSS, tus atajos de teclado personalizados, los complementos principales con sus ajustes y tus marcadores. Al importar se aplican en el otro dispositivo.",
 	"settings.logLevelName": "Nivel de registro",
 	"settings.logLevelDesc":
 		"Cuánto detalle mostrar en la consola si algo falla. Déjalo en Error salvo que estés solucionando un problema.",

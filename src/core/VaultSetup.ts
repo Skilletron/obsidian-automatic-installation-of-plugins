@@ -7,6 +7,7 @@ import {
 	isSafePluginId,
 	normalizeVersion,
 } from "../utils/parsePluginList";
+import { redactSecrets, restoreSecrets } from "../utils/secrets";
 import { COMMUNITY_THEMES_URL } from "../types";
 import { SettingsBackup } from "./SettingsBackup";
 import { t } from "../i18n";
@@ -33,7 +34,60 @@ export interface VaultSetup {
 	hotkeys?: Record<string, Hotkey[]>;
 	// Core plugins by id: true on, false off.
 	corePlugins?: Record<string, boolean>;
+	// Obsidian's own settings (app.json and appearance.json). Import sets the
+	// listed ones; the rest stay as they are.
+	appSettings?: Record<string, unknown>;
+	// Settings of core plugins by id, merged over what each one has.
+	coreSettings?: Record<string, Record<string, unknown>>;
+	// Bookmarks as in bookmarks.json. Import adds the missing ones.
+	bookmarks?: BookmarkItem[];
 }
+
+export type BookmarkItem = Record<string, unknown> & { type: string };
+
+// Handled through the theme and snippets above.
+const MANAGED_APP_SETTINGS = new Set(["cssTheme", "enabledCssSnippets"]);
+
+// Assigning these would change an object's prototype instead of a setting.
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+// Core plugins whose settings travel. Left out on purpose: sync and publish
+// (tied to an account), workspaces (layouts of one vault) and bookmarks (see
+// BookmarkItem).
+export const CORE_SETTINGS_IDS = [
+	"audio-recorder",
+	"backlink",
+	"bases",
+	"canvas",
+	"command-palette",
+	"daily-notes",
+	"editor-status",
+	"file-explorer",
+	"file-recovery",
+	"footnotes",
+	"global-search",
+	"graph",
+	"note-composer",
+	"outgoing-link",
+	"outline",
+	"page-preview",
+	"properties",
+	"random-note",
+	"slash-command",
+	"slides",
+	"switcher",
+	"tag-pane",
+	"templates",
+	"webviewer",
+	"word-count",
+	"zk-prefixer",
+];
+
+// The graph saves its zoom and whether its panel is open here too. Exporting
+// them would make every import look like a change.
+const VOLATILE_CORE_SETTINGS: Record<string, string[]> = {
+	graph: ["scale", "close"],
+};
 
 const MODIFIERS = new Set(["Mod", "Ctrl", "Meta", "Shift", "Alt"]);
 
@@ -91,21 +145,153 @@ function parseCorePlugins(raw: unknown): Record<string, boolean> | undefined {
 	return plugins;
 }
 
+function cleanAppSettings(raw: unknown): Record<string, unknown> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		return undefined;
+	}
+	return Object.fromEntries(
+		Object.entries(raw).filter(
+			([key]) => !MANAGED_APP_SETTINGS.has(key) && !UNSAFE_KEYS.has(key),
+		),
+	);
+}
+
+function parseCoreSettings(
+	raw: unknown,
+): Record<string, Record<string, unknown>> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		return undefined;
+	}
+	const settings: Record<string, Record<string, unknown>> = {};
+	for (const [id, value] of Object.entries(raw)) {
+		if (
+			!CORE_SETTINGS_IDS.includes(id) ||
+			!value ||
+			typeof value !== "object" ||
+			Array.isArray(value)
+		) {
+			logger.warn(`Ignoring settings for core plugin "${id}".`);
+			continue;
+		}
+		settings[id] = Object.fromEntries(
+			Object.entries(value as Record<string, unknown>).filter(
+				([key]) => !UNSAFE_KEYS.has(key),
+			),
+		);
+	}
+	return settings;
+}
+
+function isBookmark(item: unknown): item is BookmarkItem {
+	return (
+		!!item &&
+		typeof item === "object" &&
+		typeof (item as { type?: unknown }).type === "string"
+	);
+}
+
+function parseBookmarks(raw: unknown): BookmarkItem[] | undefined {
+	return Array.isArray(raw) ? raw.filter(isBookmark) : undefined;
+}
+
+// What makes two bookmarks the same one. Their dates don't count.
+function bookmarkKey(item: BookmarkItem): string {
+	return JSON.stringify(
+		item.type === "group"
+			? [item.type, item.title]
+			: [item.type, item.path, item.subpath, item.query, item.url],
+	);
+}
+
+// Adds the bookmarks that are missing, also inside groups of the same title.
+// Nothing is removed.
+export function mergeBookmarks(
+	current: BookmarkItem[],
+	wanted: BookmarkItem[],
+): { items: BookmarkItem[]; added: number } {
+	const items = [...current];
+	let added = 0;
+	for (const item of wanted) {
+		const index = items.findIndex((c) => bookmarkKey(c) === bookmarkKey(item));
+		if (index === -1) {
+			items.push(item);
+			added += item.type === "group" ? Math.max(countBookmarks(item), 1) : 1;
+		} else if (item.type === "group") {
+			const merged = mergeBookmarks(
+				parseBookmarks(items[index].items) ?? [],
+				parseBookmarks(item.items) ?? [],
+			);
+			items[index] = { ...items[index], items: merged.items };
+			added += merged.added;
+		}
+	}
+	return { items, added };
+}
+
+function countBookmarks(group: BookmarkItem): number {
+	return (parseBookmarks(group.items) ?? []).reduce(
+		(sum, item) => sum + (item.type === "group" ? countBookmarks(item) : 1),
+		0,
+	);
+}
+
+// Replaces secret-looking values in the settings, like Export does for
+// community plugins.
+export function redactVaultSetup(
+	setup: VaultSetup,
+	extraKeys: string[] = [],
+): { setup: VaultSetup; redacted: number } {
+	const result: VaultSetup = { ...setup };
+	let redacted = 0;
+	if (setup.appSettings) {
+		const clean = redactSecrets(setup.appSettings, extraKeys);
+		result.appSettings = clean.value as Record<string, unknown>;
+		redacted += clean.redacted;
+	}
+	if (setup.coreSettings) {
+		const clean = redactSecrets(setup.coreSettings, extraKeys);
+		result.coreSettings = clean.value as Record<string, Record<string, unknown>>;
+		redacted += clean.redacted;
+	}
+	return { setup: result, redacted };
+}
+
+// app.vault's settings, also not public API.
+interface VaultConfig {
+	config?: Record<string, unknown>;
+	setConfig?: (key: string, value: unknown) => void;
+	saveConfig?: () => Promise<void>;
+}
+
+// Applies appearance settings to the open window.
+interface AppearanceUpdates {
+	updateAccentColor?: () => void;
+	updateTheme?: () => void;
+	updateFontFamily?: () => void;
+	updateFontSize?: () => void;
+	updateViewHeaderDisplay?: () => void;
+}
+
 // app.hotkeyManager and app.internalPlugins, also not public API.
 interface HotkeyManager {
 	setHotkeys?: (commandId: string, keys: Hotkey[]) => void;
 	save?: () => Promise<void>;
 }
 
+interface CorePlugin {
+	enabled?: boolean;
+	enable?: (byUser?: boolean) => unknown;
+	disable?: (byUser?: boolean) => unknown;
+	instance?: {
+		options?: Record<string, unknown>;
+		items?: unknown[];
+		onExternalSettingsChange?: () => unknown;
+		onItemsChanged?: (save: boolean) => void;
+	};
+}
+
 interface InternalPlugins {
-	plugins?: Record<
-		string,
-		{
-			enabled?: boolean;
-			enable?: (byUser?: boolean) => unknown;
-			disable?: (byUser?: boolean) => unknown;
-		}
-	>;
+	plugins?: Record<string, CorePlugin>;
 	saveConfig?: () => Promise<void>;
 }
 
@@ -184,6 +370,18 @@ export function parseVaultSetup(raw: unknown): VaultSetup | null {
 	if (corePlugins) {
 		setup.corePlugins = corePlugins;
 	}
+	const appSettings = cleanAppSettings(obj.appSettings);
+	if (appSettings) {
+		setup.appSettings = appSettings;
+	}
+	const coreSettings = parseCoreSettings(obj.coreSettings);
+	if (coreSettings) {
+		setup.coreSettings = coreSettings;
+	}
+	const bookmarks = parseBookmarks(obj.bookmarks);
+	if (bookmarks) {
+		setup.bookmarks = bookmarks;
+	}
 	return setup;
 }
 
@@ -193,6 +391,7 @@ export interface LiveVaultState {
 	theme: string;
 	enabledSnippets: string[];
 	corePlugins?: Record<string, boolean>;
+	appSettings?: Record<string, unknown>;
 }
 
 export function liveVaultState(app: App): LiveVaultState | null {
@@ -210,6 +409,10 @@ export function liveVaultState(app: App): LiveVaultState | null {
 		state.corePlugins = Object.fromEntries(
 			Object.entries(internal).map(([id, p]) => [id, p.enabled === true]),
 		);
+	}
+	const config = (app.vault as unknown as VaultConfig).config;
+	if (config) {
+		state.appSettings = config;
 	}
 	return state;
 }
@@ -275,6 +478,41 @@ export async function readVaultSetup(
 			await readJsonValue(fileManager, fileManager.configPath("core-plugins.json")),
 		) ??
 		{};
+
+	const appSettings = cleanAppSettings(
+		live?.appSettings ?? {
+			...config,
+			...(await readJsonObject(fileManager, fileManager.configPath("app.json"))),
+		},
+	);
+	if (appSettings && Object.keys(appSettings).length > 0) {
+		setup.appSettings = appSettings;
+	}
+
+	const coreSettings: Record<string, Record<string, unknown>> = {};
+	for (const id of CORE_SETTINGS_IDS) {
+		const settings = await readJsonObject(
+			fileManager,
+			fileManager.configPath(`${id}.json`),
+		);
+		for (const key of VOLATILE_CORE_SETTINGS[id] ?? []) {
+			delete settings[key];
+		}
+		if (Object.keys(settings).length > 0) {
+			coreSettings[id] = settings;
+		}
+	}
+	if (Object.keys(coreSettings).length > 0) {
+		setup.coreSettings = coreSettings;
+	}
+
+	const bookmarks = parseBookmarks(
+		(await readJsonObject(fileManager, fileManager.configPath("bookmarks.json")))
+			.items,
+	);
+	if (bookmarks && bookmarks.length > 0) {
+		setup.bookmarks = bookmarks;
+	}
 	return setup;
 }
 
@@ -368,7 +606,74 @@ export function describeVaultSetupChanges(
 			parts.push(t("vaultSetup.describeCoreSame"));
 		}
 	}
+	if (wanted.appSettings) {
+		const total = Object.keys(wanted.appSettings).length;
+		if (total > 0) {
+			parts.push(
+				t("vaultSetup.describeApp", {
+					total,
+					changed: changedAppSettings(wanted.appSettings, current.appSettings ?? {})
+						.length,
+				}),
+			);
+		}
+	}
+	if (wanted.coreSettings) {
+		const ids = Object.keys(wanted.coreSettings);
+		if (ids.length > 0) {
+			parts.push(
+				t("vaultSetup.describeCoreSettings", {
+					total: ids.length,
+					changed: ids.filter(
+						(id) =>
+							mergedCoreSettings(
+								wanted.coreSettings?.[id] ?? {},
+								current.coreSettings?.[id] ?? {},
+							).changed,
+					).length,
+				}),
+			);
+		}
+	}
+	if (wanted.bookmarks && wanted.bookmarks.length > 0) {
+		parts.push(
+			t("vaultSetup.describeBookmarks", {
+				total: wanted.bookmarks.length,
+				added: mergeBookmarks(current.bookmarks ?? [], wanted.bookmarks).added,
+			}),
+		);
+	}
 	return parts.join(" · ");
+}
+
+// The settings to set, without ones that already match. A secret left out on
+// export keeps the value it has here, or is skipped if there is none.
+function changedAppSettings(
+	wanted: Record<string, unknown>,
+	current: Record<string, unknown>,
+): [string, unknown][] {
+	const changed: [string, unknown][] = [];
+	for (const [key, value] of Object.entries(wanted)) {
+		const restored = restoreSecrets(value, current[key]);
+		if (
+			restored !== undefined &&
+			JSON.stringify(restored) !== JSON.stringify(current[key])
+		) {
+			changed.push([key, restored]);
+		}
+	}
+	return changed;
+}
+
+function mergedCoreSettings(
+	wanted: Record<string, unknown>,
+	current: Record<string, unknown>,
+): { merged: Record<string, unknown>; changed: boolean } {
+	const merged = {
+		...current,
+		...(restoreSecrets(wanted, current) as Record<string, unknown>),
+	};
+	return { merged, changed: JSON.stringify(merged) !== JSON.stringify(current) };
 }
 
 function changedHotkeys(
@@ -411,6 +716,9 @@ export interface VaultSetupResult {
 	hotkeysChanged: number;
 	corePluginsOn: number;
 	corePluginsOff: number;
+	appSettingsChanged: number;
+	coreSettingsChanged: number;
+	bookmarksAdded: number;
 	problems: string[];
 }
 
@@ -435,6 +743,9 @@ export class VaultSetupApplier {
 			hotkeysChanged: 0,
 			corePluginsOn: 0,
 			corePluginsOff: 0,
+			appSettingsChanged: 0,
+			coreSettingsChanged: 0,
+			bookmarksAdded: 0,
 			problems: [],
 		};
 		await this.applySnippets(setup.snippets, result);
@@ -444,10 +755,224 @@ export class VaultSetupApplier {
 		if (setup.hotkeys) {
 			await this.applyHotkeys(setup.hotkeys, result);
 		}
+		if (setup.appSettings) {
+			await this.applyAppSettings(setup.appSettings, result);
+		}
+		// Before turning core plugins on, so they start with these settings.
+		if (setup.coreSettings) {
+			await this.applyCoreSettings(setup.coreSettings, result);
+		}
+		if (setup.bookmarks) {
+			await this.applyBookmarks(setup.bookmarks, result);
+		}
 		if (setup.corePlugins) {
 			await this.applyCorePlugins(setup.corePlugins, result);
 		}
 		return result;
+	}
+
+	private get vaultConfig(): VaultConfig {
+		return this.app.vault as unknown as VaultConfig;
+	}
+
+	private get corePlugins(): Record<string, CorePlugin> | undefined {
+		return (this.app as App & { internalPlugins?: InternalPlugins }).internalPlugins
+			?.plugins;
+	}
+
+	// Obsidian keeps these in memory and writes them back later, so a change
+	// made to the files alone would be lost.
+	private async applyAppSettings(
+		wanted: Record<string, unknown>,
+		result: VaultSetupResult,
+	): Promise<void> {
+		const vault = this.vaultConfig;
+		if (!vault.config || !vault.setConfig) {
+			if (Object.keys(wanted).length > 0) {
+				result.problems.push(t("vaultSetup.noConfigManager"));
+			}
+			return;
+		}
+		const changed = changedAppSettings(wanted, vault.config);
+		if (changed.length === 0) {
+			return;
+		}
+		// Save first, so the backup holds the settings as they are now.
+		await vault.saveConfig?.();
+		await this.backup?.capture(this.fileManager.configPath("app.json"));
+		await this.backup?.capture(this.fileManager.configPath("appearance.json"));
+		for (const [key, value] of changed) {
+			vault.setConfig(key, value);
+		}
+		await vault.saveConfig?.();
+		this.refreshAppearance();
+		result.appSettingsChanged = changed.length;
+	}
+
+	private refreshAppearance(): void {
+		const app = this.app as App & AppearanceUpdates;
+		try {
+			app.updateAccentColor?.();
+			app.updateTheme?.();
+			app.updateFontFamily?.();
+			app.updateFontSize?.();
+			app.updateViewHeaderDisplay?.();
+		} catch (err: unknown) {
+			logger.warn("Could not refresh the appearance:", err);
+		}
+	}
+
+	private async applyCoreSettings(
+		wanted: Record<string, Record<string, unknown>>,
+		result: VaultSetupResult,
+	): Promise<void> {
+		const plugins = this.corePlugins;
+		if (!plugins) {
+			if (Object.keys(wanted).length > 0) {
+				result.problems.push(t("vaultSetup.noCoreManager"));
+			}
+			return;
+		}
+		for (const [id, settings] of Object.entries(wanted)) {
+			// This Obsidian version or device doesn't have it.
+			if (!plugins[id]) {
+				continue;
+			}
+			const path = this.fileManager.configPath(`${id}.json`);
+			const { merged, changed } = mergedCoreSettings(
+				settings,
+				await readJsonObject(this.fileManager, path),
+			);
+			if (!changed) {
+				continue;
+			}
+			await this.backup?.capture(path);
+			if (await this.fileManager.writeFile(path, JSON.stringify(merged, null, 2))) {
+				await this.reloadCorePlugin(plugins[id], merged);
+				result.coreSettingsChanged++;
+			} else {
+				result.problems.push(t("vaultSetup.coreSettingsFailed", { id }));
+			}
+		}
+	}
+
+	private async applyBookmarks(
+		wanted: BookmarkItem[],
+		result: VaultSetupResult,
+	): Promise<void> {
+		const plugin = this.corePlugins?.bookmarks;
+		if (!plugin) {
+			return;
+		}
+		const path = this.fileManager.configPath("bookmarks.json");
+		const current = await readJsonObject(this.fileManager, path);
+		const { items, added } = mergeBookmarks(
+			parseBookmarks(current.items) ?? [],
+			wanted,
+		);
+		if (added === 0) {
+			return;
+		}
+		await this.backup?.capture(path);
+		if (
+			await this.fileManager.writeFile(
+				path,
+				JSON.stringify({ ...current, items }, null, 2),
+			)
+		) {
+			await this.reloadCorePlugin(plugin);
+			result.bookmarksAdded = added;
+		} else {
+			result.problems.push(t("vaultSetup.bookmarksFailed"));
+		}
+	}
+
+	// A running core plugin holds its settings in memory. This is what
+	// Obsidian itself calls when the plugin's file changes from outside.
+	private async reloadCorePlugin(
+		plugin: CorePlugin,
+		settings?: Record<string, unknown>,
+	): Promise<void> {
+		const { instance } = plugin;
+		if (!plugin.enabled || !instance) {
+			return;
+		}
+		try {
+			if (instance.onExternalSettingsChange) {
+				await instance.onExternalSettingsChange();
+			} else if (settings && instance.options) {
+				Object.assign(instance.options, settings);
+			}
+		} catch (err: unknown) {
+			logger.warn("Could not reload a core plugin's settings:", err);
+		}
+	}
+
+	// After Undo put these files back: makes the open Obsidian use them.
+	async reloadRestored(paths: string[]): Promise<void> {
+		const configPath = (file: string) => this.fileManager.configPath(file);
+		if (
+			paths.includes(configPath("app.json")) ||
+			paths.includes(configPath("appearance.json"))
+		) {
+			await this.reloadAppSettings();
+		}
+		const plugins = this.corePlugins;
+		for (const id of [...CORE_SETTINGS_IDS, "bookmarks"]) {
+			const plugin = plugins?.[id];
+			if (plugin && paths.includes(configPath(`${id}.json`))) {
+				// Older Obsidian can't reread the file, so its values get copied in.
+				// A key the file doesn't have stays until Obsidian is reopened: the
+				// plugin's defaults live only in memory and must not be wiped.
+				await this.reloadCorePlugin(
+					plugin,
+					await readJsonObject(this.fileManager, configPath(`${id}.json`)),
+				);
+				// With no file left, the bookmarks plugin keeps what it has.
+				if (
+					id === "bookmarks" &&
+					plugin.enabled &&
+					plugin.instance &&
+					!(await this.fileManager.exists(configPath("bookmarks.json")))
+				) {
+					plugin.instance.items = [];
+					plugin.instance.onItemsChanged?.(false);
+				}
+			}
+		}
+	}
+
+	// The theme and snippets stay as they are in memory: Undo doesn't switch
+	// them back.
+	private async reloadAppSettings(): Promise<void> {
+		const vault = this.vaultConfig;
+		if (!vault.config || !vault.setConfig) {
+			return;
+		}
+		const saved =
+			cleanAppSettings({
+				...(await readJsonObject(
+					this.fileManager,
+					this.fileManager.configPath("appearance.json"),
+				)),
+				...(await readJsonObject(
+					this.fileManager,
+					this.fileManager.configPath("app.json"),
+				)),
+			}) ?? {};
+		const live = cleanAppSettings(vault.config) ?? {};
+		for (const [key, value] of Object.entries(saved)) {
+			if (JSON.stringify(value) !== JSON.stringify(live[key])) {
+				vault.setConfig(key, value);
+			}
+		}
+		for (const key of Object.keys(live)) {
+			if (!(key in saved)) {
+				vault.setConfig(key, undefined);
+			}
+		}
+		await vault.saveConfig?.();
+		this.refreshAppearance();
 	}
 
 	// Sets hotkeys for the listed commands; other commands keep theirs.

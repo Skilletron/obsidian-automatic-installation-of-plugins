@@ -62,7 +62,8 @@ export const en = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} is not valid, so it was skipped.",
-	"vaultSetup.applying": "Applying theme, snippets, hotkeys and core plugins",
+	"vaultSetup.applying":
+		"Applying Obsidian settings, theme, snippets, hotkeys and core plugins",
 	"vaultSetup.snippetsWritten": {
 		one: "Added or updated {count} CSS snippet.",
 		other: "Added or updated {count} CSS snippets.",
@@ -88,6 +89,20 @@ export const en = {
 	"vaultSetup.describeHotkeys": "Hotkeys: {total} commands ({changed} would change)",
 	"vaultSetup.describeCore": "Core plugins: would turn on {on}, turn off {off}",
 	"vaultSetup.describeCoreSame": "Core plugins: already as listed",
+	"vaultSetup.appSettingsSet":
+		"Obsidian settings changed: {count}. Some take effect after you reopen Obsidian.",
+	"vaultSetup.coreSettingsSet": "Core plugin settings changed: {count}.",
+	"vaultSetup.bookmarksAdded": "Bookmarks added: {count}.",
+	"vaultSetup.noConfigManager": "Obsidian's settings manager is not available.",
+	"vaultSetup.coreSettingsFailed":
+		"Could not write the settings of core plugin \"{id}\".",
+	"vaultSetup.bookmarksFailed": "Could not write the bookmarks.",
+	"vaultSetup.describeApp":
+		"Obsidian settings: {total} listed ({changed} would change)",
+	"vaultSetup.describeCoreSettings":
+		"Core plugin settings: {total} plugins ({changed} would change)",
+	"vaultSetup.describeBookmarks":
+		"Bookmarks: {total} listed ({added} would be added)",
 
 	// Export
 	"export.finished": "Export finished",
@@ -110,7 +125,7 @@ export const en = {
 		other: "{count} custom hotkeys",
 	},
 	"export.vaultSetup":
-		" Also saved {theme}, {snippets}, {hotkeys} and your core plugins to {file}.",
+		" Also saved {theme}, {snippets}, {hotkeys}, your core plugins, Obsidian settings and bookmarks to {file}.",
 	"export.writeFailed": "could not write the setup JSON files",
 
 	// Setup packs
@@ -363,9 +378,10 @@ export const en = {
 	"settings.extraSecretsDesc":
 		"Comma-separated setting names to leave out as well, for example: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "License code, endpoint",
-	"settings.syncVaultSetupName": "Sync theme, snippets, hotkeys and core plugins",
+	"settings.syncVaultSetupName":
+		"Sync Obsidian settings, theme, snippets, hotkeys and core plugins",
 	"settings.syncVaultSetupDesc":
-		"Export saves your community theme, CSS snippets, custom hotkeys and which core plugins are on to vault-setup.json. Import applies them on the other device.",
+		"Export saves your Obsidian settings, community theme, CSS snippets, custom hotkeys, core plugins with their settings, and bookmarks to vault-setup.json. Import applies them on the other device.",
 	"settings.logLevelName": "Logging level",
 	"settings.logLevelDesc":
 		"How much detail to show in the console if something goes wrong. Leave on error unless you are troubleshooting.",

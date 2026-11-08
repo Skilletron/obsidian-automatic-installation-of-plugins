@@ -70,7 +70,8 @@ export const uk: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "Файл {file} некоректний, тому його пропущено.",
-	"vaultSetup.applying": "Застосування теми, фрагментів CSS, гарячих клавіш і основних плагінів",
+	"vaultSetup.applying":
+		"Застосування налаштувань Obsidian, теми, фрагментів CSS, гарячих клавіш і основних плагінів",
 	"vaultSetup.snippetsWritten": {
 		one: "Додано або оновлено {count} фрагмент CSS.",
 		few: "Додано або оновлено {count} фрагменти CSS.",
@@ -100,6 +101,20 @@ export const uk: LocaleMessages = {
 	"vaultSetup.describeHotkeys": "Гарячі клавіші: команд {total} (зміниться: {changed})",
 	"vaultSetup.describeCore": "Основні плагіни: буде увімкнено {on}, вимкнено {off}",
 	"vaultSetup.describeCoreSame": "Основні плагіни: уже як у списку",
+	"vaultSetup.appSettingsSet":
+		"Змінено налаштувань Obsidian: {count}. Деякі запрацюють після перезапуску Obsidian.",
+	"vaultSetup.coreSettingsSet": "Змінено налаштувань основних плагінів: {count}.",
+	"vaultSetup.bookmarksAdded": "Додано закладок: {count}.",
+	"vaultSetup.noConfigManager": "Менеджер налаштувань Obsidian недоступний.",
+	"vaultSetup.coreSettingsFailed":
+		"Не вдалося записати налаштування основного плагіна «{id}».",
+	"vaultSetup.bookmarksFailed": "Не вдалося записати закладки.",
+	"vaultSetup.describeApp":
+		"Налаштування Obsidian: у списку {total} (зміниться {changed})",
+	"vaultSetup.describeCoreSettings":
+		"Налаштування основних плагінів: плагінів {total} (зміниться {changed})",
+	"vaultSetup.describeBookmarks":
+		"Закладки: у списку {total} (додасться {added})",
 
 	// Export
 	"export.finished": "Експорт завершено",
@@ -135,7 +150,7 @@ export const uk: LocaleMessages = {
 		other: "{count} власної гарячої клавіші",
 	},
 	"export.vaultSetup":
-		" У {file} також збережено: {theme}, {snippets}, {hotkeys} і ваші основні плагіни.",
+		" У {file} також збережено: {theme}, {snippets}, {hotkeys}, ваші основні плагіни, налаштування Obsidian і закладки.",
 	"export.writeFailed": "не вдалося записати JSON-файли конфігурації",
 
 	// Setup packs
@@ -422,9 +437,9 @@ export const uk: LocaleMessages = {
 		"Назви налаштувань через кому, які теж слід пропускати, наприклад: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
 	"settings.syncVaultSetupName":
-		"Синхронізувати тему, фрагменти CSS, гарячі клавіші та основні плагіни",
+		"Синхронізувати налаштування Obsidian, тему, фрагменти CSS, гарячі клавіші та основні плагіни",
 	"settings.syncVaultSetupDesc":
-		"Експорт зберігає вашу сторонню тему, фрагменти CSS, власні гарячі клавіші та перелік увімкнених основних плагінів у vault-setup.json. Імпорт застосовує їх на іншому пристрої.",
+		"Експорт зберігає налаштування Obsidian, вашу сторонню тему, фрагменти CSS, власні гарячі клавіші, основні плагіни з їхніми налаштуваннями та закладки у vault-setup.json. Імпорт застосовує їх на іншому пристрої.",
 	"settings.logLevelName": "Рівень журналювання",
 	"settings.logLevelDesc":
 		"Скільки подробиць показувати в консолі, якщо щось піде не так. Залиште «Помилки», якщо не шукаєте причину проблеми.",

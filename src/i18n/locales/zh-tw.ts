@@ -57,7 +57,8 @@ export const zhTW: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} 無效，已略過。",
-	"vaultSetup.applying": "正在套用主題、片段、快捷鍵和核心外掛",
+	"vaultSetup.applying":
+		"正在套用 Obsidian 設定、主題、片段、快捷鍵和核心外掛",
 	"vaultSetup.snippetsWritten": {
 		other: "已新增或更新 {count} 個 CSS 片段。",
 	},
@@ -81,6 +82,20 @@ export const zhTW: LocaleMessages = {
 	"vaultSetup.describeHotkeys": "快捷鍵：{total} 個命令（{changed} 個將變更）",
 	"vaultSetup.describeCore": "核心外掛：將啟用 {on}，停用 {off}",
 	"vaultSetup.describeCoreSame": "核心外掛：已與清單一致",
+	"vaultSetup.appSettingsSet":
+		"已變更的 Obsidian 設定：{count}。部分設定需重新開啟 Obsidian 後生效。",
+	"vaultSetup.coreSettingsSet": "已變更的核心外掛設定：{count}。",
+	"vaultSetup.bookmarksAdded": "已新增的書籤：{count}。",
+	"vaultSetup.noConfigManager": "Obsidian 的設定管理員無法使用。",
+	"vaultSetup.coreSettingsFailed":
+		"無法寫入核心外掛「{id}」的設定。",
+	"vaultSetup.bookmarksFailed": "無法寫入書籤。",
+	"vaultSetup.describeApp":
+		"Obsidian 設定：清單中有 {total} 項（將變更 {changed} 項）",
+	"vaultSetup.describeCoreSettings":
+		"核心外掛設定：{total} 個外掛（將變更 {changed} 個）",
+	"vaultSetup.describeBookmarks":
+		"書籤：清單中有 {total} 個（將新增 {added} 個）",
 
 	// Export
 	"export.finished": "匯出完成",
@@ -99,7 +114,7 @@ export const zhTW: LocaleMessages = {
 		other: "{count} 個自訂快捷鍵",
 	},
 	"export.vaultSetup":
-		"同時已將 {theme}、{snippets}、{hotkeys} 和核心外掛狀態儲存至 {file}。",
+		"同時已將 {theme}、{snippets}、{hotkeys}、核心外掛狀態、Obsidian 設定和書籤儲存至 {file}。",
 	"export.writeFailed": "無法寫入配置 JSON 檔案",
 
 	// Setup packs
@@ -342,9 +357,10 @@ export const zhTW: LocaleMessages = {
 	"settings.extraSecretsDesc":
 		"同樣要略去的設定名稱，以逗號分隔，例如：licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
-	"settings.syncVaultSetupName": "同步主題、片段、快捷鍵和核心外掛",
+	"settings.syncVaultSetupName":
+		"同步 Obsidian 設定、主題、片段、快捷鍵和核心外掛",
 	"settings.syncVaultSetupDesc":
-		"匯出時將你的社群主題、CSS 片段、自訂快捷鍵以及已啟用的核心外掛儲存至 vault-setup.json。匯入時在另一台裝置上套用。",
+		"匯出時將你的 Obsidian 設定、社群主題、CSS 片段、自訂快捷鍵、核心外掛及其設定和書籤儲存至 vault-setup.json。匯入時在另一台裝置上套用。",
 	"settings.logLevelName": "記錄層級",
 	"settings.logLevelDesc":
 		"發生問題時在主控台中顯示的詳細程度。除非正在排解問題，否則請維持「錯誤」。",

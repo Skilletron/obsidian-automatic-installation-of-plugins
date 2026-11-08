@@ -114,6 +114,9 @@ describe("Setup packs", () => {
 	});
 
 	it("leaves out plugins that are turned off in the picker", async () => {
+		await writeConfigJson("bookmarks.json", {
+			items: [{ type: "file", ctime: 1, path: "private/diary.md" }],
+		});
 		await writeConfigJson("hotkeys.json", {
 			[`${HIDER}:toggle-tab-containers`]: [{ modifiers: ["Mod"], key: "J" }],
 			"editor:toggle-bold": [{ modifiers: ["Mod"], key: "B" }],
@@ -150,6 +153,7 @@ describe("Setup packs", () => {
 		expect(Object.keys(pack.vaultSetup?.hotkeys ?? {})).toEqual([
 			"editor:toggle-bold",
 		]);
+		expect(pack.vaultSetup).not.toHaveProperty("bookmarks");
 	});
 
 	it("does not save a pack when the picker is cancelled", async () => {

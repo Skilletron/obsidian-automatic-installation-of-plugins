@@ -94,6 +94,110 @@ describe("Theme and CSS snippets", () => {
 	});
 });
 
+describe("Obsidian's own settings", () => {
+	async function state() {
+		return browser.executeObsidian(async ({ app }) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const a = app as any;
+			const plugins = a.internalPlugins.plugins;
+			return {
+				readableLength: a.vault.getConfig("readableLineLength"),
+				newLinkFormat: a.vault.getConfig("newLinkFormat"),
+				dark: document.body.classList.contains("theme-dark"),
+				dailyFolder: plugins["daily-notes"].instance.options?.folder,
+				hasBookmarks: !!plugins.bookmarks,
+				bookmarks: plugins.bookmarks?.instance.items ?? [],
+			};
+		});
+	}
+
+	// Which theme a new vault starts with depends on the Obsidian version, so
+	// switch to the other one to see the change both ways.
+	let startedDark = false;
+	let otherTheme = "";
+
+	before(async () => {
+		await openEmptyVault();
+		startedDark = (await state()).dark;
+		otherTheme = startedDark ? "moonstone" : "obsidian";
+		await writeConfigJson("community-plugins-list.json", []);
+		await writeConfigJson("daily-notes.json", { folder: "Before" });
+		await writeConfigJson(VAULT_SETUP, {
+			appSettings: {
+				readableLineLength: false,
+				newLinkFormat: "absolute",
+				theme: otherTheme,
+			},
+			coreSettings: {
+				"daily-notes": { folder: "Daily" },
+				graph: { showTags: true },
+			},
+			corePlugins: { "daily-notes": true, bookmarks: true },
+			bookmarks: [{ type: "search", ctime: 1, query: "e2e-marker" }],
+		});
+		await runPluginMethod("runImportPipeline");
+	});
+
+	it("applies them to the running Obsidian and to the files", async () => {
+		const s = await state();
+		expect(s.readableLength).toBe(false);
+		expect(s.newLinkFormat).toBe("absolute");
+		expect(s.dark).toBe(!startedDark);
+		expect(s.dailyFolder).toBe("Daily");
+		expect(await readConfigJson("app.json")).toMatchObject({
+			readableLineLength: false,
+			newLinkFormat: "absolute",
+		});
+		expect(await readConfigJson("appearance.json")).toMatchObject({
+			theme: otherTheme,
+		});
+		expect(await readConfigJson("daily-notes.json")).toMatchObject({
+			folder: "Daily",
+		});
+		expect(await readConfigJson("graph.json")).toMatchObject({ showTags: true });
+		if (s.hasBookmarks) {
+			expect(s.bookmarks).toEqual([
+				expect.objectContaining({ query: "e2e-marker" }),
+			]);
+		}
+	});
+
+	it("exports them back, without the theme or snippets in them", async () => {
+		await runPluginMethod("exportPluginSetup");
+		const setup = await readConfigJson<{
+			appSettings: Record<string, unknown>;
+			coreSettings: Record<string, unknown>;
+		}>(VAULT_SETUP);
+		expect(setup.appSettings).toMatchObject({
+			readableLineLength: false,
+			newLinkFormat: "absolute",
+			theme: otherTheme,
+		});
+		expect(setup.appSettings.cssTheme).toBeUndefined();
+		expect(setup.appSettings.enabledCssSnippets).toBeUndefined();
+		expect(setup.coreSettings["daily-notes"]).toMatchObject({ folder: "Daily" });
+	});
+
+	it("takes them back on undo", async () => {
+		await runPluginMethod("undoLastChange"); // the export
+		await runPluginMethod("undoLastChange"); // the import
+		const s = await state();
+		expect(s.readableLength).not.toBe(false);
+		expect(s.newLinkFormat).not.toBe("absolute");
+		expect(s.dark).toBe(startedDark);
+		expect(s.dailyFolder).toBe("Before");
+		expect(s.bookmarks).toEqual([]);
+		// And they stay that way once Obsidian saves its settings again.
+		await browser.executeObsidian(({ app }) =>
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(app as any).vault.saveConfig(),
+		);
+		expect(
+			(await readConfigJson<Record<string, unknown>>("app.json")).newLinkFormat,
+		).not.toBe("absolute");
+	});
+});
+
 describe("Hotkeys and core plugins", () => {
 	const bold = { modifiers: ["Mod", "Shift"], key: "B" };
 

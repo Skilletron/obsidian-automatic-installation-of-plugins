@@ -57,7 +57,8 @@ export const ko: LocaleMessages = {
 
 	// Vault setup (theme, snippets, hotkeys, core plugins)
 	"vaultSetup.invalid": "{file} 파일이 올바르지 않아 건너뛰었습니다.",
-	"vaultSetup.applying": "테마, 스니펫, 단축키, 코어 플러그인 적용 중",
+	"vaultSetup.applying":
+		"Obsidian 설정, 테마, 스니펫, 단축키, 코어 플러그인 적용 중",
 	"vaultSetup.snippetsWritten": {
 		other: "CSS 스니펫 {count}개를 추가하거나 업데이트했습니다.",
 	},
@@ -81,6 +82,20 @@ export const ko: LocaleMessages = {
 	"vaultSetup.describeHotkeys": "단축키: 명령 {total}개 ({changed}개 변경 예정)",
 	"vaultSetup.describeCore": "코어 플러그인: {on} 켬 예정, {off} 끔 예정",
 	"vaultSetup.describeCoreSame": "코어 플러그인: 이미 목록과 같음",
+	"vaultSetup.appSettingsSet":
+		"변경된 Obsidian 설정: {count}. 일부는 Obsidian을 다시 열어야 적용됩니다.",
+	"vaultSetup.coreSettingsSet": "변경된 코어 플러그인 설정: {count}.",
+	"vaultSetup.bookmarksAdded": "추가된 북마크: {count}.",
+	"vaultSetup.noConfigManager": "Obsidian 설정 관리자를 사용할 수 없습니다.",
+	"vaultSetup.coreSettingsFailed":
+		"코어 플러그인 \"{id}\"의 설정을 쓸 수 없습니다.",
+	"vaultSetup.bookmarksFailed": "북마크를 쓸 수 없습니다.",
+	"vaultSetup.describeApp":
+		"Obsidian 설정: 목록에 {total}개 ({changed}개 변경 예정)",
+	"vaultSetup.describeCoreSettings":
+		"코어 플러그인 설정: 플러그인 {total}개 ({changed}개 변경 예정)",
+	"vaultSetup.describeBookmarks":
+		"북마크: 목록에 {total}개 ({added}개 추가 예정)",
 
 	// Export
 	"export.finished": "내보내기 완료",
@@ -99,7 +114,7 @@ export const ko: LocaleMessages = {
 		other: "사용자 지정 단축키 {count}개",
 	},
 	"export.vaultSetup":
-		" {theme}, {snippets}, {hotkeys} 및 코어 플러그인도 {file}에 저장했습니다.",
+		" {theme}, {snippets}, {hotkeys}, 코어 플러그인, Obsidian 설정 및 북마크도 {file}에 저장했습니다.",
 	"export.writeFailed": "구성 JSON 파일을 쓸 수 없습니다",
 
 	// Setup packs
@@ -342,9 +357,10 @@ export const ko: LocaleMessages = {
 	"settings.extraSecretsDesc":
 		"함께 제외할 설정 이름을 쉼표로 구분하여 입력합니다. 예: licenseCode, endpoint",
 	"settings.extraSecretsPlaceholder": "licenseCode, endpoint",
-	"settings.syncVaultSetupName": "테마, 스니펫, 단축키, 코어 플러그인 동기화",
+	"settings.syncVaultSetupName":
+		"Obsidian 설정, 테마, 스니펫, 단축키, 코어 플러그인 동기화",
 	"settings.syncVaultSetupDesc":
-		"내보내기 시 커뮤니티 테마, CSS 스니펫, 사용자 지정 단축키, 켜져 있는 코어 플러그인을 vault-setup.json에 저장합니다. 가져오기 시 다른 기기에 적용합니다.",
+		"내보내기 시 Obsidian 설정, 커뮤니티 테마, CSS 스니펫, 사용자 지정 단축키, 코어 플러그인과 그 설정, 북마크를 vault-setup.json에 저장합니다. 가져오기 시 다른 기기에 적용합니다.",
 	"settings.logLevelName": "로그 수준",
 	"settings.logLevelDesc":
 		"문제가 생겼을 때 콘솔에 표시할 세부 정보의 양입니다. 문제를 해결하는 중이 아니라면 ‘오류’로 두세요.",
