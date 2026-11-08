@@ -8,6 +8,7 @@ import {
 	normalizePath,
 } from "obsidian";
 import { FileManager } from "./src/utils/FileManager";
+import { settingsFromSaved, usedBefore } from "./src/utils/savedSettings";
 import { NetworkManager } from "./src/utils/NetworkManager";
 import { SettingsManager } from "./src/core/SettingsManager";
 import { PluginInstaller } from "./src/core/PluginInstaller";
@@ -47,7 +48,6 @@ import {
 import { parseSecretKeys } from "./src/utils/secrets";
 import {
 	InstallCommunityPluginsSettings,
-	DEFAULT_SETTINGS,
 	PLUGINS_LIST_FILE,
 	VAULT_SETUP_FILE,
 } from "./src/types";
@@ -730,19 +730,15 @@ export default class InstallCommunityPlugins extends Plugin {
 			| Partial<InstallCommunityPluginsSettings>
 			| null
 			| undefined;
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
-
-		if (data && data.mergePluginSettings === undefined) {
-			this.settings.mergePluginSettings = false;
-		}
-		// Existing installs keep exporting settings as before until the
-		// user turns this on; new installs leave secrets out.
-		if (data && data.redactSecretsOnExport === undefined) {
-			this.settings.redactSecretsOnExport = false;
-		}
-		// Same for themes and snippets: existing installs opt in.
-		if (data && data.syncVaultSetup === undefined) {
-			this.settings.syncVaultSetup = false;
+		const fresh = !data;
+		this.settings = settingsFromSaved(
+			data,
+			fresh && (await usedBefore(new FileManager(this.app))),
+		);
+		// Saved right away, so the vault isn't taken for a new install again
+		// once Export has written its files.
+		if (fresh) {
+			await this.saveSettings();
 		}
 
 		this.applyLogLevel(this.settings.logLevel || "error");
