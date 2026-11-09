@@ -197,9 +197,9 @@ Every part is optional. Export writes them for you when **Sync Obsidian settings
 | Merge settings instead of replace | On | Combine settings with what the plugin already has; when off, replace entirely |
 | Sync settings on every startup | Off | Re-apply the settings file every time Obsidian starts |
 | Run automatic actions on mobile | Off | Let auto-install and sync on startup run on phones and tablets too |
-| Leave out secrets on export | On (off if you used the plugin before 1.3.0) | Replace tokens, passwords and API keys with a placeholder in the exported settings |
+| Leave out secrets on export | On (off if you used the plugin before 1.2.3) | Replace tokens, passwords and API keys with a placeholder in the exported settings |
 | Extra secret setting names | — | More setting names to leave out, comma-separated |
-| Sync Obsidian settings, theme, snippets, hotkeys and core plugins | On (off if you used the plugin before 1.3.0) | Export and import them, and bookmarks, through `vault-setup.json` |
+| Sync Obsidian settings, theme, snippets, hotkeys and core plugins | On (off if you used the plugin before 1.2.3) | Export and import them, and bookmarks, through `vault-setup.json` |
 | Logging level | Error | How much detail to write to the console if something goes wrong |
 
 Auto-install and sync-on-startup stay off so a fresh vault does not download plugins until you opt in. Review the list file before enabling auto-install.
