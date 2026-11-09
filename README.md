@@ -1,10 +1,10 @@
 # Community Install Manager
 
-Install, enable, and configure Obsidian community plugins from JSON files in your vault. Useful for syncing the same plugin setup across devices or sharing a ready-made configuration.
+Install, enable, and configure Obsidian community plugins from JSON files in your vault, along with your theme, CSS snippets, hotkeys and Obsidian's own settings. Useful for syncing the same setup across devices or sharing a ready-made configuration.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Works on desktop and mobile. Tested automatically on Windows, Linux and Android; iOS is not covered by the automated tests.
+Works on desktop and mobile. Tested automatically in desktop Obsidian and in Obsidian for Android; iOS is not covered by the automated tests.
 
 ## What it does
 
@@ -27,7 +27,7 @@ Typical uses:
 
 This plugin can download and install other community plugins.
 
-- Only use it with vaults and JSON files you trust
+- Only use it with vaults, JSON files and setup packs you trust
 - Review `community-plugins-list.json` before turning on auto-install
 - Installed plugins can access your notes (and more on desktop)
 - Unpinned plugins install the latest suitable release, which may include breaking changes
@@ -36,8 +36,14 @@ This plugin can download and install other community plugins.
 ## Features
 
 - Install plugins from the Obsidian Community Plugins registry (via Obsidian’s own installer)
-- Optional version pins so setups stay reproducible
-- Export / import / preview of your plugin list and settings
+- Optional version pins so setups stay reproducible, and per-device or turned-off entries
+- Export, import and preview of your plugin list and settings, with the exact setting changes shown before anything is written
+- Theme, CSS snippets, hotkeys, core plugins, Obsidian's own settings and bookmarks through `vault-setup.json`
+- Shareable setup packs: pick the plugins to share, send a link, and the other side sees everything in it before anything changes
+- Update check for installed plugins that keeps their settings and moves their pins
+- Secrets (tokens, passwords, API keys) left out of exports
+- Undo for the last 10 imports, exports and settings changes
+- Works on phones and tablets, with automatic actions off there unless you allow them
 - Optional auto-install on startup and settings sync on startup (**off** by default)
 - Auto-enable after install and apply settings on install (**on** by default for new installs)
 - Merge plugin settings into existing ones (on by default for new installs)
@@ -51,10 +57,12 @@ The plugin follows Obsidian's language: English, Russian, Ukrainian, German, Fre
 | Remote service | Purpose |
 |---|---|
 | Community plugins registry on GitHub | Look up plugin IDs and repositories |
-| GitHub release assets (`releases/download/...`) | Resolve pinned/latest manifests |
-| Obsidian’s built-in installer | Download and install plugin files (same path as Community plugins) |
+| GitHub release assets (`releases/download/...`) and `raw.githubusercontent.com` | Resolve pinned/latest manifests and check for updates |
+| Obsidian’s built-in installer | Download and install plugin files and themes (same path as Community plugins) |
+| Community themes registry on GitHub | Find the theme named in `vault-setup.json` |
+| The link you give to **Import setup pack from a link** | Download that setup pack (GitHub gist and file pages are turned into their raw file) |
 
-No telemetry. Network use happens only when you import/install (or when auto-install is enabled). The installer avoids calling `api.github.com` so anonymous rate limits are less likely.
+No telemetry. Network use happens only when you import, check for updates or load a setup pack (or when auto-install is enabled). The installer avoids calling `api.github.com` so anonymous rate limits are less likely.
 
 ## Installation
 
@@ -129,7 +137,7 @@ Maps plugin IDs to settings objects applied to each plugin:
 }
 ```
 
-### Theme, snippets, hotkeys and core plugins — `vault-setup.json`
+### Theme, snippets, hotkeys, core plugins, Obsidian settings and bookmarks — `vault-setup.json`
 
 ```json
 {
@@ -161,7 +169,7 @@ Every part is optional. Export writes them for you when **Sync Obsidian settings
 ## Quick start
 
 1. On a vault that already has the plugins you want: Command Palette → **Export plugin setup to JSON**
-2. Copy the two JSON files (or the whole vault config) to another device
+2. Copy the JSON files from `.obsidian` (or the whole vault config) to another device
 3. There: **Preview plugin setup import**, review the report, then **Import plugin setup from JSON**
 4. Turn on only the automatic options you need in Settings
 
@@ -170,8 +178,8 @@ Every part is optional. Export writes them for you when **Sync Obsidian settings
 | Command | Action |
 |---|---|
 | Preview plugin setup import | Shows what would be installed, skipped or re-pinned, and exactly which settings would change for each plugin (old → new, with secrets masked) — without changing anything |
-| Export plugin setup to JSON | Writes the current community plugins and their settings into the two JSON files |
-| Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on) |
+| Export plugin setup to JSON | Writes the current community plugins and their settings into the list and settings files, and the rest of your setup into `vault-setup.json` when syncing it is on |
+| Import plugin setup from JSON | Installs from the list (and enables / applies settings if those options are on), then applies `vault-setup.json` when syncing it is on |
 | Apply settings from JSON | Applies settings from the settings file without reinstalling plugins. Running plugins are unloaded while their `data.json` is written, then loaded again (after you close Settings, if it is open) |
 | Export shareable setup pack | Lets you pick which installed plugins to share and saves them as `setup-pack.json` in your vault, with secrets always left out |
 | Import setup pack from a link | Loads a setup pack from a link or a vault path, shows what it contains, and adds it to your setup only after you confirm |
@@ -200,7 +208,7 @@ Auto-install and sync-on-startup stay off so a fresh vault does not download plu
 
 **Export shareable setup pack** first shows your installed plugins, all turned on: turn off the ones you don't want to share. It then writes `setup-pack.json` to your vault: the plugins you kept (with versions), their settings, and, when syncing it is on, your Obsidian settings, theme, snippets, hotkeys and core plugins with their settings. Bookmarks never go in, since they name your notes. Plugins you turned off leave no trace: neither their settings nor their hotkeys go in. Secrets are always left out of it, whatever the export setting says. Put it somewhere public, such as a GitHub gist, and share the link.
 
-**Import setup pack from a link** takes that link (an https link; GitHub gist and file pages work too) or the path of a pack file in your vault. It shows the pack's name, where it came from, every plugin in it and what would change in your theme and snippets. Nothing happens until you click **Add to my setup and import**. Then the pack is added to your own files (it wins where both have something) and Import runs. Undo last change puts your files back.
+**Import setup pack from a link** takes that link (an https link; GitHub gist and file pages work too) or the path of a pack file in your vault. It shows the pack's name, where it came from, every plugin in it and what would change in your theme, snippets, hotkeys, core plugins and Obsidian settings. Nothing happens until you click **Add to my setup and import**. Then the pack is added to your own files (it wins where both have something) and Import runs. Undo last change puts your files back.
 
 You can also share a link that opens the same confirmation in Obsidian:
 
