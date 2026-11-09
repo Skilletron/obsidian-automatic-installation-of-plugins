@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.3.0] - 2026-11-09
+## [1.2.3] - 2026-11-09
 
 ### Upgrading
 - Update the plugin on every device that shares the vault. If **Leave out secrets on export** is on, an older version on another device would write the placeholder from the exported settings file over your real tokens and keys
